@@ -1,7 +1,10 @@
-# Generated from design/gateway.md v1.11
+# Generated from design/gateway.md v1.20
 from fastapi import Request, HTTPException
 
 class OpenAIAdapter:
+    """
+    OpenAI 适配器。
+    Phase 4 预留，目前返回 501。
+    """
     async def chat(self, request: Request):
-        # Phase 4 仅预留入口
-        raise HTTPException(status_code=501, detail="OpenAI Adapter not yet implemented in Phase 4.")
+        raise HTTPException(status_code=501, detail="Official OpenAI API support is planned for future phases.")

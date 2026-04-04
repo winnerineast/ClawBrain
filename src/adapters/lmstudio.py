@@ -8,9 +8,13 @@ from fastapi.responses import StreamingResponse
 from src.pipeline import Pipeline
 from src.scout import ModelScout, ModelTier
 
-class OllamaAdapter:
+class LMStudioAdapter:
+    """
+    LM Studio 适配器。
+    对接本地 1234 端口，兼容 OpenAI 协议。
+    """
     def __init__(self, scout: ModelScout):
-        self.base_url = "http://127.0.0.1:11434"
+        self.base_url = "http://127.0.0.1:1234"
         self.pipeline = Pipeline()
         self.scout = scout
         self._client: Optional[httpx.AsyncClient] = None
@@ -18,7 +22,7 @@ class OllamaAdapter:
     @property
     def client(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=300.0, limits=httpx.Limits(max_connections=100))
+            self._client = httpx.AsyncClient(timeout=300.0, limits=httpx.Limits(max_connections=50))
         return self._client
 
     async def close(self):
@@ -28,62 +32,53 @@ class OllamaAdapter:
     async def chat(self, request: Request):
         try:
             body = await request.json()
-            model_name = body.get("model", "unknown")
+            model_full_name = body.get("model", "unknown")
+            # 移除前缀以便转发给后端
+            model_name = model_full_name.replace("lmstudio/", "")
+            body["model"] = model_name
+            
             context_id = request.headers.get("x-clawbrain-session", "default")
             
-            # 1. 准入审计
-            tier = await self.scout.get_model_tier(model_name)
-            
+            # 1. 准入审计 (LM Studio 暂视为 TIER_1 以确保兼容，除非明确配置)
+            tier = ModelTier.TIER_1 
+
             # 2. 上下文增强
             memory_router = request.app.state.memory_router
             last_msg = body.get("messages", [{}])[-1].get("content", "")
             intent = self.pipeline.compressor.compress(last_msg)
             enriched_context = await memory_router.get_combined_context(context_id, intent)
             
-            # 注入为首条 system 消息
+            # 注入系统消息
             if "messages" in body:
                 body["messages"].insert(0, {"role": "system", "content": enriched_context})
 
-            # 3. 拦截控制
-            if tier == ModelTier.TIER_3 and "tools" in body:
-                raise HTTPException(status_code=422, detail=f"KPI Violation: Model {model_name} too small for tools.")
-
-            # 4. 内容优化
+            # 3. 内容优化
             for msg in body["messages"][1:]:
                 if "content" in msg and msg["content"]:
                     msg["content"] = self.pipeline.compressor.compress(msg["content"])
-                
-                # TIER_2 指令增强
-                if tier == ModelTier.TIER_2:
-                    from src.models import StandardRequest, Message
-                    # 简化逻辑：直接在第一条消息追加（如果不存在）
-                    if "[SYSTEM ENFORCEMENT]" not in body["messages"][0]["content"]:
-                        body["messages"][0]["content"] += "\n\n[SYSTEM ENFORCEMENT]: Respond ONLY in valid JSON."
-
-            # 5. 转发
+            
+            # 4. 转发
+            print(f"[GATEWAY] Routing to LMStudio: {model_name}")
+            
             if body.get("stream", False):
                 async def stream_generator():
-                    async with self.client.stream("POST", f"{self.base_url}/api/chat", json=body) as resp:
+                    async with self.client.stream("POST", f"{self.base_url}/v1/chat/completions", json=body) as resp:
                         if resp.is_error:
-                            yield json.dumps({"error": "Backend KPI Failure"}).encode()
+                            yield json.dumps({"error": "LM Studio Backend Error"}).encode()
                             return
                         async for chunk in resp.aiter_bytes():
                             yield chunk
                     # 闭环存证
-                    await memory_router.ingest(body, {"message": {"content": "Ollama Streamed Response"}})
-                return StreamingResponse(stream_generator(), media_type="application/x-ndjson")
+                    await memory_router.ingest(body, {"message": {"content": "LMStudio Streamed Response"}})
+                
+                return StreamingResponse(stream_generator(), media_type="text/event-stream")
             else:
-                resp = await self.client.post(f"{self.base_url}/api/chat", json=body)
+                resp = await self.client.post(f"{self.base_url}/v1/chat/completions", json=body)
                 resp_json = resp.json()
                 # 闭环存储
                 await memory_router.ingest(body, resp_json)
                 return resp_json
 
         except Exception as e:
-            if isinstance(e, HTTPException): raise e
-            logging.error(f"Ollama Adapter error: {e}")
+            logging.error(f"LMStudio Adapter error: {e}")
             raise HTTPException(status_code=502, detail=str(e))
-
-    async def list_models(self):
-        resp = await self.client.get(f"{self.base_url}/api/tags")
-        return resp.json()
