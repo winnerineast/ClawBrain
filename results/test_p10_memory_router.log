@@ -7,10 +7,7 @@ plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collecting ... collected 1 item
 
-tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall 
-[MARATHON START] Ingesting 84 interactions...
-  - Impact Check: 0 blobs persisted to disk.
-FAILED
+tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall FAILED
 
 =================================== FAILURES ===================================
 ____________________ test_p10_marathon_pressure_and_recall _____________________
@@ -24,26 +21,11 @@ ____________________ test_p10_marathon_pressure_and_recall _____________________
         # 1. 加载强化数据集
         data = json.loads(Path("tests/data/p10_marathon.json").read_text())
         thread = data["marathon_thread"]
-        canary = data["canaries"]["initial_protocol"]
-    
-        print(f"\n[MARATHON START] Ingesting {len(thread)} interactions...")
-    
-        # 2. 模拟真实摄入流
-        for msg in thread[:-1]: # 摄入除最后一条外的所有历史
-            payload = {
-                "model": "gemma4:e4b",
-                "messages": [msg]
-            }
-            await router.ingest(payload)
-    
-        # 3. 验证 1MB 冲击后的系统状态
-        # 检查磁盘是否有 Blob 生成
-        blob_count = len(list(Path(TEST_DIR).glob("blobs/*.json")))
-        print(f"  - Impact Check: {blob_count} blobs persisted to disk.")
->       assert blob_count > 0
-E       assert 0 > 0
+>       canary = data["canaries"]["initial_protocol"]
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'initial_protocol'
 
-tests/test_p10_memory_router.py:49: AssertionError
+tests/test_p10_memory_router.py:33: KeyError
 =========================== short test summary info ============================
 FAILED tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall
-============================== 1 failed in 0.17s ===============================
+============================== 1 failed in 0.05s ===============================

@@ -1,4 +1,4 @@
-# design/memory_router.md v1.2
+# design/memory_router.md v1.4
 
 ## 1. 任务目标 (Objective)
 实现 **ClawBrain MemoryRouter (记忆路由)** 与 **CleanupManager (清理管理器)**。
@@ -26,9 +26,10 @@
 
 ## 3. 高保真审计与测试规范 (TDD)
 
-### 3.1 路由决策审计 (Routing Decision Audit)
-- **验证点**：发送一个请求，验证其是否**同时**出现在了内存（WorkingMemory）和磁盘（Hippocampus）中。
-- **日志展示**：Side-by-Side 展示 `Action: Ingest -> [L1: OK, L2: OK]`。
+### 3.1 真实大数据冲击与分流审计 (Fixed)
+- **验证点**：压力测试中注入的数据必须**确切触发** 512KB 分流阈值。
+- **数据规范**：测试数据生成器必须使用 **4MB 以上的真实、非重复技术文本（如从 kernel.org 抓取的 Linux 文档）**，以确保数据具备语义复杂性，且能稳定触发磁盘分流。
+- **日志展示**：显式打印 `Expected_Blob_Dir` 与 `Actual_Blob_File_Size`。
 
 ### 3.2 复合上下文合成审计 (Synthesis Audit)
 - **验证点**：在有“历史摘要”和“活跃对话”的情况下发起检索。
