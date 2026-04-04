@@ -64,6 +64,15 @@ graph LR
 
 ---
 
+## 🔄 万能协议翻译与适配 (Universal Dialect Translation)
+ClawBrain 内置了强大的方言翻译引擎，能够自动对齐不同提供商的 API 契约，确保 100% 兼容性：
+
+- **Google Gemini**: 自动处理 `role: assistant` 到 `role: model` 的映射，并精准注入 `system_instruction`。
+- **Anthropic Claude**: 自动执行 **角色交替正规化 (Role Normalization)**，合并连续的重复角色消息，确保请求符合 Claude 严格的 API 校验。
+- **OpenAI 兼容簇**: 为 DeepSeek, Mistral, xAI (Grok), vLLM, SGLang, OpenRouter 等提供自动模型前缀剥离与 Header 透传。
+
+---
+
 ## 🧠 深度设计哲学：三子记忆实现
 项目深受“虾叔理论”启发，并在工程上实现了三层动力学架构：
 
@@ -83,7 +92,9 @@ graph LR
 
 ## 🔄 支持的模型托管 (Supported Hosting)
 - **本地 (Local)**: Ollama (Default), LM Studio, vLLM, SGLang.
-- **云端 (Cloud)**: OpenAI, DeepSeek, Anthropic, OpenRouter.
+- **云端 (Cloud)**: OpenAI, DeepSeek, Anthropic (Claude), Google (Gemini), xAI (Grok), Mistral, OpenRouter, Together AI.
+
+---
 
 ## ⚙️ 配置挂载 (Transparent Mounting)
 仅需将 `baseUrl` 指向本地端口 **`11435`**，无需配置 Key：
@@ -111,4 +122,4 @@ pytest tests/
 ```
 
 ---
-<p align="right">由 GEMINI CLI Agent 依据项目源码 v1.25 生成</p>
+<p align="right">由 GEMINI CLI Agent 依据项目源码 v1.26 生成</p>
