@@ -6,7 +6,7 @@ English | [中文版](./README.md)
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain is an open-source LLM agent gateway. Its core value proposition is acting as an **External Brain for OpenClaw**, providing more than just protocol routing. It implements biomimetic memory algorithms to achieve high-ratio context distillation and long-term episodic recall, even in VRAM-constrained environments like the RTX 4090.
+ClawBrain is an open-source LLM agent gateway. Its core value proposition is acting as an **External Brain for OpenClaw**, providing advanced biomimetic memory algorithms to achieve high-ratio context distillation and long-term episodic recall, even in VRAM-constrained environments like the RTX 4090.
 
 ---
 
@@ -15,23 +15,67 @@ Inspired by "Uncle Xia's Theory," the project functionally implements a tri-laye
 
 ### 1. Hippocampus (Episodic Memory Layer)
 *   **Implementation**: `src/memory/storage.py` (SQLite FTS5 + Blob Storage)
-*   **Fact**: The system's "lossless black box." It records 100% of raw bytes to disk. For massive documents exceeding 512KB, it automatically triggers stream offloading to protect system memory. Supports sub-millisecond full-text search.
+*   **Feature**: The system's "lossless black box." It records 100% of raw bytes to disk, supports 10MB+ stream offloading to protect RAM, and provides sub-millisecond full-text search.
 
 ### 2. Neocortex (Semantic Memory Layer)
 *   **Implementation**: `src/memory/neocortex.py` (Asynchronous Distillation)
-*   **Fact**: The system's "knowledge distillation pool." It uses asynchronous background workers to call lightweight LLMs, generalizing trivia from the Hippocampus into concise bullet-point fact lists that persist at the edges of the model's context.
+*   **Feature**: The system's "knowledge distillation pool." It uses asynchronous background workers to call lightweight LLMs, generalizing episodic data into concise bullet-point fact lists.
 
 ### 3. Working Memory (Active Attention Layer)
 *   **Implementation**: `src/memory/working.py` (Weighted OrderedDict)
-*   **Fact**: The system's "instant focus." It dynamically calculates "Activation" scores based on **Temporal Proximity** and **Thematic Relevance**. Recent and relevant messages are prioritized, ensuring the model's attention is always on what matters most.
+*   **Feature**: The system's "instant focus." It dynamically calculates "Activation" scores based on **Temporal Proximity** and **Thematic Relevance**, ensuring the model's attention is always on the most relevant context.
+
+---
+
+## 🔄 Supported Hosting & Providers
+ClawBrain supports a wide range of platforms through its universal translation layer:
+
+- **Local Infrastructure**:
+  - **Ollama**: Default backend with full audit support.
+  - **LM Studio**: Integrated via OpenAI-compatible protocol.
+  - **vLLM / SGLang**: For high-throughput production environments.
+- **Cloud APIs**:
+  - **OpenAI (GPT-4o/o1)**: Official REST interfaces.
+  - **DeepSeek**: Cost-effective OpenAI-compatible alternative.
+  - **Anthropic (Claude 3.5)**: Native API support (In Development).
+  - **OpenRouter / Together AI**: Aggregator gateway support.
+
+---
+
+## ⚙️ Mounting & Configuration
+
+### 1. Entry Point
+By default, ClawBrain listens on local port **`11435`**.
+- **Default Base URL**: `http://127.0.0.1:11435`
+
+### 2. Client Integration (Example: OpenClaw)
+Modify your `~/.openclaw/openclaw.json` to route traffic through the Neural Gateway:
+
+```json
+"models": {
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://127.0.0.1:11435", // Entry point to the neural brain
+      "api": "ollama",
+      "apiKey": "OLLAMA_API_KEY"
+    }
+  }
+}
+```
+
+### 3. Model Prefixes & Routing
+Dynamically specify the backend via model name prefixes:
+- `ollama/gemma4:e4b`: Route to local Ollama (11434).
+- `lmstudio/llama-3`: Route to local LM Studio (1234).
+- `openai/gpt-4o`: Route to official OpenAI Cloud.
 
 ---
 
 ## 🚀 Key Technical Features
-- 🔄 **Universal Translation Gateway**: Built-in protocol detector and dialect translator supporting seamless routing for 30+ providers from local Ollama/LM Studio to cloud APIs.
-- ✂️ **High-Ratio Context Distillation**: Regex-based compression with code-block protection, stripping prefix noise to maximize the available context window.
-- 🛡️ **Contract-Based Model Qualification (TIER)**: Automatically classifies models by scale and protocol support, intercepting tool calls for underpowered models to prevent pipeline collapse.
-- 🧪 **High-Fidelity Audit System**: Adheres to the **GEMINI.md** constitution, providing byte-level SHA-256 verification and full mathematical derivation logs.
+- 🔄 **Universal Translation Gateway**: Built-in protocol detector for seamless OpenAI/Ollama cross-protocol routing.
+- ✂️ **High-Ratio Context Distillation**: Regex-based compression with code-block protection to maximize context efficiency.
+- 🛡️ **Model Qualification (TIER)**: Classifies model capabilities and intercepts tool calls for underpowered models.
+- 🧪 **High-Fidelity Audit System**: Adheres to **GEMINI.md**, providing byte-level SHA-256 verification and mathematical derivation logs.
 
 ---
 
@@ -43,9 +87,5 @@ cd ClawBrain && python3 -m venv venv
 source venv/bin/activate && pip install -r requirements.txt
 ```
 
-## ⚙️ Mounting
-
-Point your client's `baseUrl` to `11435` to activate neural-enhanced automation.
-
 ---
-<p align="right">Generated by GEMINI CLI Agent v1.23 based on Source Code</p>
+<p align="right">Generated by GEMINI CLI Agent based on Source Code v1.23</p>
