@@ -1,44 +1,33 @@
-# design/memory_router.md v1.6
+# design/memory_router.md v1.8
 
 ## 1. 任务目标 (Objective)
-实现 **ClawBrain MemoryRouter (记忆路由)** 与 **CleanupManager (清理管理器)**。
-作为系统的中央调度器，负责：
-1. **统一摄入 (Ingestion)**：将原始 Payload 分解并分发至工作记忆与海马体。
-2. **上下文检索 (Retrieval)**：综合三层记忆（活跃+摘要+召回）构造最终 Context。
-3. **自动化清理 (Cleanup)**：强制执行 TTL 与容量约束。
-4. **自动提纯 (Auto-Distillation)**：当海马体情节积累达到阈值时，自动启动新皮层泛化任务。
+实现 **ClawBrain MemoryRouter (记忆路由)**。作为大脑中枢，平衡“即时注意力”与“长程语义整合”。引入基于 Context 预算的动态分流与自适应提纯机制。
 
 ## 2. 核心架构逻辑 (Architecture)
 
-### 2.1 记忆路由引擎 (MemoryRouter)
-- **依赖注入 (Fixed)**：构造函数必须接收 `db_dir` 参数，且必须显式传递给内部实例化的 `Hippocampus` 和 `Neocortex` 对象。禁止由于省略传参导致各模块使用不一致的默认存储路径。
-- **方法 `ingest(payload: Dict)`**：
-  - 调用 `SignalDecomposer` 获取意图与指纹。
-  - 将 Trace 分别送入 `WorkingMemory` (实时激活) 和 `Hippocampus` (无损持久化)。
-  - **触发逻辑 (New)**：在 ingest 成功后，检查当前会话的 `trace_counter`。若达到 50 条，启动 `asyncio.create_task()` 异步执行 `Neocortex.distill()`，且不阻塞当前响应。
-- **方法 `get_combined_context(current_focus: str)`**：
-  - **L1 (Working)**：获取所有活跃消息。
-  - **L3 (Neocortex)**：获取当前会话的语义摘要。
-  - **L2 (Hippocampus)**：基于 `current_focus` 执行 FTS5 搜索，获取最相关的历史片段。
-  - **合成规则**：Summary + Search_Hits + Active_Messages。
+### 2.1 依赖注入与整合周期 (Consolidation Epoch)
+- **参数 `distill_threshold`**：定义为“语义整合周期”。
+  - **物理意义**：它代表了从“情节”转向“知识”的临界点。
+  - **推荐算法**：应设为 $ModelContext / AverageTraceSize$ 的 0.8 倍。对于 64k 窗口，默认 50 轮是一个平衡了“计算成本”与“记忆精度”的经验值。
+- **参数 `db_dir`**：强制透传至存储层。
 
-### 2.2 清理管理器 (CleanupManager)
-- **海马体清理**：删除 7 天前的记录及关联 Blob。
-- **工作记忆刷新**：每轮交互自动触发活跃度重算。
+### 2.2 动态分流逻辑 (Dynamic Offloading)
+- **方法 `ingest(payload, offload_threshold)`**：
+  - **offload_threshold**：由网关根据当前 **模型实际上下文窗口** 动态传入。
+  - **逻辑**：若单次输入超过该模型窗口的 10%（或自定义比例），强制执行磁盘分流，严禁挤占有限的推理空间。
 
-## 3. 高保真审计与测试规范 (TDD)
+### 2.3 自适应提纯 (Auto-Distillation)
+- 每次 `ingest` 成功后，计数器累加。
+- 达到 `distill_threshold` 时，判定为“认知负荷达标”，触发后台 `Neocortex.distill()` 任务，将最近一个周期的碎片信息固化为语义事实。
 
-### 3.1 真实大数据冲击与分流审计 (Fixed)
-- **验证点**：压力测试中注入的数据必须确切触发 512KB 分流阈值。
-- **数据规范**：测试数据生成器必须使用 4MB 以上的真实、非重复技术文本（如从 kernel.org 抓取的 Linux 文档），以确保数据具备语义复杂性，且能稳定触发磁盘分流。
-- **日志展示**：显式打印 `Expected_Blob_Dir` 与 `Actual_Blob_File_Size`。
+## 3. 高保真审计规范 (TDD)
 
-### 3.2 复合上下文合成与长程召回审计 (Fixed)
-- **契约要求**：测试必须使用 `secure_protocol` 作为金丝雀事实的 Key。
-- **验证点**：在有“历史摘要”和“活跃对话”的情况下发起检索。
-- **审计展示**：左侧展示原始各层内容，右侧展示最终拼接给 LLM 的字符串，验证优先级顺序。
+### 3.1 认知负荷触发审计 (Cognitive Load Audit)
+- **验证点**：通过设置极低的 `distill_threshold`（如 3），验证系统是否在认知饱和时自动启动提纯。
+- **日志展示**：`[MEMORY_DYNAMIC] Cognitive Load Reached -> Triggering Consolidation Epoch.`
+
+### 3.2 动态分流精准度审计
+- **验证点**：传入 1MB 数据，并设置 `offload_threshold=500KB`，验证分流 100% 触发。
 
 ## 4. 生成目标
-- `src/memory/router.py`: 中央调度器实现。
-- `tests/test_p10_memory_router.py`: 路由与合成专项验收测试。
-- `tests/data/p10_router.json`: 路由场景测试数据。
+- `src/memory/router.py`, `src/memory/storage.py`, `tests/test_p10_memory_router.py`。

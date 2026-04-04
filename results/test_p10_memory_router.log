@@ -5,23 +5,16 @@ metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-
 rootdir: /home/nvidia/ClawBrain
 plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 1 item
+collecting ... collected 2 items
 
-tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall 
-[MARATHON START] Ingesting 4 interactions...
-  - Impact Check: 1 blobs persisted.
-  - Actual Blob Size: 4614516 bytes
-
-[NEURAL MARATHON AUDIT: 4.5MB Impact & Recall]
-================================================================================
-SCENARIO: Verification of Blob offloading (>512KB) and Canary Recall
---------------------------------------------------------------------------------
-EXPECTED KNOWLEDGE                     | ACTUAL RECALL
--------------------------------------- | --------------------------------------
-CLAW-SECURE-ALPHA-99                   | === SYSTEM MEMORY SUMMARY (NEOCORTEX) ...
-------------------------------------------------------------
-INTEGRITY MATCH: YES
-================================================================================
+tests/test_p10_memory_router.py::test_p10_dynamic_offload_audit 
+[AUDIT: Dynamic Offload]
+Threshold 100KB -> Blob Count: 0
+Threshold 5KB   -> Blob Count: 1
+PASSED
+tests/test_p10_memory_router.py::test_p10_cognitive_load_trigger 
+[AUDIT: Cognitive Load]
+[MEMORY_DYNAMIC] Cognitive Load Reached (3) -> Triggering Consolidation Epoch.
 PASSED
 
-============================== 1 passed in 0.46s ===============================
+============================== 2 passed in 1.42s ===============================
