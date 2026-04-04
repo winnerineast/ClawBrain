@@ -1,4 +1,4 @@
-# 🦞 ClawBrain: 你的智能体工作流“硅基海马体”
+# 🦞 ClawBrain: 为智能体工作流打造的“硅基海马体”
 
 [English](./README_EN.md) | 中文版
 
@@ -6,59 +6,46 @@
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-<p align="center">
-  <strong>不侵入代码，不妥协性能。为 OpenClaw 打造的确定性、高密度 LLM 神经网关。</strong>
-</p>
+ClawBrain 是一个开源的 LLM 代理网关。它的核心价值在于：**作为 OpenClaw 的外挂大脑，它不仅解决多协议路由，更通过一套仿生记忆算法，在受限的本地显存（如 4090）环境下，实现上下文的高倍提纯与长程记忆召回。**
 
 ---
 
-## 🌟 核心愿景 (Vision)
-ClawBrain 是一个仿生学设计的 LLM 代理网关。它作为客户端（如 OpenClaw）与底层模型之间的“硅基海马体”，通过**三层动力学记忆系统**和**上下文动态提纯**，让你的 AI 能够像人类一样拥有长期记忆、短期注意力和瞬时反应力。
+## 🧠 设计哲学：三子算法记忆系统
+项目深受“虾叔理论”启发，并在工程上实现了三层动力学记忆架构：
 
-## 🚀 核心特性 (Key Features)
-- 🧠 **三代三子记忆系统 (Neural Memory)**：模拟生物大脑的分层架构——海马体（情节记录）、新皮层（语义泛化）、工作记忆（活跃注意力）。
-- ✂️ **上下文高倍提纯 (Context Distillation)**：基于正则的无损压缩技术，在 100% 保护代码缩进的前提下，大幅削减冗余 Token，提升 4090 运行效率。
-- 🛡️ **模型准入契约 (TIER Control)**：自动识别模型等级，硬性拦截能力不足的工具调用，确保 Agent 自动化链路不因模型幻觉而崩溃。
-- 🔄 **协议对等路由 (Universal Routing)**：原生支持 Ollama 协议，无缝适配 OpenAI 及其它主流接口。
+### 1. 海马体 (Hippocampus) —— 情节记忆层
+*   **工程实现**：`src/memory/storage.py` (SQLite FTS5 + Blob Storage)
+*   **实事求是**：它是系统的“无损黑匣子”。无论输入多大，100% 原始字节落盘。对于超过 512KB 的巨量文档，自动执行流式分流以保护内存。支持毫秒级的全文检索。
+
+### 2. 新皮层 (Neocortex) —— 语义记忆层
+*   **工程实现**：`src/memory/neocortex.py` (Asynchronous Distillation)
+*   **实事求是**：它是系统的“知识提炼池”。通过异步调用轻量级 LLM，将海马体中的琐碎情节泛化为 Bullet Points 形式的事实清单，常驻于模型上下文的边缘。
+
+### 3. 工作记忆 (Working Memory) —— 活跃注意力层
+*   **工程实现**：`src/memory/working.py` (Weighted OrderedDict)
+*   **实事求是**：它是系统的“瞬时焦点”。基于 **“时间远离度”** 与 **“话题相关度”** 双因子动态计算分值。最近聊过的、以及与当前话题相关的消息会被赋予高激活值（Activation），确保注意力始终聚焦。
 
 ---
 
-## 🛠️ 安装指南 (Installation)
+## 🚀 核心技术特性
+- 🔄 **通用协议翻译网关**：内置协议探测器与方言翻译器，支持从本地 Ollama、LM Studio 到云端 30+ 种 Provider 的无缝路由。
+- ✂️ **上下文高倍提纯**：基于正则的代码块保护压缩算法，精准剥离 Prefix 噪音，释放模型窗口。
+- 🛡️ **契约式准入控制 (TIER)**：根据参数量与协议支持自动分级，硬性拦截能力不足的小模型误用工具。
+- 🧪 **高保真审计体系**：遵循 **GEMINI.md** 法典，提供字节级 Hash 校验与数学推导全记录日志。
+
+---
+
+## 🛠️ 安装指南
 
 ```bash
-# 克隆仓库
 git clone https://github.com/winnerineast/ClawBrain.git
-cd ClawBrain
-
-# 初始化虚拟环境
-python3 -m venv venv
-source venv/bin/activate
-
-# 安装依赖
-pip install -r requirements.txt
+cd ClawBrain && python3 -m venv venv
+source venv/bin/activate && pip install -r requirements.txt
 ```
 
-## ⚙️ 配置挂载 (Mounting to OpenClaw)
+## ⚙️ 配置挂载
 
-修改 OpenClaw 配置文件 `~/.openclaw/openclaw.json`，让 Agent 接入“外挂大脑”：
-
-```json
-"ollama": {
-  "baseUrl": "http://127.0.0.1:11435",  // 路由至 ClawBrain 神经网关
-  "api": "ollama"
-}
-```
+在 OpenClaw (`openclaw.json`) 中将 `baseUrl` 指向 `11435` 即可激活神经增强模式。
 
 ---
-
-## 🧪 自动化审计 (Audit)
-项目遵循 **GEMINI.md** 宪法，所有核心功能均通过 Side-by-Side 证据审计，确保逻辑 100% 确定。
-
-```bash
-# 执行全量验收测试
-export PYTHONPATH=$PYTHONPATH:.
-pytest tests/
-```
-
----
-<p align="right">由 GEMINI CLI Agent v1.19 驱动生成</p>
+<p align="right">由 GEMINI CLI Agent 依据项目源码 v1.23 生成</p>
