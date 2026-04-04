@@ -1,4 +1,4 @@
-# design/memory_router.md v1.5
+# design/memory_router.md v1.6
 
 ## 1. 任务目标 (Objective)
 实现 **ClawBrain MemoryRouter (记忆路由)** 与 **CleanupManager (清理管理器)**。
@@ -6,14 +6,16 @@
 1. **统一摄入 (Ingestion)**：将原始 Payload 分解并分发至工作记忆与海马体。
 2. **上下文检索 (Retrieval)**：综合三层记忆（活跃+摘要+召回）构造最终 Context。
 3. **自动化清理 (Cleanup)**：强制执行 TTL 与容量约束。
+4. **自动提纯 (Auto-Distillation)**：当海马体情节积累达到阈值时，自动启动新皮层泛化任务。
 
 ## 2. 核心架构逻辑 (Architecture)
 
 ### 2.1 记忆路由引擎 (MemoryRouter)
-- **依赖注入 (Fixed)**：构造函数必须接收 `db_dir` 参数，且**必须显式传递**给内部实例化的 `Hippocampus` 和 `Neocortex` 对象。禁止由于省略传参导致各模块使用不一致的默认存储路径。
+- **依赖注入 (Fixed)**：构造函数必须接收 `db_dir` 参数，且必须显式传递给内部实例化的 `Hippocampus` 和 `Neocortex` 对象。禁止由于省略传参导致各模块使用不一致的默认存储路径。
 - **方法 `ingest(payload: Dict)`**：
   - 调用 `SignalDecomposer` 获取意图与指纹。
   - 将 Trace 分别送入 `WorkingMemory` (实时激活) 和 `Hippocampus` (无损持久化)。
+  - **触发逻辑 (New)**：在 ingest 成功后，检查当前会话的 `trace_counter`。若达到 50 条，启动 `asyncio.create_task()` 异步执行 `Neocortex.distill()`，且不阻塞当前响应。
 - **方法 `get_combined_context(current_focus: str)`**：
   - **L1 (Working)**：获取所有活跃消息。
   - **L3 (Neocortex)**：获取当前会话的语义摘要。
@@ -27,8 +29,8 @@
 ## 3. 高保真审计与测试规范 (TDD)
 
 ### 3.1 真实大数据冲击与分流审计 (Fixed)
-- **验证点**：压力测试中注入的数据必须**确切触发** 512KB 分流阈值。
-- **数据规范**：测试数据生成器必须使用 **4MB 以上的真实、非重复技术文本（如从 kernel.org 抓取的 Linux 文档）**，以确保数据具备语义复杂性，且能稳定触发磁盘分流。
+- **验证点**：压力测试中注入的数据必须确切触发 512KB 分流阈值。
+- **数据规范**：测试数据生成器必须使用 4MB 以上的真实、非重复技术文本（如从 kernel.org 抓取的 Linux 文档），以确保数据具备语义复杂性，且能稳定触发磁盘分流。
 - **日志展示**：显式打印 `Expected_Blob_Dir` 与 `Actual_Blob_File_Size`。
 
 ### 3.2 复合上下文合成与长程召回审计 (Fixed)
