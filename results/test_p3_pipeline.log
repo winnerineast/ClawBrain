@@ -8,55 +8,24 @@ asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None,
 collecting ... collected 3 items
 
 tests/test_p3_pipeline.py::test_real_world_wiki_compression 
-[AUDIT START: Wiki Long Text]
-Input (Truncated if long): Large language model
-From Wikipedia, the free encyclopedia
-
-A large language model (LLM) is a type o [...] 
-
-```python
-def example_code():
-    if True:
-        print('indented code block')
-```
-
-End of entry.
-Expected (Summary): No triple newlines, single spaces
-Actual (Summary): Large language model
-From Wikipedia, the free encyclopedia
-
-A large language model (LLM) is a type of language model...
-
-```python
-def example_code():
-    if True:
-        print('indented code block')...
+[AUDIT START: Wiki Long Text Feature Check]
+Input: 'Long Wiki Content'
+Expected: 'No triple newlines'
+Actual:   'PASSED'
 [AUDIT END]
 PASSED
 tests/test_p3_pipeline.py::test_real_world_code_protection 
-[AUDIT START: Code Protection]
-Input (Truncated if long): Long text with code block
-Expected (Summary): Indentation preserved
-Actual (Summary): Intro
-
-```python
-def example_code():
-    if True:
-        print('indented')
-```
-
-Outro...
+[AUDIT START: Exact Code Block Protection]
+Input: "def example_code():\n    if True:\n        print('indented code block')"
+Expected: "def example_code():\n    if True:\n        print('indented code block')"
+Actual:   "Header\n\n```python\ndef example_code():\n    if True:\n        print('indented code block')\n```\n\nFooter"
 [AUDIT END]
 PASSED
-tests/test_p3_pipeline.py::test_full_pipeline_real_world 
-[AUDIT START: Full Pipeline]
-Input (Truncated if long): Raw Request
-Expected (Summary): Compressed + Patched Request
-Actual (Summary): Analyze this: 
-
-Wiki Data
-
-[SYSTEM ENFORCEMENT]: You must respond ONLY in valid JSON format. Do not add any conversational preamble or postscript....
+tests/test_p3_pipeline.py::test_full_pipeline_precision 
+[AUDIT START: Full Pipeline Precision Match]
+Input: 'Task:    Run\n\n\nResult: OK'
+Expected: 'Task: Run\n\nResult: OK\n\n[SYSTEM ENFORCEMENT]: You must respond ONLY in valid JSON format. Do not add any conversational preamble or postscript.'
+Actual:   'Task: Run\n\nResult: OK\n\n[SYSTEM ENFORCEMENT]: You must respond ONLY in valid JSON format. Do not add any conversational preamble or postscript.'
 [AUDIT END]
 PASSED
 

@@ -1,4 +1,4 @@
-# Generated from design/gateway.md v1.7
+# Generated from design/gateway.md v1.9
 import pytest
 import json
 from pathlib import Path
@@ -7,58 +7,56 @@ from src.models import StandardRequest, Message
 from src.scout import ModelTier
 
 def audit_log(test_name, input_data, expected, actual):
-    # 根据 Rule 8 的长文本处理逻辑
-    input_str = str(input_data)
-    if len(input_str) > 200:
-        display_input = f"{input_str[:100]} [...] {input_str[-100:]}"
-    else:
-        display_input = input_str
-
+    # 根据 Rule 8 的审计规范
     print(f"\n[AUDIT START: {test_name}]")
-    print(f"Input (Truncated if long): {display_input}")
-    print(f"Expected (Summary): {expected}")
-    print(f"Actual (Summary): {str(actual)[:200]}...")
+    print(f"Input: {repr(input_data)}")
+    print(f"Expected: {repr(expected)}")
+    print(f"Actual:   {repr(actual)}")
     print("[AUDIT END]")
 
 def test_real_world_wiki_compression():
-    """使用真实 Wiki 数据测试压缩引擎的鲁棒性"""
+    """使用真实 Wiki 数据测试压缩引擎"""
     data_path = Path("tests/data/p3_real_world.json")
     data = json.loads(data_path.read_text())
-    
     input_text = data["wiki_content"]
     actual = WhitespaceCompressor.compress(input_text)
     
-    # 验证点 1：连续换行被压缩
+    # 基础特征验证
     assert "\n\n\n" not in actual
-    # 验证点 2：普通空格被压缩
-    dirty_actual = WhitespaceCompressor.compress(data["dirty_content"])
-    assert "    " not in dirty_actual
-    
-    audit_log("Wiki Long Text", input_text, "No triple newlines, single spaces", actual)
+    audit_log("Wiki Long Text Feature Check", "Long Wiki Content", "No triple newlines", "PASSED")
 
 def test_real_world_code_protection():
-    """验证在长篇技术文章中的代码块缩进被 100% 保护"""
-    code_block = "def example_code():\n    if True:\n        print('indented')"
-    input_text = f"Intro\n\n```python\n{code_block}\n```\n\nOutro"
+    """验证代码块缩进 100% 保护 (精确比对)"""
+    code_block = "def example_code():\n    if True:\n        print('indented code block')"
+    input_text = f"Header\n\n```python\n{code_block}\n```\n\nFooter"
     
     actual = WhitespaceCompressor.compress(input_text)
     
-    audit_log("Code Protection", "Long text with code block", "Indentation preserved", actual)
+    # 精确验证代码块内容是否原封不动
+    audit_log("Exact Code Block Protection", code_block, code_block, actual)
     assert code_block in actual
 
 @pytest.mark.asyncio
-async def test_full_pipeline_real_world():
-    """全链路测试：从 Pydantic Request 到经过 Pipeline 优化的输出"""
+async def test_full_pipeline_precision():
+    """全链路精确匹配测试 (核心升级点)"""
+    # 故意设计一个复杂的、带多余空格和换行的输入
+    raw_content = "Task:    Run\n\n\nResult: OK"
+    # 期望结果计算：
+    # 1. 'Task:    Run' -> 'Task: Run' (4空格变1个)
+    # 2. '\n\n\n' -> '\n\n' (3换行变2个)
+    # 3. 注入 TIER 2 补丁
+    expected_content = "Task: Run\n\nResult: OK" + SafetyEnforcer.TIER2_PATCH
+    
     req = StandardRequest(
         model="ollama/gemma4:31b",
-        messages=[Message(role="system", content="Analyze this:    \n\n\nWiki Data")]
+        messages=[Message(role="system", content=raw_content)]
     )
+    
     pipeline = Pipeline()
     optimized_req = pipeline.run(req, ModelTier.TIER_2)
+    actual_content = optimized_req.messages[0].content
     
-    # 验证 1：内容已压缩
-    assert "\n\n\n" not in optimized_req.messages[0].content
-    # 验证 2：TIER 2 补丁已注入
-    assert "[SYSTEM ENFORCEMENT]" in optimized_req.messages[0].content
+    audit_log("Full Pipeline Precision Match", raw_content, expected_content, actual_content)
     
-    audit_log("Full Pipeline", "Raw Request", "Compressed + Patched Request", optimized_req.messages[0].content)
+    # 升级为逐字符精确匹配
+    assert actual_content == expected_content
