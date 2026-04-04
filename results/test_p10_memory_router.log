@@ -5,44 +5,45 @@ metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-
 rootdir: /home/nvidia/ClawBrain
 plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 2 items
+collecting ... collected 1 item
 
-tests/test_p10_memory_router.py::test_p10_ingestion_routing 
-[AUDIT: Dual-Layer Ingestion]
-------------------------------------------------------------
-ACTION: Ingest 'Hello Router'
-------------------------------------------------------------
-LAYER                       | STATUS
---------------------------- | ---------------------------
-L1: Working Memory          | ACTIVE
-L2: Hippocampus             | STORED
-L3: Neocortex               | N/A
-------------------------------------------------------------
-============================================================
-PASSED
-tests/test_p10_memory_router.py::test_p10_combined_context_synthesis 
-[SYNTHESIS PROOF]
-=== SYSTEM MEMORY SUMMARY (NEOCORTEX) ===
-This user is interested in security.
+tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall 
+[MARATHON START] Ingesting 84 interactions...
+  - Impact Check: 0 blobs persisted to disk.
+FAILED
 
-=== RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS) ===
-Hits found in 0 past interactions.
+=================================== FAILURES ===================================
+____________________ test_p10_marathon_pressure_and_recall _____________________
 
-=== ACTIVE CONVERSATION (WORKING MEMORY) ===
-Current question: SSH Keys
+    @pytest.mark.asyncio
+    async def test_p10_marathon_pressure_and_recall():
+        """Phase 10 强化审计：50轮对话、1MB冲击、7天跨度的全链路验收"""
+        if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
+        router = MemoryRouter(db_dir=TEST_DIR)
+    
+        # 1. 加载强化数据集
+        data = json.loads(Path("tests/data/p10_marathon.json").read_text())
+        thread = data["marathon_thread"]
+        canary = data["canaries"]["initial_protocol"]
+    
+        print(f"\n[MARATHON START] Ingesting {len(thread)} interactions...")
+    
+        # 2. 模拟真实摄入流
+        for msg in thread[:-1]: # 摄入除最后一条外的所有历史
+            payload = {
+                "model": "gemma4:e4b",
+                "messages": [msg]
+            }
+            await router.ingest(payload)
+    
+        # 3. 验证 1MB 冲击后的系统状态
+        # 检查磁盘是否有 Blob 生成
+        blob_count = len(list(Path(TEST_DIR).glob("blobs/*.json")))
+        print(f"  - Impact Check: {blob_count} blobs persisted to disk.")
+>       assert blob_count > 0
+E       assert 0 > 0
 
-
-[AUDIT: Context Synthesis]
-------------------------------------------------------------
-ACTION: Retrieve context for 'security'
-------------------------------------------------------------
-LAYER                       | STATUS
---------------------------- | ---------------------------
-L1: Working Memory          | ACTIVE
-L2: Hippocampus             | SEARCHED
-L3: Neocortex               | LOADED
-------------------------------------------------------------
-============================================================
-PASSED
-
-============================== 2 passed in 0.04s ===============================
+tests/test_p10_memory_router.py:49: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall
+============================== 1 failed in 0.17s ===============================

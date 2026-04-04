@@ -1,77 +1,65 @@
 # Generated from design/memory_router.md v1.0
 import pytest
+import json
 import os
 import shutil
 from pathlib import Path
 from src.memory.router import MemoryRouter
 
-TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p10_tmp"
+TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p10_marathon_tmp"
 
-def visual_audit_router(test_name, action, l1_status, l2_status, l3_status):
-    print(f"\n[AUDIT: {test_name}]")
-    print("-" * 60)
-    print(f"ACTION: {action}")
-    print("-" * 60)
-    print(f"{'LAYER':<27} | {'STATUS'}")
-    print(f"{'-'*27} | {'-'*27}")
-    print(f"{'L1: Working Memory':<27} | {l1_status}")
-    print(f"{'L2: Hippocampus':<27} | {l2_status}")
-    print(f"{'L3: Neocortex':<27} | {l3_status}")
-    print("-" * 60)
-    print("=" * 60)
+def visual_audit_marathon(test_name, description, expected, actual):
+    match = "YES" if str(expected).lower() in str(actual).lower() else "NO"
+    print(f"\n[NEURAL MARATHON AUDIT: {test_name}]")
+    print("=" * 80)
+    print(f"SCENARIO: {description}")
+    print("-" * 80)
+    print(f"{'EXPECTED KNOWLEDGE':<38} | {'ACTUAL RECALL'}")
+    print(f"{'-'*38} | {'-'*38}")
+    print(f"{str(expected)[:38]:<38} | {str(actual)[:38]}...")
+    print("-" * 80)
+    print(f"INTEGRITY MATCH: {match}")
+    print("=" * 80)
 
 @pytest.mark.asyncio
-async def test_p10_ingestion_routing():
-    """验证摄入动作是否正确分发到 L1 和 L2"""
+async def test_p10_marathon_pressure_and_recall():
+    """Phase 10 强化审计：50轮对话、1MB冲击、7天跨度的全链路验收"""
     if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
     router = MemoryRouter(db_dir=TEST_DIR)
     
-    payload = {"model": "test", "messages": [{"role": "user", "content": "Hello Router"}]}
+    # 1. 加载强化数据集
+    data = json.loads(Path("tests/data/p10_marathon.json").read_text())
+    thread = data["marathon_thread"]
+    canary = data["canaries"]["initial_protocol"]
     
-    # 执行摄入
-    tid = await router.ingest(payload)
+    print(f"\n[MARATHON START] Ingesting {len(thread)} interactions...")
     
-    # 验证 L1 (Working Memory)
-    l1_active = tid in [it.trace_id for it in router.wm.items]
+    # 2. 模拟真实摄入流
+    for msg in thread[:-1]: # 摄入除最后一条外的所有历史
+        payload = {
+            "model": "gemma4:e4b",
+            "messages": [msg]
+        }
+        await router.ingest(payload)
     
-    # 验证 L2 (Hippocampus)
-    # 我们通过 FTS 搜索验证它是否已存入
-    l2_stored = len(router.hippo.search("Hello Router")) > 0
+    # 3. 验证 1MB 冲击后的系统状态
+    # 检查磁盘是否有 Blob 生成
+    blob_count = len(list(Path(TEST_DIR).glob("blobs/*.json")))
+    print(f"  - Impact Check: {blob_count} blobs persisted to disk.")
+    assert blob_count > 0
     
-    visual_audit_router(
-        "Dual-Layer Ingestion",
-        "Ingest 'Hello Router'",
-        "ACTIVE" if l1_active else "MISSING",
-        "STORED" if l2_stored else "MISSING",
-        "N/A"
+    # 4. 执行长程召回测试 (提问 7 天前的内容)
+    current_focus = "initial protocol version"
+    context = await router.get_combined_context("session-marathon", current_focus)
+    
+    # 执行高保真审计
+    visual_audit_marathon(
+        "7-Day Temporal Recall",
+        "Recalling Canary Fact from Round 1 after 50 rounds + 1MB data shock",
+        canary,
+        context
     )
     
-    assert l1_active is True
-    assert l2_stored is True
-
-@pytest.mark.asyncio
-async def test_p10_combined_context_synthesis():
-    """验证三层记忆的复合合成逻辑"""
-    router = MemoryRouter(db_dir=TEST_DIR)
-    
-    # 预置 L3 (Neocortex) 摘要
-    router.neo._save_summary("session-1", "This user is interested in security.")
-    
-    # 预置 L1 (Working Memory)
-    await router.ingest({"messages": [{"role": "user", "content": "Current question: SSH Keys"}]})
-    
-    # 执行合成
-    context = await router.get_combined_context("session-1", "security")
-    
-    print(f"\n[SYNTHESIS PROOF]\n{context}\n")
-    
-    # 验证优先级和内容
-    assert "SYSTEM MEMORY SUMMARY" in context
-    assert "interested in security" in context
-    assert "SSH Keys" in context
-    
-    visual_audit_router(
-        "Context Synthesis",
-        "Retrieve context for 'security'",
-        "ACTIVE", "SEARCHED", "LOADED"
-    )
+    # 核心断言：金丝雀事实必须在合成后的上下文（无论是 L2 检索还是 L3 摘要）中浮现
+    assert canary.lower() in context.lower()
+    assert "RELEVANT HISTORICAL SNIPPETS" in context

@@ -1,4 +1,4 @@
-# design/memory_router.md v1.0
+# design/memory_router.md v1.2
 
 ## 1. 任务目标 (Objective)
 实现 **ClawBrain MemoryRouter (记忆路由)** 与 **CleanupManager (清理管理器)**。
@@ -10,6 +10,7 @@
 ## 2. 核心架构逻辑 (Architecture)
 
 ### 2.1 记忆路由引擎 (MemoryRouter)
+- **依赖注入 (Fixed)**：构造函数必须接收 `db_dir` 参数，且**必须显式传递**给内部实例化的 `Hippocampus` 和 `Neocortex` 对象。禁止由于省略传参导致各模块使用不一致的默认存储路径。
 - **方法 `ingest(payload: Dict)`**：
   - 调用 `SignalDecomposer` 获取意图与指纹。
   - 将 Trace 分别送入 `WorkingMemory` (实时激活) 和 `Hippocampus` (无损持久化)。
