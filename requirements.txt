@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+httpx
+pydantic
+pydantic-settings
+pytest
+pytest-json-report
+python-dotenv

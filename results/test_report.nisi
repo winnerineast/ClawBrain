@@ -1,0 +1,23 @@
+[
+  {
+    "test_id": "tests/test_models.py::test_standard_request_parsing",
+    "status": "PASSED",
+    "latency_ms": 0,
+    "module_name": "models",
+    "error_detail": null
+  },
+  {
+    "test_id": "tests/test_models.py::test_tool_calling_parsing",
+    "status": "PASSED",
+    "latency_ms": 0,
+    "module_name": "models",
+    "error_detail": null
+  },
+  {
+    "test_id": "tests/test_models.py::test_invalid_request",
+    "status": "PASSED",
+    "latency_ms": 0,
+    "module_name": "models",
+    "error_detail": null
+  }
+]
