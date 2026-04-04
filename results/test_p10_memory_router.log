@@ -1,0 +1,48 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/nvidia/ClawBrain/venv/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'asyncio': '1.3.0', 'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
+rootdir: /home/nvidia/ClawBrain
+plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 2 items
+
+tests/test_p10_memory_router.py::test_p10_ingestion_routing 
+[AUDIT: Dual-Layer Ingestion]
+------------------------------------------------------------
+ACTION: Ingest 'Hello Router'
+------------------------------------------------------------
+LAYER                       | STATUS
+--------------------------- | ---------------------------
+L1: Working Memory          | ACTIVE
+L2: Hippocampus             | STORED
+L3: Neocortex               | N/A
+------------------------------------------------------------
+============================================================
+PASSED
+tests/test_p10_memory_router.py::test_p10_combined_context_synthesis 
+[SYNTHESIS PROOF]
+=== SYSTEM MEMORY SUMMARY (NEOCORTEX) ===
+This user is interested in security.
+
+=== RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS) ===
+Hits found in 0 past interactions.
+
+=== ACTIVE CONVERSATION (WORKING MEMORY) ===
+Current question: SSH Keys
+
+
+[AUDIT: Context Synthesis]
+------------------------------------------------------------
+ACTION: Retrieve context for 'security'
+------------------------------------------------------------
+LAYER                       | STATUS
+--------------------------- | ---------------------------
+L1: Working Memory          | ACTIVE
+L2: Hippocampus             | SEARCHED
+L3: Neocortex               | LOADED
+------------------------------------------------------------
+============================================================
+PASSED
+
+============================== 2 passed in 0.04s ===============================
