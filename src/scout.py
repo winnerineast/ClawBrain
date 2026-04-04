@@ -1,4 +1,4 @@
-# Generated from design/gateway.md v1.17
+# Generated from design/gateway.md v1.32
 import re
 import httpx
 import logging
@@ -12,11 +12,13 @@ class ModelTier(str, Enum):
     TIER_3 = "TIER_3_BASIC"
 
 class ModelScout:
-    # 3.1 准则：内置确定性映射表
+    # 2.2 准则修复：内置确定性映射表，防止测试环境下的网络抖动导致拦截失效
     KNOWN_MODELS = {
-        "qwen2.5:latest": ModelTier.TIER_3, # 4.7B version
+        "qwen2.5:latest": ModelTier.TIER_3, # 4.7B 确定为 TIER 3
         "gemma4:e4b": ModelTier.TIER_1,
-        "gemma4:31b": ModelTier.TIER_1
+        "gemma4:31b": ModelTier.TIER_1,
+        "gpt-4": ModelTier.TIER_1,
+        "gpt-4o": ModelTier.TIER_1
     }
 
     def __init__(self, ollama_base_url: str = "http://127.0.0.1:11434"):
@@ -48,7 +50,6 @@ class ModelScout:
                 self.cache[model_name] = {"tier": tier, "timestamp": now}
                 return tier
         except Exception:
-            # 3.1 准则：异常降级为 TIER_3
             return ModelTier.TIER_3
 
     def _evaluate(self, name: str, meta: Dict[str, Any]) -> ModelTier:
@@ -63,7 +64,6 @@ class ModelScout:
 
         has_tools = "TOOLS" in modelfile or "TOOL_CALL" in modelfile
         
-        # 2.2 准则：契约界定
         if params >= 20 or (params >= 7 and has_tools):
             return ModelTier.TIER_1
         elif params >= 7:

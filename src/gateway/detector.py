@@ -1,25 +1,33 @@
-# Generated from design/gateway.md v1.22
-from typing import Dict, Any
-from src.models import StandardRequest, Message, Tool
+# Generated from design/gateway.md v1.33
+from typing import Dict, Any, Tuple
+from src.models import StandardRequest
 
 class ProtocolDetector:
     """
-    负责将来自不同客户端协议的 HTTP Payload 转化为 ClawBrain 的 StandardInteractionRequest。
+    负责将不同客户端协议标准化。
+    2.3 准则修正：深度提取 tools, options, stream 等元数据。
     """
     @staticmethod
-    def detect_and_standardize(payload: Dict[str, Any]) -> tuple[str, StandardRequest]:
-        # 探测：如果带有 'messages' 和 'model'，且具备 OpenAI 的特定结构，或者是 Ollama
-        # 为简化，当前内部的 StandardRequest 设计已经兼容两者。
-        
-        # 判断来源协议 (用于之后决定反向翻译流的格式)
-        # OpenAI 通常包含 'temperature' 字段且没有 'options' 的字典结构，但这不可靠。
-        # 这里用一种简单启发式：如果在顶层存在 options，大概率是 Ollama 原生。
+    def detect_and_standardize(payload: Dict[str, Any]) -> Tuple[str, StandardRequest]:
+        # 1. 探测协议
         source_protocol = "ollama" if "options" in payload else "openai"
         
-        # Standardize (统一成 Pydantic 模型，剔除杂质)
+        # 2. 深度元数据对齐
+        # 尝试从顶层、options 或 extra_body 中提取 tools
+        tools = payload.get("tools")
+        if not tools and "options" in payload:
+            # 某些 Ollama 客户端可能将 tools 放入 options
+            tools = payload["options"].get("tools")
+            
+        stream = payload.get("stream", False)
+        
+        # 3. 构造标准请求
         try:
             req = StandardRequest(**payload)
+            # 强制覆盖以确保元数据完整
+            if tools: req.tools = tools
+            req.stream = stream
         except Exception as e:
-            raise ValueError(f"Payload standardization failed: {e}")
+            raise ValueError(f"Standardization failed: {e}")
             
         return source_protocol, req
