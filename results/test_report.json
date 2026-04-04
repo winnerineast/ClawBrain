@@ -3,21 +3,18 @@
     "test_id": "tests/test_models.py::test_standard_request_parsing",
     "status": "FAIL",
     "module": "models",
-    "latency_ms": 10,
     "evidence_log": "results/test_report.log"
   },
   {
     "test_id": "tests/test_models.py::test_tool_calling_parsing",
     "status": "FAIL",
     "module": "models",
-    "latency_ms": 5,
     "evidence_log": "results/test_report.log"
   },
   {
     "test_id": "tests/test_models.py::test_invalid_request",
     "status": "FAIL",
     "module": "models",
-    "latency_ms": 5,
     "evidence_log": "results/test_report.log"
   }
 ]
