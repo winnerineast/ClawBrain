@@ -84,6 +84,12 @@ ClawBrain's core is not a static database but a process of **"Phase Transitions"
 
 ### 3. Neocortex (L3: Semantic Fact Layer)
 *   **Implementation**: Asynchronous Distillation Engine.
+*   **Core Parameter: Consolidation Epoch (`distill_threshold`)**:
+    - **Physical Meaning**: This parameter defines the tipping point where "episodic trivia" is transformed into "core knowledge." It represents the amount of redundant information the system tolerates before performing a costly logical abstraction.
+    - **Self-Evolution**: Once the number of dialogue turns in the Hippocampus reaches this threshold, a background task is automatically triggered to generalize fragments into solidified fact lists.
+    - **Recommended Algorithm**: This value should be inversely correlated with the model's **Context Window**.
+        - **Formula**: `distill_threshold ≈ (ContextWindow / AverageTraceSize) * 0.8`
+        - **Example**: For a 64k window model, a setting of **50** is recommended. For an 8k window, it should be set to **5-10** to trigger more frequent "flushing and purification."
 *   **Evolutionary Logic**:
     - **Async Distillation**: Background tasks trigger once episodic trivia reaches a threshold.
     - **Generalized Extraction**: Leveraging the model's slow-accumulation effect, repetitive technical decisions or user preferences are distilled into "Fact Checklists."
