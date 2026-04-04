@@ -1,19 +1,23 @@
-# Generated from design/gateway_cloud.md v1.1
+# Generated from design/gateway.md v1.26
 import json
 from typing import Dict, Any, AsyncGenerator, List
 from src.models import StandardRequest
 
 class DialectTranslator:
     """
-    负责将内部 StandardRequest 翻译为目标提供商的专属方言。
+    万能方言翻译器。
+    负责将 StandardRequest 转换为各 Provider 的原生格式。
     """
+    
     @staticmethod
     def to_ollama(request: StandardRequest) -> Dict[str, Any]:
         return request.model_dump(exclude_none=True)
 
     @staticmethod
     def to_openai(request: StandardRequest) -> Dict[str, Any]:
+        """翻译为标准 OpenAI 格式，支持 DeepSeek, Mistral, OpenRouter 等"""
         payload = request.model_dump(exclude_none=True)
+        # 剥离前缀，如 'deepseek/chat' -> 'chat'
         if "/" in payload.get("model", ""):
             payload["model"] = payload["model"].split("/", 1)[1]
         payload.pop("options", None)
@@ -21,42 +25,64 @@ class DialectTranslator:
 
     @staticmethod
     def to_anthropic(request: StandardRequest) -> Dict[str, Any]:
-        """
-        2.1 准则：翻译为 Anthropic (Claude) 规格。
-        处理：System 提取、max_tokens 补全、角色交替修复。
-        """
-        raw_payload = request.model_dump(exclude_none=True)
-        messages = raw_payload.get("messages", [])
+        """翻译为 Anthropic (Claude) 格式，包含角色正规化逻辑"""
+        raw = request.model_dump(exclude_none=True)
+        messages = raw.get("messages", [])
         
         system_parts = []
-        normalized_messages = []
+        normalized = []
         
-        # 1. 提取 System
         for msg in messages:
             if msg.get("role") == "system":
                 system_parts.append(msg.get("content", ""))
             else:
-                # 2. 角色交替规范：合并连续相同角色
-                if normalized_messages and normalized_messages[-1]["role"] == msg["role"]:
-                    normalized_messages[-1]["content"] += "\n" + msg.get("content", "")
+                # 角色交替合并逻辑 (Rule 2.1)
+                if normalized and normalized[-1]["role"] == msg["role"]:
+                    normalized[-1]["content"] += "\n" + msg.get("content", "")
                 else:
-                    normalized_messages.append({
-                        "role": msg["role"],
-                        "content": msg.get("content", "")
-                    })
+                    normalized.append({"role": msg["role"], "content": msg.get("content", "")})
         
-        # 3. 构造规格 Body
-        anthropic_payload = {
-            "model": raw_payload.get("model", "").split("/")[-1],
-            "max_tokens": raw_payload.get("max_tokens") or 4096, # 2.1 必填项补全
-            "messages": normalized_messages,
-            "stream": raw_payload.get("stream", False)
+        anthropic_body = {
+            "model": raw.get("model", "").split("/")[-1],
+            "max_tokens": raw.get("max_tokens") or 4096,
+            "messages": normalized,
+            "stream": raw.get("stream", False)
         }
-        
         if system_parts:
-            anthropic_payload["system"] = "\n".join(system_parts)
+            anthropic_body["system"] = "\n".join(system_parts)
+        return anthropic_body
+
+    @staticmethod
+    def to_google(request: StandardRequest) -> Dict[str, Any]:
+        """翻译为 Google Gemini 格式"""
+        raw = request.model_dump(exclude_none=True)
+        messages = raw.get("messages", [])
+        
+        contents = []
+        system_instruction = ""
+        
+        for msg in messages:
+            if msg.get("role") == "system":
+                system_instruction += msg.get("content", "") + "\n"
+            else:
+                # Google 的角色映射：assistant -> model
+                role = "model" if msg.get("role") == "assistant" else "user"
+                contents.append({
+                    "role": role,
+                    "parts": [{"text": msg.get("content", "")}]
+                })
+        
+        google_body = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": raw.get("temperature", 0.7),
+                "maxOutputTokens": raw.get("max_tokens", 4096)
+            }
+        }
+        if system_instruction:
+            google_body["system_instruction"] = {"parts": [{"text": system_instruction.strip()}]}
             
-        return anthropic_payload
+        return google_body
 
     @staticmethod
     async def reverse_stream_ollama_to_openai(response_stream: AsyncGenerator[bytes, None]) -> AsyncGenerator[str, None]:
