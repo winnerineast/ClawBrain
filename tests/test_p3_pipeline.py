@@ -1,50 +1,64 @@
 # Generated from design/gateway.md v1.7
 import pytest
 import json
+from pathlib import Path
 from src.pipeline import WhitespaceCompressor, SafetyEnforcer, Pipeline
 from src.models import StandardRequest, Message
 from src.scout import ModelTier
 
-def audit_log(input_data, expected, actual):
-    print("\n[AUDIT START]")
-    print(f"Input: {input_data}")
-    print(f"Expected: {expected}")
-    print(f"Actual: {actual}")
+def audit_log(test_name, input_data, expected, actual):
+    # 根据 Rule 8 的长文本处理逻辑
+    input_str = str(input_data)
+    if len(input_str) > 200:
+        display_input = f"{input_str[:100]} [...] {input_str[-100:]}"
+    else:
+        display_input = input_str
+
+    print(f"\n[AUDIT START: {test_name}]")
+    print(f"Input (Truncated if long): {display_input}")
+    print(f"Expected (Summary): {expected}")
+    print(f"Actual (Summary): {str(actual)[:200]}...")
     print("[AUDIT END]")
 
-def test_whitespace_compression():
-    """验证普通文本被压缩，且代码块被保护"""
-    input_text = "Hello    world!\n\n\n\n` ` `python\n    def test():\n        pass\n` ` `"
-    # 普通文本部分：4个空格应变1个，4个换行应变2个
-    # 代码块部分：4个空格缩进必须保留
+def test_real_world_wiki_compression():
+    """使用真实 Wiki 数据测试压缩引擎的鲁棒性"""
+    data_path = Path("tests/data/p3_real_world.json")
+    data = json.loads(data_path.read_text())
+    
+    input_text = data["wiki_content"]
+    actual = WhitespaceCompressor.compress(input_text)
+    
+    # 验证点 1：连续换行被压缩
+    assert "\n\n\n" not in actual
+    # 验证点 2：普通空格被压缩
+    dirty_actual = WhitespaceCompressor.compress(data["dirty_content"])
+    assert "    " not in dirty_actual
+    
+    audit_log("Wiki Long Text", input_text, "No triple newlines, single spaces", actual)
+
+def test_real_world_code_protection():
+    """验证在长篇技术文章中的代码块缩进被 100% 保护"""
+    code_block = "def example_code():\n    if True:\n        print('indented')"
+    input_text = f"Intro\n\n```python\n{code_block}\n```\n\nOutro"
     
     actual = WhitespaceCompressor.compress(input_text)
-    expected_contains_plain = "Hello world!\n\n"
-    expected_contains_code = "    def test():"
     
-    audit_log(input_text, "Compressed Plain + Protected Code", actual)
-    assert expected_contains_plain in actual
-    assert expected_contains_code in actual
+    audit_log("Code Protection", "Long text with code block", "Indentation preserved", actual)
+    assert code_block in actual
 
-def test_tier2_enforcement():
-    """验证 TIER 2 模型被注入了强制 JSON 补丁"""
+@pytest.mark.asyncio
+async def test_full_pipeline_real_world():
+    """全链路测试：从 Pydantic Request 到经过 Pipeline 优化的输出"""
     req = StandardRequest(
-        model="test-14b",
-        messages=[Message(role="user", content="Hello")]
+        model="ollama/gemma4:31b",
+        messages=[Message(role="system", content="Analyze this:    \n\n\nWiki Data")]
     )
-    SafetyEnforcer.apply(req, ModelTier.TIER_2)
+    pipeline = Pipeline()
+    optimized_req = pipeline.run(req, ModelTier.TIER_2)
     
-    audit_log("TIER 2 Request", "Content with Patch", req.messages[0].content)
-    assert "[SYSTEM ENFORCEMENT]" in req.messages[0].content
-
-def test_tier1_bypass():
-    """验证 TIER 1 模型不被修改内容"""
-    original_content = "Hello"
-    req = StandardRequest(
-        model="gemma4:e4b",
-        messages=[Message(role="user", content=original_content)]
-    )
-    SafetyEnforcer.apply(req, ModelTier.TIER_1)
+    # 验证 1：内容已压缩
+    assert "\n\n\n" not in optimized_req.messages[0].content
+    # 验证 2：TIER 2 补丁已注入
+    assert "[SYSTEM ENFORCEMENT]" in optimized_req.messages[0].content
     
-    audit_log("TIER 1 Request", original_content, req.messages[0].content)
-    assert req.messages[0].content == original_content
+    audit_log("Full Pipeline", "Raw Request", "Compressed + Patched Request", optimized_req.messages[0].content)

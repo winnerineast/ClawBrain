@@ -7,43 +7,87 @@ plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collecting ... collected 3 items
 
-tests/test_p3_pipeline.py::test_whitespace_compression 
-[AUDIT START]
-Input: Hello    world!
+tests/test_p3_pipeline.py::test_real_world_wiki_compression FAILED
+tests/test_p3_pipeline.py::test_real_world_code_protection 
+[AUDIT START: Code Protection]
+Input (Truncated if long): Long text with code block
+Expected (Summary): Indentation preserved
+Actual (Summary): Intro
 
+```python
+def example_code():
+ if True:
+ print('indented')
+```
 
-
-` ` `python
-    def test():
-        pass
-` ` `
-Expected: Compressed Plain + Protected Code
-Actual: Hello world!
-
-` ` `python
-    def test():
-        pass
-` ` `` ` `python
-    def test():
-        pass
-` ` `
+Outro...
 [AUDIT END]
-PASSED
-tests/test_p3_pipeline.py::test_tier2_enforcement 
-[AUDIT START]
-Input: TIER 2 Request
-Expected: Content with Patch
-Actual: Hello
+FAILED
+tests/test_p3_pipeline.py::test_full_pipeline_real_world 
+[AUDIT START: Full Pipeline]
+Input (Truncated if long): Raw Request
+Expected (Summary): Compressed + Patched Request
+Actual (Summary): Analyze this: 
 
-[SYSTEM ENFORCEMENT]: You must respond ONLY in valid JSON format. Do not add any conversational preamble or postscript.
-[AUDIT END]
-PASSED
-tests/test_p3_pipeline.py::test_tier1_bypass 
-[AUDIT START]
-Input: TIER 1 Request
-Expected: Hello
-Actual: Hello
+Wiki Data
+
+[SYSTEM ENFORCEMENT]: You must respond ONLY in valid JSON format. Do not add any conversational preamble or postscript....
 [AUDIT END]
 PASSED
 
-============================== 3 passed in 0.07s ===============================
+=================================== FAILURES ===================================
+_______________________ test_real_world_wiki_compression _______________________
+
+    def test_real_world_wiki_compression():
+        """使用真实 Wiki 数据测试压缩引擎的鲁棒性"""
+        data_path = Path("tests/data/p3_real_world.json")
+>       data = json.loads(data_path.read_text())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_p3_pipeline.py:26: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.12/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x77d57ddf8b60>
+s = '{\n  "wiki_content": "Large language model\\nFrom Wikipedia, the free encyclopedia\\n\\n\\nA large language model (LL...dirty_content": "This    is    a    test    with    too    many    spaces. \\n\\n\\n\\n\\nAnd too many newlines."\n}\n'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+>           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           json.decoder.JSONDecodeError: Invalid \escape: line 2 column 543 (char 544)
+
+/usr/lib/python3.12/json/decoder.py:353: JSONDecodeError
+_______________________ test_real_world_code_protection ________________________
+
+    def test_real_world_code_protection():
+        """验证在长篇技术文章中的代码块缩进被 100% 保护"""
+        code_block = "def example_code():\n    if True:\n        print('indented')"
+        input_text = f"Intro\n\n```python\n{code_block}\n```\n\nOutro"
+    
+        actual = WhitespaceCompressor.compress(input_text)
+    
+        audit_log("Code Protection", "Long text with code block", "Indentation preserved", actual)
+>       assert code_block in actual
+E       assert "def example_code():\n    if True:\n        print('indented')" in "Intro\n\n```python\ndef example_code():\n if True:\n print('indented')\n```\n\nOutro"
+
+tests/test_p3_pipeline.py:47: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_p3_pipeline.py::test_real_world_wiki_compression - json.dec...
+FAILED tests/test_p3_pipeline.py::test_real_world_code_protection - assert "d...
+========================= 2 failed, 1 passed in 0.14s ==========================

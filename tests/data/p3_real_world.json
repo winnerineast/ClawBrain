@@ -1,0 +1,4 @@
+{
+  "wiki_content": "Large language model\nFrom Wikipedia, the free encyclopedia\n\n\nA large language model (LLM) is a type of language model notable for its ability to achieve general-purpose language generation and other natural language processing tasks. LLMs acquire these abilities by learning statistical relationships from vast amounts of text during a self-supervised and semi-supervised training process.\n\n\n[Architecture Section]\nMost modern LLMs use the Transformer architecture. Some also implement Mixture of Experts (MoE).\n\n\` \` \`python\ndef example_code():\n    \"\"\"This is a sample with deep indentation\"\"\"\n    if True:\n        print('This must stay indented')\n\` \` \` \n\n\nReferences:\n1. Vaswani et al. (2017)\n2. Brown et al. (2020)\n",
+  "dirty_content": "This    is    a    test    with    too    many    spaces. \n\n\n\n\nAnd too many newlines."
+}
