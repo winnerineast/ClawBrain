@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/nvidia/ClawBrain/venv/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
+rootdir: /home/nvidia/ClawBrain
+plugins: metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
+collecting ... collected 3 items
+
+tests/test_models.py::test_standard_request_parsing PASSED               [ 33%]
+tests/test_models.py::test_tool_calling_parsing PASSED                   [ 66%]
+tests/test_models.py::test_invalid_request PASSED                        [100%]
+
+============================== 3 passed in 0.04s ===============================
