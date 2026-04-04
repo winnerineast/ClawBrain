@@ -1,23 +1,37 @@
-# design/gateway.md v1.9
+# design/gateway.md v1.11
 
 ## 1. 任务目标 (Objective)
-[保持 v1.8 目标]
+生成名为 **ClawBrain Protocol Router** 的核心分发组件。
+系统必须根据入口路径 (Endpoint Path) 自动路由至对应的原生协议适配器，严禁进行跨协议的破坏性转换。
 
-## 2. 核心架构设计约束 (Technical Constraints)
-[保持 v1.8 约束]
+## 2. 核心架构设计 (Architecture)
 
-## 3. 自动化测试与审计规范 (Updated for Precision)
+### 2.1 路径分发规则 (Endpoint Routing)
+- **Ollama 栈 (Path: /api/*)**:
+  - 路由至 `OllamaAdapter`。
+  - 职责：解析 Ollama 原生 JSON，调用 Pipeline 处理 `messages` 内容，转发至底层 Ollama。
+- **OpenAI 栈 (Path: /v1/*)**:
+  - 路由至 `OpenAIAdapter`。
+  - 职责：解析 OpenAI 原生 JSON，调用 Pipeline 处理 `messages` 内容，转发至 OpenAI 兼容后端。
 
-### 3.1 测试数据生成
-[保持 v1.8 规范]
+### 2.2 适配器接口修正 (Updated BaseAdapter)
+- 适配器不再接收统一模型，而是接收 **FastAPI Request** 对象或其原始 JSON。
+- 每一个适配器独立负责其协议下的 `chat()`, `generate()`, `tags()` 实现。
 
-### 3.2 审计精度 (Mandatory Upgrade)
-- **逐字符精确验证 (Exact Match Assertions)**：全链路集成测试（如 `test_full_pipeline`）严禁使用 `in` 或 `not in` 等模糊包含断言。
-- **验证要求**：必须预先定义完整的“理论上压缩后且注入后的字符串”，并使用 `==` 进行 100% 匹配验证。
-- **边界覆盖**：必须验证内容末尾的补丁注入是否产生了多余的空格或换行。
+## 3. 自动化测试规格 (TDD Requirements)
 
-## 4. 自动化报告 (Rule 8 & 9)
-[保持 JSON 报告与关联日志路径的定义]
+### 3.1 协议隔离验证 (Mandatory)
+- **Ollama 链路测试**：发送 `/api/chat`，验证只有 `OllamaAdapter` 被触发，且保留了 `options` 字段。
+- **OpenAI 链路测试**：发送 `/v1/chat/completions`，验证只有 `OpenAIAdapter` 被触发。
+
+### 3.2 路由容错
+- 验证非法路径请求是否被正确拦截。
+
+## 4. 审计标准 (Rule 8)
+- 审计日志必须记录：`Entry Path` -> `Selected Adapter` -> `Target Backend`。
 
 ## 5. 生成目标 (Output Targets)
-[保持原列表]
+- `src/main.py`: 实现基于路径的分发逻辑。
+- `src/adapters/ollama.py`: Ollama 原生协议适配。
+- `src/adapters/openai.py`: OpenAI 原生协议适配 (Stub)。
+- `tests/test_p4_router.py`: 路径分发与协议隔离审计。
