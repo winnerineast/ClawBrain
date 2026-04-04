@@ -7,14 +7,50 @@ plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collecting ... collected 3 items
 
+tests/test_p5_e2e.py::test_e2e_multi_round_marathon 
+[MARATHON BREAKDOWN]
+Total History Rounds: 40
+  - Round 1 Snapshot:  Round 1: How to set up a FastAPI server?...
+  - Round 10 Snapshot: Round 10: How to run tests against a real Postgres...
+  - Round 20 Snapshot: To sum up: Dev with FastAPI/SQLAlchemy, Dockerize,...
+------------------------------------------------------------
+[MODEL_QUAL] Model: gemma4:e4b | Tier: TIER_1_EXPERT | Action: PASS
+
+[AUDIT: Marathon Knowledge Recall]
+------------------------------------------------------------
+INPUT: Round 21: Based on our talk about FastAPI (Round 2) and AWS ECS (Round 12), what is the single most critical step for production stability?
+------------------------------------------------------------
+EXPECTED                    | ACTUAL
+--------------------------- | ---------------------------
+Recall from Round 2/12      | The single most critical st
+------------------------------------------------------------
+MATCH: NO
+============================================================
+
+[FULL RESPONSE PROOF]
+The single most critical step for production stability, synthesizing both the FastAPI/SQLAlchemy application layer and the AWS ECS infrastructure, is **Robust, Transactional Connection and State Management.**
+
+While monitoring (CloudWatch) and redundancy (ALB/ECS) are vital for *detecting* failure, and containerization is vital for *portability*, the application’s stability hinges on how it handles its relationship with persistent state (the database) when external systems inevitably fail or slow down.
+
+Here is why:
+
+1. **The Single Point of Failure:** In this entire stack, the database is the most common and most destructive point of failure. If your FastAPI application assumes a connection to SQLAlchemy is always instantaneous and successful, a momentary database slowdown (a common occurrence under load) will cause your application to crash or execute incorrect data writes.
+2. **The Solution (The Stability Pattern):** You must implement **Circuit Breaker patterns** and meticulous **Transaction Scope Management**.
+    * **Circuit Breakers:** Instead of having your application retry connecting to the database indefinitely upon failure (which consumes resources and degrades performance), the circuit breaker pattern monitors the failure rate. If the rate exceeds a threshold, the circuit "trips," and your application fails fast (returning a controlled error message) *before* hammering the struggling database, allowing the database time to recover.
+    * **Transactional Guarantees:** You must ensure every write operation is wrapped in explicit, atomic transactions (`session.begin()`). This guarantees that if *any* part of the request fails (network timeout, validation error, DB constraint violation), the entire block of changes is rolled back, preventing orphaned or corrupted data records.
+
+**In summary:** Don't just focus on *how* to deploy (ECS) or *how* to write code (FastAPI); focus on *how* your code interacts with its critical external dependency (the DB) in a way that is resilient to failure, slowdown, and network jitter.
+
+PASSED
 tests/test_p5_e2e.py::test_e2e_ollama_chat_lifespan [MODEL_QUAL] Model: gemma4:e4b | Tier: TIER_1_EXPERT | Action: PASS
 
 [AUDIT: E2E Chat]
 ------------------------------------------------------------
 INPUT: 1+1=?
 ------------------------------------------------------------
-EXPECTED: 2
-ACTUAL:   {"model":"gemma4:e4b","created_at":"2026-04-04T08:11:47.158061244Z","message":{"role":"assistant","c...
+EXPECTED                    | ACTUAL
+--------------------------- | ---------------------------
+2                           | {"model":"gemma4:e4b","crea
 ------------------------------------------------------------
 MATCH: YES
 ============================================================
@@ -25,23 +61,12 @@ tests/test_p5_e2e.py::test_e2e_qualification_interception [MODEL_QUAL] Model: qw
 ------------------------------------------------------------
 INPUT: Qwen + Tools
 ------------------------------------------------------------
-EXPECTED: 422
-ACTUAL:   422...
+EXPECTED                    | ACTUAL
+--------------------------- | ---------------------------
+422                         | 422
 ------------------------------------------------------------
 MATCH: YES
 ============================================================
 PASSED
-tests/test_p5_e2e.py::test_e2e_multi_round_marathon [MODEL_QUAL] Model: gemma4:e4b | Tier: TIER_1_EXPERT | Action: PASS
 
-[AUDIT: E2E Marathon]
-------------------------------------------------------------
-INPUT: 21 Rounds technical thread
-------------------------------------------------------------
-EXPECTED: Status 200
-ACTUAL:   200...
-------------------------------------------------------------
-MATCH: NO
-============================================================
-PASSED
-
-============================== 3 passed in 6.21s ===============================
+============================== 3 passed in 9.53s ===============================
