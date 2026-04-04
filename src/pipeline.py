@@ -1,46 +1,46 @@
-# Generated from design/gateway.md v1.7
+# Generated from design/gateway.md v1.8
 import re
-from typing import List
-from src.models import Message, StandardRequest
+from src.models import StandardRequest
 from src.scout import ModelTier
 
 class WhitespaceCompressor:
     """
-    负责对文本进行压缩，剔除冗余空格和换行。
-    必须保护 ` ` ` 代码块内的缩进不被破坏。
+    基于 design/gateway.md v1.8 实现的高精度压缩引擎。
+    先切分代码块，再对非代码块区域执行底噪去除。
     """
     @staticmethod
     def compress(text: str) -> str:
         if not text:
             return text
         
-        # 将文本分割为“普通文本”和“代码块”
-        parts = re.split(r'((` ` `[\s\S]*?` ` `))', text)
+        # 遵循 2.1 准则：先捕获代码块，保持缩进无损
+        pattern = r'(```[\s\S]*?```)'
+        # 使用括号捕获组，split 会保留分隔符
+        parts = re.split(pattern, text)
         processed_parts = []
         
         for part in parts:
-            if part.startswith('` ` `'):
-                # 保护代码块
+            if part.startswith('```') and part.endswith('```'):
+                # 命中保护逻辑
                 processed_parts.append(part)
             else:
-                # 压缩普通文本：将连续空格(2个以上)替换为1个，连续换行(3个以上)替换为2个
+                # 2.1 准则：仅处理非代码块区域
+                # 将 2+ 空格变为 1
                 temp = re.sub(r' {2,}', ' ', part)
+                # 将 3+ 换行变为 2
                 temp = re.sub(r'\n{3,}', '\n\n', temp)
                 processed_parts.append(temp)
         
         return "".join(processed_parts)
 
 class SafetyEnforcer:
-    """
-    针对不同层级的模型，动态增强指令稳定性。
-    """
     TIER2_PATCH = "\n\n[SYSTEM ENFORCEMENT]: You must respond ONLY in valid JSON format. Do not add any conversational preamble or postscript."
 
     @classmethod
     def apply(cls, request: StandardRequest, tier: ModelTier):
-        if tier == ModelTier.TIER_2:
-            # 在 System Prompt 或第一条 User 消息后注入补丁
-            if request.messages:
+        if tier == ModelTier.TIER_2 and request.messages:
+            # 遵循 2.2 准则：幂等性检查
+            if cls.TIER2_PATCH not in request.messages[0].content:
                 request.messages[0].content += cls.TIER2_PATCH
         return request
 
@@ -50,12 +50,8 @@ class Pipeline:
         self.enforcer = SafetyEnforcer()
 
     def run(self, request: StandardRequest, tier: ModelTier) -> StandardRequest:
-        # 1. 压缩所有消息内容
         for msg in request.messages:
             if msg.content:
                 msg.content = self.compressor.compress(msg.content)
-        
-        # 2. 执行安全性增强
         request = self.enforcer.apply(request, tier)
-        
         return request
