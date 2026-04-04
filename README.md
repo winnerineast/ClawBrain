@@ -1,4 +1,4 @@
-# 🦞 ClawBrain: 为智能体工作流打造的“硅基海马体”
+# 🦞 ClawBrain: 智能体工作流的“硅基海马体”
 
 [English](./README_EN.md) | 中文版
 
@@ -6,26 +6,26 @@
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain 是一个仿生学设计的 **透明神经中继网关**。它不仅解决多协议路由，更通过一套仿生记忆算法，在受限的硬件环境下，实现上下文的高倍提纯与长程记忆召回。
+ClawBrain 是一个基于仿生学设计的 **透明神经中继网关**。它不仅解决了多协议路由的兼容性问题，更通过模拟人类大脑的记忆演变逻辑，为大语言模型（LLM）提供了一个能够自我进化、具备长短期记忆协同的“外挂大脑”。在受限的显存硬件环境下，ClawBrain 能显著提升智能体的上下文利用效率与任务执行的逻辑一致性。
 
 ---
 
-## 🛡️ 隐私与安全承诺 (Privacy & Security)
-**ClawBrain 遵循“无影准则”，保护您的核心资产：**
-- **零记录 (Zero-Knowledge)**：系统**绝不记录、保存或持久化**您的任何 `API Key` 或鉴权凭证。
-- **纯透传 (Transparent Relay)**：所有 Key 仅在内存中瞬时中转，随请求直接透传至目标上游，请求结束立即销毁。
-- **本地化 (Local First)**：所有记忆数据（海马体/新皮层）均存储在您本地的 SQLite 数据库中，不上传至任何云端。
+## 🛡️ 隐私与安全承诺
+**ClawBrain 遵循“无影准则”，保护您的核心数字资产：**
+- **零记录政策**：系统核心逻辑中**严禁记录、保存或持久化**您的任何接口密钥或鉴权凭证。
+- **透明透传架构**：所有的身份验证信息仅在内存中进行瞬时中转，随请求直接透传至目标上游，一旦请求处理完成，内存即刻释放销毁。
+- **本地化存储**：所有的记忆产物（海马体的情节记录、新皮层的语义事实）均完全存储在您本地的数据库中，绝不上传至任何第三方云端。
 
 ---
 
-## 🏗️ 全景架构：信息流与记忆演变 (System Architecture)
+## 🏗️ 全景架构：信息流与记忆演变
 
-系统采用横向流动设计，下方挂载三层动力学记忆引擎：
+系统采用横向流动设计，下方挂载三层深度动力学记忆引擎，确保每一次交互都经过神经增强：
 
 ```mermaid
 graph LR
     subgraph Client_Side [左：输入端]
-        OC[OpenClaw / OpenAI SDK]
+        OC[智能体客户端 / 开发者工具]
     end
 
     subgraph Relay_Core [中：ClawBrain 神经中继]
@@ -40,10 +40,10 @@ graph LR
             HP[海马体: 情节无损归档]
             
             %% 记忆内部流动
-            WM -- 衰减/整合 --> NC
-            WM -- 固化 --> HP
-            NC -- 泛化规则 --> Process
-            HP -- 全文检索 --> Process
+            WM -- 衰减与整合 --> NC
+            WM -- 物理固化 --> HP
+            NC -- 泛化规则注入 --> Process
+            HP -- 全文语义检索 --> Process
         end
         
         Ingress --> Process
@@ -51,68 +51,67 @@ graph LR
     end
 
     subgraph Provider_Side [右：输出端]
-        LLM[大模型: Ollama / DeepSeek / OpenAI]
+        LLM[模型供应商: 本地或云端]
     end
 
     %% 主流向
-    OC -- "请求 (含 Key)" --> Ingress
-    Egress -- "透传 (含 Key)" --> LLM
-    LLM -- "流式返回" --> Egress
-    Egress -- "闭环存证" --> WM
-    Egress -- "实时回传" --> OC
+    OC -- "原生请求 (含密钥)" --> Ingress
+    Egress -- "方言透传 (含密钥)" --> LLM
+    LLM -- "流式响应返回" --> Egress
+    Egress -- "闭环记忆存证" --> WM
+    Egress -- "结果实时回传" --> OC
 ```
 
 ---
 
-## 🔄 万能协议翻译与适配 (Universal Dialect Translation)
-ClawBrain 内置了强大的方言翻译引擎，能够自动对齐不同提供商的 API 契约，确保 100% 兼容性：
+## 🧠 深度设计哲学：三子记忆的演变算法
 
-- **Google Gemini**: 自动处理 `role: assistant` 到 `role: model` 的映射，并精准注入 `system_instruction`。
-- **Anthropic Claude**: 自动执行 **角色交替正规化 (Role Normalization)**，合并连续的重复角色消息，确保请求符合 Claude 严格的 API 校验。
-- **OpenAI 兼容簇**: 为 DeepSeek, Mistral, xAI (Grok), vLLM, SGLang, OpenRouter 等提供自动模型前缀剥离与 Header 透传。
+ClawBrain 的核心并非静态的数据库，而是信息在不同能级之间流动的 **“相变”** 过程。每一个交互对（刺激-反应）都会在系统中经历从瞬间激活到长效固化的演变：
 
----
+### 1. 工作记忆 (L1: 活跃注意力层)
+*   **工程实现**：内存中带权重的有序字典（Weighted OrderedDict）。
+*   **演变逻辑**：
+    - **初始激活**：每组新交互进入时，获得满额电荷（权重为 1.0）。
+    - **吸引子动力学**：系统会持续扫描当前话题。如果新输入的内容与旧记忆高度相关，相关的旧记忆会被重新“充电”，在注意力中心驻留更久。
+    - **自然衰减**：不相关的信息随时间呈指数级衰减。当权重低于 0.3 阈值时，信息从“瞬时意识”中消失，其索引将被挤出至新皮层进行泛化处理。
 
-## 🧠 深度设计哲学：三子记忆实现
-项目深受“虾叔理论”启发，并在工程上实现了三层动力学架构：
+### 2. 海马体 (L2: 情节归档层)
+*   **工程实现**：SQLite 全文检索引擎（FTS5）与本地二进制存储（Blob Storage）。
+*   **演变逻辑**：
+    - **数字化底片**：系统将每一轮对话的原始字节进行 100% 无损落盘。
+    - **冲击防御**：面对巨量数据（如 10MB 级的合同或超长日志），海马体会自动开启流式分流模式，确保内存波动平稳，并在索引中精准标记记忆锚点。
+    - **完整性审计**：每一条情节记忆都绑定了 SHA-256 校验和，确保历史记录的真实性与可回溯性。
 
-### 1. 海马体 (Hippocampus) —— 情节记忆层
-*   **工程实现**：`src/memory/storage.py` (SQLite FTS5 + Blob Storage)
-*   **特性**：系统的“无损黑匣子”。100% 原始字节落盘，支持 10MB 级流式分流保护内存，提供字节级 SHA-256 存证审计。
-
-### 2. 新皮层 (Neocortex) —— 语义记忆层
-*   **工程实现**：`src/memory/neocortex.py` (Asynchronous Distillation)
-*   **特性**：系统的“知识提炼池”。通过异步后台任务，将琐碎情节泛化为 Bullet Points 事实清单，常驻于模型上下文边缘。
-
-### 3. 工作记忆 (Working Memory) —— 活跃注意力层
-*   **工程实现**：`src/memory/working.py` (Weighted OrderedDict)
-*   **特性**：系统的“瞬时焦点”。基于“时间远离度”与“话题相关度”双因子动态计算激活值，确保注意力始终聚焦。
-
----
-
-## 🔄 支持的模型托管 (Supported Hosting)
-- **本地 (Local)**: Ollama (Default), LM Studio, vLLM, SGLang.
-- **云端 (Cloud)**: OpenAI, DeepSeek, Anthropic (Claude), Google (Gemini), xAI (Grok), Mistral, OpenRouter, Together AI.
+### 3. 新皮层 (L3: 语义事实层)
+*   **工程实现**：后台异步语义提纯引擎（Asynchronous Distillation）。
+*   **演变逻辑**：
+    - **异步提纯**：当海马体中的琐碎情节积累到一定阈值，后台任务会自动启动。
+    - **泛化提取**：利用模型的慢速累积效应，将反复出现的技术决策或用户偏好提炼为“事实清单”。
+    - **长程常驻**：提纯后的知识点会以极简的格式，常驻在模型上下文的边缘，提供跨越周期的逻辑指导，彻底解决模型“断片”的问题。
 
 ---
 
-## ⚙️ 配置挂载 (Transparent Mounting)
-仅需将 `baseUrl` 指向本地端口 **`11435`**，无需配置 Key：
+## 🔄 协议翻译与模型适配
+ClawBrain 内置了强大的万能方言翻译器，能够根据不同提供商的 API 契约自动对齐，实现 100% 兼容：
+- **本地环境**：深度适配 Ollama, LM Studio, vLLM, SGLang。
+- **云端环境**：支持 OpenAI, DeepSeek, Anthropic (Claude 3.5), Google (Gemini), xAI (Grok), Mistral 等。
+- **自动对齐**：自动处理角色合并（解决 Claude 报错）、角色映射（适配 Gemini）以及模型前缀剥离。
+
+---
+
+## ⚙️ 挂载指南：零配置透传
+仅需在客户端将地址指向本地端口 **`11435`**，无需在网关进行任何重复配置：
 
 ```json
-"models": {
-  "providers": {
-    "ollama": {
-      "baseUrl": "http://127.0.0.1:11435", 
-      "apiKey": "sk-xxx..." // 凭证由网关透明透传
-    }
-  }
+"ollama": {
+  "baseUrl": "http://127.0.0.1:11435", 
+  "apiKey": "sk-xxx..." // 您的原始密钥将由网关安全透传
 }
 ```
 
 ---
 
-## 🧪 确定性审计 (Audit)
+## 🧪 确定性审计
 项目遵循 **GEMINI.md** 宪法，提供 Side-by-Side 证据审计。
 
 ```bash
@@ -122,4 +121,4 @@ pytest tests/
 ```
 
 ---
-<p align="right">由 GEMINI CLI Agent 依据项目源码 v1.26 生成</p>
+<p align="right">由 GEMINI CLI Agent 依据项目源码 v1.26 驱动生成</p>
