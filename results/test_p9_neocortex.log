@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/nvidia/ClawBrain/venv/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'asyncio': '1.3.0', 'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
+rootdir: /home/nvidia/ClawBrain
+plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_p9_neocortex.py::test_neocortex_distillation 
+[AUDIT: Semantic Distillation]
+------------------------------------------------------------
+METRIC                      | VALUE
+--------------------------- | ---------------------------
+Raw Bytes                   | 572
+Summary Bytes               | 560
+Compression Ratio           | 2.10%
+Canary Check                | PASS
+------------------------------------------------------------
+============================================================
+PASSED
+
+============================== 1 passed in 8.16s ===============================
