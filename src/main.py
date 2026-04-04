@@ -1,15 +1,17 @@
-# Generated from design/gateway.md v1.15
+# Generated from design/memory_integration.md v1.1
 import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from src.adapters.ollama import OllamaAdapter
 from src.adapters.openai import OpenAIAdapter
 from src.scout import ModelScout
+from src.memory.router import MemoryRouter
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 2.1 准则：Lifespan 资源初始化
+    # 2.3 准则：在生命周期中初始化记忆路由器
     scout = ModelScout()
+    app.state.memory_router = MemoryRouter()
     app.state.ollama_adapter = OllamaAdapter(scout)
     app.state.openai_adapter = OpenAIAdapter()
     yield
@@ -32,4 +34,4 @@ async def openai_chat(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "proxy": "ClawBrain"}
+    return {"status": "ok", "proxy": "ClawBrain", "memory_engine": "ready"}
