@@ -1,0 +1,91 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/nvidia/ClawBrain/venv/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
+rootdir: /home/nvidia/ClawBrain
+plugins: metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
+collecting ... collected 3 items
+
+tests/test_p1_models.py::test_standard_request_parsing 
+[AUDIT START]
+Input: {
+  "model": "ollama/gemma4:e4b",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "Hello!"
+    }
+  ],
+  "stream": true
+}
+Expected: ollama/gemma4:e4b
+Actual: ollama/gemma4:e4b
+[AUDIT END]
+
+[AUDIT START]
+Input: {
+  "model": "ollama/gemma4:e4b",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "Hello!"
+    }
+  ],
+  "stream": true
+}
+Expected: 2
+Actual: 2
+[AUDIT END]
+PASSED
+tests/test_p1_models.py::test_tool_calling_parsing 
+[AUDIT START]
+Input: {
+  "model": "gemma4:31b",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Read file"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+Expected: read_file
+Actual: read_file
+[AUDIT END]
+PASSED
+tests/test_p1_models.py::test_invalid_request 
+[AUDIT START] Testing Invalid Input: {'model': 'test-model'}
+
+[AUDIT START]
+Input: {
+  "model": "test-model"
+}
+Expected: Failed as expected
+Actual: Failed as expected: ValidationError
+[AUDIT END]
+PASSED
+
+============================== 3 passed in 0.03s ===============================
