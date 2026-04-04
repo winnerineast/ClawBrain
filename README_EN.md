@@ -117,13 +117,15 @@ Simply point your client to local port **`11435`**; no redundant gateway configu
 
 ---
 
-## 🧪 Deterministic Audit
-Adheres to **GEMINI.md**, providing Side-by-Side evidence for every logical transformation.
+## 🧪 Deterministic Audit & Neural Activity Logs
+The project adheres to the **GEMINI.md** constitution, providing Side-by-Side evidence for every logical transformation across the entire lifecycle.
+- **Full-Stack Instrumentation**: The system records real-time `[DETECTOR]`, `[PIPELINE]`, `[MODEL_QUAL]`, `[ADAPTER]`, and `[HP_STOR]` tags, ensuring every decision from protocol detection to async storage is transparent.
+- **Async Log Verification**: Enhanced test wait mechanisms ensure that even background Hippocampus archival actions are 100% captured and verified.
 
 ```bash
-# Run full acceptance tests
+# Run full acceptance tests and inspect neural activity logs
 export PYTHONPATH=$PYTHONPATH:.
-pytest tests/
+pytest -v -s -o "log_cli=true" tests/
 ```
 
 ---
