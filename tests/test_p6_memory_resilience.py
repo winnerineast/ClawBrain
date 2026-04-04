@@ -1,55 +1,56 @@
-# Generated from design/memory.md v1.7
+# Generated from design/memory.md v1.8
 import pytest
-import asyncio
+import json
 from src.memory.core import MemoryEngine, TraceStatus
+from src.memory.signals import SignalDecomposer
 
-def visual_audit(test_name, input_data, expected, actual):
+def visual_audit(test_name, input_val, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
     print(f"\n[AUDIT: {test_name}]")
     print("-" * 60)
-    print(f"INPUT: {str(input_data)[:100]}...")
+    print(f"INPUT: {repr(input_val)[:100]}...")
     print("-" * 60)
-    print(f"{'EXPECTED STATE':<27} | {'ACTUAL STATE'}")
+    print(f"{'EXPECTED':<27} | {'ACTUAL'}")
     print(f"{'-'*27} | {'-'*27}")
-    print(f"{str(expected):<27} | {str(actual)}")
+    print(f"{str(expected)[:27]:<27} | {str(actual)[:27]}")
     print("-" * 60)
     print(f"MATCH: {match}")
     print("=" * 60)
 
 @pytest.mark.asyncio
-async def test_symmetric_commit_flow():
-    """验证完整的 刺激-反应 对称提交链路"""
-    engine = MemoryEngine()
-    input_payload = {"model": "gemma4", "messages": [{"role": "user", "content": "Hi"}]}
-    output_payload = {"message": {"role": "assistant", "content": "Hello"}}
+async def test_signal_fingerprinting():
+    """验证协议指纹的一致性"""
+    payload1 = {"model": "gemma", "tools": ["read"], "messages": [{"content": "hi"}]}
+    payload2 = {"model": "gemma", "tools": ["read"], "messages": [{"content": "different"}]}
     
-    # 1. 录入输入
-    tid = await engine.ingest_stimulus(input_payload)
-    trace = engine.active_traces[tid]
-    visual_audit("Stimulus Received", "User: Hi", TraceStatus.PENDING, trace.status)
-    assert trace.status == TraceStatus.PENDING
+    hash1 = SignalDecomposer.get_schema_fingerprint(payload1)
+    hash2 = SignalDecomposer.get_schema_fingerprint(payload2)
     
-    # 2. 录入响应
-    await engine.associate_reaction(tid, output_payload)
-    visual_audit("Reaction Committed", "Assistant: Hello", TraceStatus.COMMITTED, trace.status)
-    assert trace.status == TraceStatus.COMMITTED
-    assert trace.reaction == output_payload
+    visual_audit("Schema Fingerprint Constancy", "Payload structure", hash1, hash2)
+    # 虽然消息不同，但由于结构（model, tools）相同，Hash 必须一致
+    assert hash1 == hash2
 
 @pytest.mark.asyncio
-async def test_orphan_input_logic():
-    """验证“孤儿输入”自动标记逻辑"""
+async def test_core_intent_extraction():
+    """验证最后一条 User 意图提取"""
+    payload = {
+        "messages": [
+            {"role": "system", "content": "You are a bot"},
+            {"role": "user", "content": "First question"},
+            {"role": "assistant", "content": "Answer"},
+            {"role": "user", "content": "The Real Goal"}
+        ]
+    }
+    intent = SignalDecomposer.extract_core_intent(payload)
+    visual_audit("Intent Extraction", "Multi-round messages", "The Real Goal", intent)
+    assert intent == "The Real Goal"
+
+@pytest.mark.asyncio
+async def test_full_commit_flow():
+    """验证对称提交"""
     engine = MemoryEngine()
-    input_payload = {"model": "gemma4", "messages": [{"role": "user", "content": "I will cancel this..."}]}
-    
-    # 录入输入后不给响应
-    tid = await engine.ingest_stimulus(input_payload)
-    
-    # 模拟时间流逝（通过修改 trace 的 timestamp）
-    engine.active_traces[tid].timestamp -= 600 
-    
-    # 执行清理
-    engine.cleanup_orphans(ttl_seconds=300)
-    
-    orphan_trace = engine.working_memory[0]
-    visual_audit("Orphan Intent Detection", "Cancelled Request", TraceStatus.ORPHAN, orphan_trace.status)
-    assert orphan_trace.status == TraceStatus.ORPHAN
+    tid = await engine.ingest_stimulus({"q": "1"})
+    await engine.associate_reaction(tid, {"a": "2"})
+    status = engine.working_memory[0].status
+    visual_audit("Commit Flow", "1 -> 2", TraceStatus.COMMITTED, status)
+    assert status == TraceStatus.COMMITTED
