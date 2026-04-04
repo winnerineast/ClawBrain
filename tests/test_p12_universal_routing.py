@@ -1,11 +1,12 @@
-# Generated from design/gateway.md v1.23
+# Generated from design/gateway.md v1.29
 import pytest
+import asyncio
 from fastapi.testclient import TestClient
 from src.main import app
 from unittest.mock import patch, MagicMock, AsyncMock
 
 def visual_audit(test_name, input_desc, target_prov, actual_status):
-    print(f"\n[AUDIT: {test_name}]")
+    print(f"\n[DIALECT AUDIT: {test_name}]")
     print("-" * 60)
     print(f"INPUT: {input_desc}")
     print("-" * 60)
@@ -26,15 +27,16 @@ async def test_universal_routing_lmstudio():
     
     with TestClient(app) as client:
         with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-            # 3.1 准则修复：使用 MagicMock 模拟同步方法 json()
             mock_resp = MagicMock()
             mock_resp.is_error = False
             mock_resp.status_code = 200
-            # 关键：json() 返回字典，而不是协程
             mock_resp.json.return_value = {"choices": [{"message": {"content": "mock"}}]}
             mock_post.return_value = mock_resp
             
             response = client.post("/v1/chat/completions", json=payload)
+            
+            # 3.2 准则修复：等待异步日志传播
+            await asyncio.sleep(1)
             
             visual_audit("Universal Routing -> LMStudio", "lmstudio/llama-3 via /v1", "lmstudio (Dialect: openai)", response.status_code)
             
@@ -60,6 +62,9 @@ async def test_universal_routing_ollama():
             mock_post.return_value = mock_resp
             
             response = client.post("/api/chat", json=payload)
+            
+            # 3.2 准则修复：等待异步日志传播
+            await asyncio.sleep(1)
             
             visual_audit("Universal Routing -> Ollama", "gemma4:e4b via /api", "ollama (Dialect: ollama)", response.status_code)
             

@@ -1,7 +1,7 @@
-# Generated from design/memory_integration.md v1.2
+# Generated from design/gateway.md v1.27
+import logging
 import json
 import httpx
-import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse
@@ -14,9 +14,16 @@ from src.gateway.translator import DialectTranslator
 from src.pipeline import Pipeline
 from src.models import Message
 
+# 2.4 准则：全局结构化日志配置
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("GATEWAY")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 2.2 准则：生命周期内初始化记忆中枢
     app.state.scout = ModelScout()
     app.state.memory_router = MemoryRouter()
     app.state.registry = ProviderRegistry()
@@ -44,28 +51,46 @@ async def _process_request(request: Request):
 
     # 1. 协议探测与标准化
     source_protocol, std_req = ProtocolDetector.detect_and_standardize(raw_body)
+    context_id = raw_headers.get("x-clawbrain-session", "default")
+    
+    # 2.4 埋点 [DETECTOR]
+    logger.info(f"[DETECTOR] Proto: {source_protocol} | Model: {std_req.model} | Session: {context_id}")
 
     # 2. 路由发现
     provider_name, provider_config = registry.resolve_provider(std_req.model)
     target_protocol = provider_config.protocol
     
+    # 2.4 埋点 [ADAPTER]
+    key_found = "Authorization" in raw_headers or "x-api-key" in raw_headers
+    logger.info(f"[ADAPTER] Target: {provider_name} | Dialect: {target_protocol} | Key_Detected: {key_found}")
+
     # 3. 准入审计
     tier = await scout.get_model_tier(std_req.model)
     if provider_name != "ollama": tier = ModelTier.TIER_1
+    
+    # 2.4 埋点 [MODEL_QUAL]
+    action = "BLOCK" if tier == ModelTier.TIER_3 and std_req.tools else "PASS"
+    logger.info(f"[MODEL_QUAL] Tier: {tier.value} | Action: {action}")
 
-    # 4. 神经增强 (2.2 准则：集成记忆与压缩)
-    context_id = raw_headers.get("x-clawbrain-session", "default")
+    if action == "BLOCK":
+        raise HTTPException(status_code=422, detail=f"Model {std_req.model} too small for tools.")
+
+    # 4. 神经增强与内容优化
     last_msg_content = std_req.messages[-1].content if std_req.messages else ""
     intent = pipeline.compressor.compress(last_msg_content)
     
-    # 合成增强上下文
     enriched_context = await memory_router.get_combined_context(context_id, intent)
-    
-    # 注入为首个 System 消息
+    # 注入增强消息
     std_req.messages.insert(0, Message(role="system", content=enriched_context))
     
-    # 执行流水线压缩与增强
+    # 记录压缩前长度
+    old_total_len = sum(len(m.content or "") for m in std_req.messages)
     std_req = pipeline.run(std_req, tier)
+    new_total_len = sum(len(m.content or "") for m in std_req.messages)
+    
+    # 2.4 埋点 [PIPELINE]
+    saved = ((old_total_len - new_total_len) / old_total_len * 100) if old_total_len > 0 else 0
+    logger.info(f"[PIPELINE] Compression: {old_total_len} -> {new_total_len} | Saved: {saved:.1f}%")
 
     # 5. 方言翻译
     if target_protocol == "ollama":
@@ -82,9 +107,7 @@ async def _process_request(request: Request):
         target_payload = DialectTranslator.to_openai(std_req)
         endpoint = f"{provider_config.base_url}/v1/chat/completions"
 
-    # 6. 转发与闭环存储 (2.2 准则：动态分流阈值)
-    offload_threshold = 65536 # 假设默认窗口为 64k 的 10% 约为 6.5KB (测试演示用)
-    
+    # 6. 转发与闭环存储
     try:
         if std_req.stream:
             async def stream_generator():
@@ -94,18 +117,20 @@ async def _process_request(request: Request):
                         return
                     async for chunk in resp.aiter_bytes():
                         yield chunk
-                # 闭环存证
-                await memory_router.ingest(raw_body, {"message": {"content": "[Streamed]"}}, offload_threshold)
+                # 2.4 埋点 [HP_STOR] 将在 ingest 内部触发
+                await memory_router.ingest(raw_body, {"message": {"content": "[Streamed]"}})
             return StreamingResponse(stream_generator())
         else:
             resp = await client.post(endpoint, json=target_payload, headers=pass_headers)
+            if resp.is_error:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
             resp_json = resp.json()
-            # 闭环存证
-            await memory_router.ingest(raw_body, resp_json, offload_threshold)
+            await memory_router.ingest(raw_body, resp_json)
             return resp_json
 
     except Exception as e:
-        logging.error(f"Forwarding error: {e}")
+        if isinstance(e, HTTPException): raise e
+        logger.error(f"Forwarding error: {e}")
         raise HTTPException(status_code=502, detail=str(e))
 
 @app.post("/api/chat")
@@ -116,4 +141,4 @@ async def openai_ingress(request: Request): return await _process_request(reques
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "mode": "Universal Neural Relay", "integrated": True}
+    return {"status": "ok", "mode": "Universal Neural Relay", "version": "1.27"}
