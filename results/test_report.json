@@ -16,5 +16,17 @@
     "status": "FAIL",
     "module": "models",
     "evidence_log": "results/test_report.log"
+  },
+  {
+    "test_id": "tests/test_scout.py::test_tier_classification",
+    "status": "FAIL",
+    "module": "scout",
+    "evidence_log": "results/test_report.log"
+  },
+  {
+    "test_id": "tests/test_scout.py::test_cache_logic",
+    "status": "FAIL",
+    "module": "scout",
+    "evidence_log": "results/test_report.log"
   }
 ]

@@ -4,88 +4,39 @@ cachedir: .pytest_cache
 metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
 rootdir: /home/nvidia/ClawBrain
 plugins: metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
-collecting ... collected 3 items
+collecting ... collected 2 items
 
-tests/test_models.py::test_standard_request_parsing 
-[AUDIT START]
-Input: {
-  "model": "ollama/gemma4:e4b",
-  "messages": [
-    {
-      "role": "system",
-      "content": "You are a helpful assistant."
-    },
-    {
-      "role": "user",
-      "content": "Hello!"
-    }
-  ],
-  "stream": true
-}
-Expected: ollama/gemma4:e4b
-Actual: ollama/gemma4:e4b
-[AUDIT END]
+tests/test_scout.py::test_tier_classification FAILED
+tests/test_scout.py::test_cache_logic FAILED
 
-[AUDIT START]
-Input: {
-  "model": "ollama/gemma4:e4b",
-  "messages": [
-    {
-      "role": "system",
-      "content": "You are a helpful assistant."
-    },
-    {
-      "role": "user",
-      "content": "Hello!"
-    }
-  ],
-  "stream": true
-}
-Expected: 2
-Actual: 2
-[AUDIT END]
-PASSED
-tests/test_models.py::test_tool_calling_parsing 
-[AUDIT START]
-Input: {
-  "model": "gemma4:31b",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Read file"
-    }
-  ],
-  "tools": [
-    {
-      "type": "function",
-      "function": {
-        "name": "read_file",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    }
-  ]
-}
-Expected: read_file
-Actual: read_file
-[AUDIT END]
-PASSED
-tests/test_models.py::test_invalid_request 
-[AUDIT START] Testing Invalid Input: {'model': 'test-model'}
+=================================== FAILURES ===================================
+___________________________ test_tier_classification ___________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_______________________________ test_cache_logic _______________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+=============================== warnings summary ===============================
+tests/test_scout.py:13
+  /home/nvidia/ClawBrain/tests/test_scout.py:13: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
 
-[AUDIT START]
-Input: {
-  "model": "test-model"
-}
-Expected: Failed as expected
-Actual: Failed as expected: ValidationError
-[AUDIT END]
-PASSED
+tests/test_scout.py:35
+  /home/nvidia/ClawBrain/tests/test_scout.py:35: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
 
-============================== 3 passed in 0.04s ===============================
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_scout.py::test_tier_classification - Failed: async def func...
+FAILED tests/test_scout.py::test_cache_logic - Failed: async def functions ar...
+======================== 2 failed, 2 warnings in 0.02s =========================
