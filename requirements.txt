@@ -5,4 +5,5 @@ pydantic
 pydantic-settings
 pytest
 pytest-json-report
+pytest-asyncio
 python-dotenv
