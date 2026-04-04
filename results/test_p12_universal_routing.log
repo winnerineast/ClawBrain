@@ -7,8 +7,7 @@ plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collecting ... collected 2 items
 
-tests/test_p12_universal_routing.py::test_universal_routing_lmstudio [ROUTER] Target Provider: lmstudio | Dialect: openai
-
+tests/test_p12_universal_routing.py::test_universal_routing_lmstudio 
 [AUDIT: Universal Routing -> LMStudio]
 ------------------------------------------------------------
 INPUT: lmstudio/llama-3 via /v1
@@ -20,8 +19,7 @@ lmstudio (Dialect: openai)  | 200
 VERDICT: PASS
 ============================================================
 PASSED
-tests/test_p12_universal_routing.py::test_universal_routing_ollama [ROUTER] Target Provider: ollama | Dialect: ollama
-
+tests/test_p12_universal_routing.py::test_universal_routing_ollama 
 [AUDIT: Universal Routing -> Ollama]
 ------------------------------------------------------------
 INPUT: gemma4:e4b via /api
@@ -34,4 +32,4 @@ VERDICT: PASS
 ============================================================
 PASSED
 
-============================== 2 passed in 0.38s ===============================
+============================== 2 passed in 1.20s ===============================

@@ -1,34 +1,29 @@
-# Generated from design/gateway.md v1.22
+# Generated from design/gateway.md v1.25
 from typing import Dict, Any, Tuple
 
 class ProviderConfig:
     def __init__(self, base_url: str, protocol: str):
         self.base_url = base_url
-        self.protocol = protocol # 'ollama' 或 'openai'
+        self.protocol = protocol
 
 class ProviderRegistry:
     """
-    动态提供商注册表。
-    负责根据前缀路由到对应的真实后端，而无需硬编码类。
+    智能路由注册表。
+    2.2 准则：仅维护 Provider 到真实 URL 的映射。
     """
     def __init__(self):
-        # 默认配置
         self.providers: Dict[str, ProviderConfig] = {
-            "ollama": ProviderConfig(base_url="http://127.0.0.1:11434", protocol="ollama"),
-            "lmstudio": ProviderConfig(base_url="http://127.0.0.1:1234", protocol="openai"),
-            "openai": ProviderConfig(base_url="https://api.openai.com", protocol="openai"),
-            "deepseek": ProviderConfig(base_url="https://api.deepseek.com", protocol="openai")
+            "ollama": ProviderConfig("http://127.0.0.1:11434", "ollama"),
+            "lmstudio": ProviderConfig("http://127.0.0.1:1234", "openai"),
+            "openai": ProviderConfig("https://api.openai.com", "openai"),
+            "deepseek": ProviderConfig("https://api.deepseek.com", "openai"),
+            "anthropic": ProviderConfig("https://api.anthropic.com", "openai") # 暂假定 OpenAI 兼容入口
         }
 
     def resolve_provider(self, full_model_name: str) -> Tuple[str, ProviderConfig]:
-        """
-        例如：'lmstudio/llama3' -> ('lmstudio', ProviderConfig)
-        默认回退为 ollama。
-        """
         if "/" in full_model_name:
-            provider_prefix = full_model_name.split("/")[0]
-            if provider_prefix in self.providers:
-                return provider_prefix, self.providers[provider_prefix]
+            prefix = full_model_name.split("/")[0]
+            if prefix in self.providers:
+                return prefix, self.providers[prefix]
         
-        # 默认路由
         return "ollama", self.providers["ollama"]
