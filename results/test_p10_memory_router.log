@@ -7,25 +7,21 @@ plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collecting ... collected 1 item
 
-tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall FAILED
+tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall 
+[MARATHON START] Ingesting 4 interactions...
+  - Impact Check: 1 blobs persisted.
+  - Actual Blob Size: 4614516 bytes
 
-=================================== FAILURES ===================================
-____________________ test_p10_marathon_pressure_and_recall _____________________
+[NEURAL MARATHON AUDIT: 4.5MB Impact & Recall]
+================================================================================
+SCENARIO: Verification of Blob offloading (>512KB) and Canary Recall
+--------------------------------------------------------------------------------
+EXPECTED KNOWLEDGE                     | ACTUAL RECALL
+-------------------------------------- | --------------------------------------
+CLAW-SECURE-ALPHA-99                   | === SYSTEM MEMORY SUMMARY (NEOCORTEX) ...
+------------------------------------------------------------
+INTEGRITY MATCH: YES
+================================================================================
+PASSED
 
-    @pytest.mark.asyncio
-    async def test_p10_marathon_pressure_and_recall():
-        """Phase 10 强化审计：50轮对话、1MB冲击、7天跨度的全链路验收"""
-        if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
-        router = MemoryRouter(db_dir=TEST_DIR)
-    
-        # 1. 加载强化数据集
-        data = json.loads(Path("tests/data/p10_marathon.json").read_text())
-        thread = data["marathon_thread"]
->       canary = data["canaries"]["initial_protocol"]
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       KeyError: 'initial_protocol'
-
-tests/test_p10_memory_router.py:33: KeyError
-=========================== short test summary info ============================
-FAILED tests/test_p10_memory_router.py::test_p10_marathon_pressure_and_recall
-============================== 1 failed in 0.05s ===============================
+============================== 1 passed in 0.46s ===============================

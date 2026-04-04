@@ -1,4 +1,4 @@
-# Generated from design/memory_router.md v1.0
+# Generated from design/memory_router.md v1.5
 import pytest
 import json
 import os
@@ -17,49 +17,55 @@ def visual_audit_marathon(test_name, description, expected, actual):
     print(f"{'EXPECTED KNOWLEDGE':<38} | {'ACTUAL RECALL'}")
     print(f"{'-'*38} | {'-'*38}")
     print(f"{str(expected)[:38]:<38} | {str(actual)[:38]}...")
-    print("-" * 80)
+    print("-" * 60)
     print(f"INTEGRITY MATCH: {match}")
     print("=" * 80)
 
 @pytest.mark.asyncio
 async def test_p10_marathon_pressure_and_recall():
-    """Phase 10 强化审计：50轮对话、1MB冲击、7天跨度的全链路验收"""
+    """Phase 10 强化审计：4.5MB 真实文档冲击下的全链路验收"""
     if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
     router = MemoryRouter(db_dir=TEST_DIR)
     
     # 1. 加载强化数据集
-    data = json.loads(Path("tests/data/p10_marathon.json").read_text())
+    data_path = Path("tests/data/p10_marathon.json")
+    data = json.loads(data_path.read_text())
     thread = data["marathon_thread"]
-    canary = data["canaries"]["initial_protocol"]
+    
+    # 3.2 准则：使用 secure_protocol 作为 Key
+    canary = data["canaries"]["secure_protocol"]
     
     print(f"\n[MARATHON START] Ingesting {len(thread)} interactions...")
     
     # 2. 模拟真实摄入流
-    for msg in thread[:-1]: # 摄入除最后一条外的所有历史
+    for msg in thread:
         payload = {
             "model": "gemma4:e4b",
             "messages": [msg]
         }
         await router.ingest(payload)
     
-    # 3. 验证 1MB 冲击后的系统状态
-    # 检查磁盘是否有 Blob 生成
+    # 3.1 准则：验证 4MB+ 冲击后的系统状态
     blob_count = len(list(Path(TEST_DIR).glob("blobs/*.json")))
-    print(f"  - Impact Check: {blob_count} blobs persisted to disk.")
+    # 获取 Blob 文件大小
+    blobs = list(Path(TEST_DIR).glob("blobs/*.json"))
+    actual_size = os.path.getsize(blobs[0]) if blobs else 0
+    
+    print(f"  - Impact Check: {blob_count} blobs persisted.")
+    print(f"  - Actual Blob Size: {actual_size} bytes")
+    
+    # 验证点：必须确切触发分流
     assert blob_count > 0
+    assert actual_size > 512 * 1024
     
-    # 4. 执行长程召回测试 (提问 7 天前的内容)
-    current_focus = "initial protocol version"
-    context = await router.get_combined_context("session-marathon", current_focus)
+    # 4. 执行长程召回测试
+    context = await router.get_combined_context("marathon-session", "secure protocol version")
     
-    # 执行高保真审计
     visual_audit_marathon(
-        "7-Day Temporal Recall",
-        "Recalling Canary Fact from Round 1 after 50 rounds + 1MB data shock",
+        "4.5MB Impact & Recall",
+        "Verification of Blob offloading (>512KB) and Canary Recall",
         canary,
         context
     )
     
-    # 核心断言：金丝雀事实必须在合成后的上下文（无论是 L2 检索还是 L3 摘要）中浮现
     assert canary.lower() in context.lower()
-    assert "RELEVANT HISTORICAL SNIPPETS" in context

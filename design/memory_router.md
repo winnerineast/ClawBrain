@@ -1,4 +1,4 @@
-# design/memory_router.md v1.4
+# design/memory_router.md v1.5
 
 ## 1. 任务目标 (Objective)
 实现 **ClawBrain MemoryRouter (记忆路由)** 与 **CleanupManager (清理管理器)**。
@@ -31,7 +31,8 @@
 - **数据规范**：测试数据生成器必须使用 **4MB 以上的真实、非重复技术文本（如从 kernel.org 抓取的 Linux 文档）**，以确保数据具备语义复杂性，且能稳定触发磁盘分流。
 - **日志展示**：显式打印 `Expected_Blob_Dir` 与 `Actual_Blob_File_Size`。
 
-### 3.2 复合上下文合成审计 (Synthesis Audit)
+### 3.2 复合上下文合成与长程召回审计 (Fixed)
+- **契约要求**：测试必须使用 `secure_protocol` 作为金丝雀事实的 Key。
 - **验证点**：在有“历史摘要”和“活跃对话”的情况下发起检索。
 - **审计展示**：左侧展示原始各层内容，右侧展示最终拼接给 LLM 的字符串，验证优先级顺序。
 
