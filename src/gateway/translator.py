@@ -1,4 +1,4 @@
-# Generated from design/gateway_cloud.md v1.0
+# Generated from design/gateway_cloud.md v1.1
 import json
 from typing import Dict, Any, AsyncGenerator, List
 from src.models import StandardRequest
@@ -14,7 +14,6 @@ class DialectTranslator:
     @staticmethod
     def to_openai(request: StandardRequest) -> Dict[str, Any]:
         payload = request.model_dump(exclude_none=True)
-        # 移除模型前缀
         if "/" in payload.get("model", ""):
             payload["model"] = payload["model"].split("/", 1)[1]
         payload.pop("options", None)
@@ -23,28 +22,40 @@ class DialectTranslator:
     @staticmethod
     def to_anthropic(request: StandardRequest) -> Dict[str, Any]:
         """
-        2.1 准则：翻译为 Anthropic (Claude) 专属格式。
-        核心逻辑：剥离 system message 到顶层字段。
+        2.1 准则：翻译为 Anthropic (Claude) 规格。
+        处理：System 提取、max_tokens 补全、角色交替修复。
         """
         raw_payload = request.model_dump(exclude_none=True)
         messages = raw_payload.get("messages", [])
         
-        system_content = ""
-        user_assistant_messages = []
+        system_parts = []
+        normalized_messages = []
         
+        # 1. 提取 System
         for msg in messages:
             if msg.get("role") == "system":
-                system_content += msg.get("content", "") + "\n"
+                system_parts.append(msg.get("content", ""))
             else:
-                user_assistant_messages.append(msg)
+                # 2. 角色交替规范：合并连续相同角色
+                if normalized_messages and normalized_messages[-1]["role"] == msg["role"]:
+                    normalized_messages[-1]["content"] += "\n" + msg.get("content", "")
+                else:
+                    normalized_messages.append({
+                        "role": msg["role"],
+                        "content": msg.get("content", "")
+                    })
         
+        # 3. 构造规格 Body
         anthropic_payload = {
             "model": raw_payload.get("model", "").split("/")[-1],
-            "max_tokens": raw_payload.get("max_tokens", 4096),
-            "system": system_content.strip(),
-            "messages": user_assistant_messages,
+            "max_tokens": raw_payload.get("max_tokens") or 4096, # 2.1 必填项补全
+            "messages": normalized_messages,
             "stream": raw_payload.get("stream", False)
         }
+        
+        if system_parts:
+            anthropic_payload["system"] = "\n".join(system_parts)
+            
         return anthropic_payload
 
     @staticmethod
