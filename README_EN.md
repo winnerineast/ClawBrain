@@ -6,83 +6,109 @@ English | [中文版](./README.md)
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain is a biomimetically designed **Transparent Neural Relay Gateway**. It goes beyond protocol conversion by acting as an "External Brain" for LLMs. By funneling every interaction through the "Hippocampus" and "Neocortex," it empowers standard models with long-term memory and precise execution capabilities that transcend original context limits.
+ClawBrain is a biomimetically designed **Transparent Neural Relay Gateway**. It enables advanced memory algorithms to achieve high-ratio context distillation and long-term episodic recall, even in VRAM-constrained environments.
+
+---
+
+## 🛡️ Privacy & Security Commitment
+**ClawBrain adheres to the "No-Shadow Principle":**
+- **Zero-Knowledge**: The system **never records, saves, or persists** any of your `API Keys` or authentication credentials.
+- **Transparent Relay**: All credentials are held only in volatile memory for instantaneous forwarding and are destroyed immediately after the request completion.
+- **Local First**: All memory artifacts (Hippocampus/Neocortex) are stored in your local SQLite database and are never uploaded to any cloud service.
 
 ---
 
 ## 🏗️ System Architecture: The Neural Lifecycle
 
-The core of ClawBrain is a highly decoupled pipeline ensuring every request undergoes deep cognitive enhancement:
+The system utilizes a horizontal flow design, anchored by a tri-layer dynamic memory engine:
 
 ```mermaid
-graph TD
-    Client[Client: OpenClaw/OpenAI SDK] -- HTTP Request --> Detector[1. Protocol Detector]
-    Detector -- Standardize to Internal Format --> Cognitive[2. Cognitive Layer]
-    
-    subgraph Cognitive[Core Brain Processing]
-        WM[Working Memory: Active Attention]
-        NC[Neocortex: Semantic Fact Summary]
-        HP[Hippocampus: Episodic Retrieval]
-        Comp[Compression Engine: Indentation-aware]
+graph LR
+    subgraph Client_Side [Left: Ingress]
+        OC[OpenClaw / OpenAI SDK]
     end
-    
-    Cognitive -- Memory Injection + Distillation --> Translator[3. Dialect Translator]
-    Translator -- Pass-through Credentials + Dialect --> Upstream[4. Provider: Ollama/DeepSeek/OpenAI]
-    
-    Upstream -- Streaming Response --> ResHandler[5. Response Handler]
-    ResHandler -- Extract Evidence --> Ingestor[6. Memory Ingestion]
-    Ingestor -- Lossless Write --> HP
-    ResHandler -- Real-time Passthrough --> Client
+
+    subgraph Relay_Core [Middle: ClawBrain Neural Relay]
+        direction TB
+        Ingress[1. Protocol Detector & Standardization]
+        Process[2. Cognitive Pipeline]
+        Egress[3. Dialect Translation & Relay]
+        
+        subgraph Neural_Engine [Bottom: Tri-Layer Memory System]
+            WM[Working Memory: Active Attention]
+            NC[Neocortex: Semantic Fact Summary]
+            HP[Hippocampus: Lossless Archive]
+            
+            %% Memory Internal Flow
+            WM -- Decay/Consolidation --> NC
+            WM -- Solidification --> HP
+            NC -- Generalized Rules --> Process
+            HP -- FTS Retrieval --> Process
+        end
+        
+        Ingress --> Process
+        Process --> Egress
+    end
+
+    subgraph Provider_Side [Right: Egress]
+        LLM[LLM: Ollama / DeepSeek / OpenAI]
+    end
+
+    %% Main Flow
+    OC -- "Request (with Key)" --> Ingress
+    Egress -- "Forward (with Key)" --> LLM
+    LLM -- "Stream Response" --> Egress
+    Egress -- "Loop Closure" --> WM
+    Egress -- "Real-time Relay" --> OC
 ```
 
 ---
 
-## 🧠 Deep Design Concepts
+## 🧠 Design Philosophy: Tri-Layer Implementation
+Inspired by "Uncle Xia's Theory," functionally implemented via:
 
-### 1. Dynamic Protocol Ingress
-The system no longer requires manual protocol selection. The gateway automatically determines if the source is **Ollama Native** or **OpenAI Compatible** based on request paths (`/api` vs `/v1`) and structural fingerprints.
+### 1. Hippocampus (Episodic Memory Layer)
+*   **Implementation**: `src/memory/storage.py` (SQLite FTS5 + Blob Storage)
+*   **Feature**: The system's "lossless black box." 100% of raw bytes recorded to disk. Supports 10MB+ stream offloading and sub-millisecond full-text search with SHA-256 integrity audits.
 
-### 2. Cognitive Pipeline
-Before forwarding to the model, ClawBrain executes a tri-factor enhancement:
-- **Memory Synthesis**: Dynamically concatenates the current query with episodic history and generalized knowledge.
-- **Activation Dynamics**: Based on "Temporal" and "Thematic" factors, relevant history automatically surfaces to the top of the context.
-- **Physical Distillation**: Eliminates 15%+ of textual noise while strictly preserving code block (` ``` `) indentation.
+### 2. Neocortex (Semantic Memory Layer)
+*   **Implementation**: `src/memory/neocortex.py` (Asynchronous Distillation)
+*   **Feature**: The system's "knowledge pool." Uses async background workers to call lightweight LLMs, generalizing episodic data into concise bullet-point fact lists that persist at the context edge.
 
-### 3. Transparent Dialect Translation
-The key to being a "Universal Interface." The gateway translates standardized requests into provider-specific (e.g., Anthropic or DeepSeek) JSON structures and handles **bidirectional streaming conversion between NDJSON and SSE**.
+### 3. Working Memory (Active Attention Layer)
+*   **Implementation**: `src/memory/working.py` (Weighted OrderedDict)
+*   **Feature**: The system's "instant focus." Calculates "Activation" scores based on **Temporal Proximity** and **Thematic Relevance**, ensuring attention is always on the most relevant context.
 
 ---
 
-## ⚙️ Mounting Guide: Zero-Config Pass-through
+## 🔄 Supported Hosting
+- **Local**: Ollama (Default), LM Studio, vLLM, SGLang.
+- **Cloud**: OpenAI, DeepSeek, Anthropic, OpenRouter.
 
-ClawBrain utilizes a **"Credential Straight-through"** architecture. No API keys are stored on the gateway side.
-
-### Client Integration (e.g., OpenClaw)
-Simply point your `baseUrl` to ClawBrain; keep all other settings (including the real sk-key) unchanged:
+## ⚙️ Transparent Mounting
+Simply point your `baseUrl` to **`11435`**; no redundant key configuration needed:
 
 ```json
-"ollama": {
-  "baseUrl": "http://127.0.0.1:11435", // Route to Neural Gateway
-  "api": "ollama",
-  "apiKey": "sk-xxx..." // Credentials are transparently forwarded
+"models": {
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://127.0.0.1:11435", 
+      "apiKey": "sk-xxx..." // Credentials are forwarded transparently
+    }
+  }
 }
 ```
-
-### Model Routing Prefixes
-Dynamically select backends via model name prefixes:
-- `ollama/gemma4` $\rightarrow$ Routes to local 11434.
-- `lmstudio/llama3` $\rightarrow$ Routes to local 1234.
-- `openai/gpt-4o` $\rightarrow$ Routes to api.openai.com.
 
 ---
 
 ## 🧪 Deterministic Audit
-Adheres to the **GEMINI.md** constitution. All E2E tests provide Side-by-Side evidence.
+Adheres to **GEMINI.md**, providing Side-by-Side evidence for every logical transformation.
 
 ```bash
-# Run full integration acceptance
-pytest tests/test_p11_integration.py
+# Run full acceptance tests
+export PYTHONPATH=$PYTHONPATH:.
+pytest tests/
 ```
 
 ---
-<p align="right">Driven by GEMINI CLI Agent v1.25</p>
+<p align="right">Generated by GEMINI CLI Agent based on Source Code v1.25</p>
