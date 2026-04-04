@@ -5,29 +5,32 @@ metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-
 rootdir: /home/nvidia/ClawBrain
 plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 4 items
+collecting ... collected 2 items
 
-tests/test_p4_router.py::test_ollama_path_routing 
-[AUDIT START: Ollama Routing]
-Path: /api/chat
-Expected Status: 502 or 200
-Actual Status:   200
-[AUDIT END]
+tests/test_p4_router.py::test_ollama_path_routing [MODEL_QUAL] Model: gemma4:e4b | Tier: TIER_1_EXPERT | Action: PASS
+
+[AUDIT: Ollama Routing]
+------------------------------------------------------------
+PATH: /api/chat
+------------------------------------------------------------
+EXPECTED STATUS             | ACTUAL STATUS
+--------------------------- | ---------------------------
+200                         | 200
+------------------------------------------------------------
+MATCH: YES
+============================================================
 PASSED
 tests/test_p4_router.py::test_openai_path_routing 
-[AUDIT START: OpenAI Routing]
-Path: /v1/chat/completions
-Expected Status: 501
-Actual Status:   501
-[AUDIT END]
+[AUDIT: OpenAI Routing]
+------------------------------------------------------------
+PATH: /v1/chat/completions
+------------------------------------------------------------
+EXPECTED STATUS             | ACTUAL STATUS
+--------------------------- | ---------------------------
+501                         | 501
+------------------------------------------------------------
+MATCH: YES
+============================================================
 PASSED
-tests/test_p4_router.py::test_invalid_path 
-[AUDIT START: Invalid Path]
-Path: /invalid/path
-Expected Status: 404
-Actual Status:   404
-[AUDIT END]
-PASSED
-tests/test_p4_router.py::test_health_check PASSED
 
-============================== 4 passed in 3.70s ===============================
+============================== 2 passed in 0.28s ===============================

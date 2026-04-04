@@ -5,28 +5,18 @@ metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-
 rootdir: /home/nvidia/ClawBrain
 plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 3 items
+collecting ... collected 1 item
 
-tests/test_p3_pipeline.py::test_real_world_wiki_compression 
-[AUDIT START: Wiki Long Text Feature Check]
-Input: 'Long Wiki Content'
-Expected: 'No triple newlines'
-Actual:   'PASSED'
-[AUDIT END]
-PASSED
-tests/test_p3_pipeline.py::test_real_world_code_protection 
-[AUDIT START: Exact Code Block Protection]
-Input: "def example_code():\n    if True:\n        print('indented code block')"
-Expected: "def example_code():\n    if True:\n        print('indented code block')"
-Actual:   "Header\n\n```python\ndef example_code():\n    if True:\n        print('indented code block')\n```\n\nFooter"
-[AUDIT END]
-PASSED
 tests/test_p3_pipeline.py::test_full_pipeline_precision 
-[AUDIT START: Full Pipeline Precision Match]
-Input: 'Task:    Run\n\n\nResult: OK'
-Expected: 'Task: Run\n\nResult: OK\n\n[SYSTEM ENFORCEMENT]: You must respond ONLY in valid JSON format. Do not add any conversational preamble or postscript.'
-Actual:   'Task: Run\n\nResult: OK\n\n[SYSTEM ENFORCEMENT]: You must respond ONLY in valid JSON format. Do not add any conversational preamble or postscript.'
-[AUDIT END]
+[AUDIT: Pipeline Precision]
+------------------------------------------------------------
+INPUT: 'Task:    Run\n\n\nResult: OK'...
+------------------------------------------------------------
+EXPECTED: 'Task: Run\n\nResult: OK\n\n[SYSTEM ENFORCEMENT]: ...
+ACTUAL:   'Task: Run\n\nResult: OK\n\n[SYSTEM ENFORCEMENT]: ...
+------------------------------------------------------------
+MATCH: YES
+============================================================
 PASSED
 
-============================== 3 passed in 0.05s ===============================
+============================== 1 passed in 0.05s ===============================
