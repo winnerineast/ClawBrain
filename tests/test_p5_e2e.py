@@ -21,7 +21,7 @@ def visual_audit(test_name, input_summary, expected, actual):
 @pytest.mark.asyncio
 async def test_e2e_multi_round_marathon():
     """E2E: 21轮深度技术对话马拉松测试 (带 Breakdown 审计)"""
-    data_path = Path("tests/data/p5_multi_round.json")
+    data_path = Path("tests/data/p5_e2e.json")
     thread = json.loads(data_path.read_text())["multi_round_thread"]
     
     # 打印审计 Breakdown (3.1 准则)

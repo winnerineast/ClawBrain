@@ -28,18 +28,23 @@ MATCH: NO
 ============================================================
 
 [FULL RESPONSE PROOF]
-The single most critical step for production stability, synthesizing both the FastAPI/SQLAlchemy application layer and the AWS ECS infrastructure, is **Robust, Transactional Connection and State Management.**
+The single most critical step for production stability when combining FastAPI and AWS ECS is implementing **Robust and Comprehensive Readiness and Liveness Health Checks.**
 
-While monitoring (CloudWatch) and redundancy (ALB/ECS) are vital for *detecting* failure, and containerization is vital for *portability*, the application’s stability hinges on how it handles its relationship with persistent state (the database) when external systems inevitably fail or slow down.
+### Why this is Critical:
 
-Here is why:
+*   **The Problem:** A simple HTTP check (e.g., checking if the server is listening on port 8000) only confirms that your FastAPI process is running. It *does not* confirm that your application is actually able to perform its core job (e.g., communicating with the database, connecting to Redis, or hitting an external API).
+*   **The Impact:** If your FastAPI application starts up, connects to the database, and *then* fails because of a flaky DB connection or a missing environment variable, the basic HTTP check will pass, and ECS will consider the container "healthy." The ALB will route traffic to a container that is functionally broken.
+*   **The Solution:** You must expose a dedicated `/health` endpoint in your FastAPI app that performs **deep dependency checks**.
 
-1. **The Single Point of Failure:** In this entire stack, the database is the most common and most destructive point of failure. If your FastAPI application assumes a connection to SQLAlchemy is always instantaneous and successful, a momentary database slowdown (a common occurrence under load) will cause your application to crash or execute incorrect data writes.
-2. **The Solution (The Stability Pattern):** You must implement **Circuit Breaker patterns** and meticulous **Transaction Scope Management**.
-    * **Circuit Breakers:** Instead of having your application retry connecting to the database indefinitely upon failure (which consumes resources and degrades performance), the circuit breaker pattern monitors the failure rate. If the rate exceeds a threshold, the circuit "trips," and your application fails fast (returning a controlled error message) *before* hammering the struggling database, allowing the database time to recover.
-    * **Transactional Guarantees:** You must ensure every write operation is wrapped in explicit, atomic transactions (`session.begin()`). This guarantees that if *any* part of the request fails (network timeout, validation error, DB constraint violation), the entire block of changes is rolled back, preventing orphaned or corrupted data records.
+### How to Implement It:
 
-**In summary:** Don't just focus on *how* to deploy (ECS) or *how* to write code (FastAPI); focus on *how* your code interacts with its critical external dependency (the DB) in a way that is resilient to failure, slowdown, and network jitter.
+1.  **FastAPI Side:** Create a `/health` endpoint. This endpoint should attempt to validate connections to all crucial external services:
+    *   `Database:` Attempt a lightweight connection check (e.g., `SELECT 1;`).
+    *   `Cache:` Attempt to connect and ping the Redis instance.
+    *   *(If applicable)* `External API:` Attempt a connection to a critical third-party service.
+2.  **ECS/ALB Side:** Configure the ECS Task Definition and the Application Load Balancer (ALB) to use this `/health` path as the primary target health check.
+
+By doing this, you ensure that ECS will only route traffic to instances that are not only running but are *operationally ready* to process business logic. This drastically minimizes downtime caused by dependency failures.
 
 PASSED
 tests/test_p5_e2e.py::test_e2e_ollama_chat_lifespan [MODEL_QUAL] Model: gemma4:e4b | Tier: TIER_1_EXPERT | Action: PASS
@@ -69,4 +74,4 @@ MATCH: YES
 ============================================================
 PASSED
 
-============================== 3 passed in 9.53s ===============================
+============================== 3 passed in 9.22s ===============================
