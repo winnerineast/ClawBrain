@@ -5,49 +5,33 @@ metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-19-generic-x86_64-with-
 rootdir: /home/nvidia/ClawBrain
 plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 3 items
+collecting ... collected 2 items
 
-tests/test_p8_working_memory.py::test_p8_temporal_decay 
-[AUDIT: Temporal Decay]
-------------------------------------------------------------
-INPUT: 1000s elapsed
-------------------------------------------------------------
-METRIC                      | VALUE
---------------------------- | ---------------------------
-Time Score                  | 0.0000
-Relevance Score             | 0.0000
-Total Activation            | 0.2575
-------------------------------------------------------------
-ACTION: Decay Verified
-============================================================
+tests/test_p8_working_memory.py::test_p8_decay_timeline_audit 
+[HIGH-FIDELITY AUDIT: Decay Timeline Progression]
+================================================================================
+DESCRIPTION: Activation at T0 vs T1000 (1000s elapsed)
+--------------------------------------------------------------------------------
+EXPECTED EVIDENCE                      | ACTUAL EVIDENCE
+-------------------------------------- | --------------------------------------
+T0 Act: 1.0000                         | T0 Act: 1.0000
+T1000 Act: Should be < 0.3             | T1000 Act: 0.2575
+--------------------------------------------------------------------------------
+DYNAMICS VERIFIED: YES
+================================================================================
 PASSED
-tests/test_p8_working_memory.py::test_p8_relevance_awakening 
-[AUDIT: Relevance Awakening]
-------------------------------------------------------------
-INPUT: Database -> Database
-------------------------------------------------------------
-METRIC                      | VALUE
---------------------------- | ---------------------------
-Time Score                  | 0.0000
-Relevance Score             | 0.0000
-Total Activation            | 0.1947
-------------------------------------------------------------
-ACTION: Awaken Verified
-============================================================
-PASSED
-tests/test_p8_working_memory.py::test_p8_noise_eviction 
-[AUDIT: Noise Eviction]
-------------------------------------------------------------
-INPUT: Unrelated old msg
-------------------------------------------------------------
-METRIC                      | VALUE
---------------------------- | ---------------------------
-Time Score                  | 0.0000
-Relevance Score             | 0.0000
-Total Activation            | 0.0000
-------------------------------------------------------------
-ACTION: Evicted
-============================================================
+tests/test_p8_working_memory.py::test_p8_relevance_awakening_audit 
+[HIGH-FIDELITY AUDIT: Semantic Awakening Boost]
+================================================================================
+DESCRIPTION: Awakening an old memory via Relevance
+--------------------------------------------------------------------------------
+EXPECTED EVIDENCE                      | ACTUAL EVIDENCE
+-------------------------------------- | --------------------------------------
+Unrelated Act: ~0.0947                 | Unrelated Act: 0.0947
+Related Act: Must be > Unrelated       | Related Act: 0.2447
+--------------------------------------------------------------------------------
+DYNAMICS VERIFIED: YES
+================================================================================
 PASSED
 
-============================== 3 passed in 0.01s ===============================
+============================== 2 passed in 0.01s ===============================
