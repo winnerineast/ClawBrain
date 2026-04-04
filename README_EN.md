@@ -6,76 +6,60 @@ English | [中文版](./README.md)
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain is an open-source LLM agent gateway. Its core value proposition is acting as an **External Brain for OpenClaw**, providing advanced biomimetic memory algorithms to achieve high-ratio context distillation and long-term episodic recall, even in VRAM-constrained environments like the RTX 4090.
+ClawBrain is a biomimetic LLM agent gateway. Acting as a "Silicon Hippocampus" between clients (like OpenClaw) and underlying models, it utilizes a **tri-layer dynamic memory system** and **context distillation** to empower your AI with human-like memory and reflexes.
 
 ---
 
-## 🧠 Design Philosophy: Tri-Layer Neural Memory
-Inspired by "Uncle Xia's Theory," the project functionally implements a tri-layer dynamic memory architecture:
+## ⚙️ Mirror Configuration
 
-### 1. Hippocampus (Episodic Memory Layer)
-*   **Implementation**: `src/memory/storage.py` (SQLite FTS5 + Blob Storage)
-*   **Feature**: The system's "lossless black box." It records 100% of raw bytes to disk, supports 10MB+ stream offloading to protect RAM, and provides sub-millisecond full-text search.
+ClawBrain uses a "Transparent Mirror" configuration logic. You replace the backend URL in your client with ClawBrain's URL and configure the actual upstream credentials within ClawBrain.
 
-### 2. Neocortex (Semantic Memory Layer)
-*   **Implementation**: `src/memory/neocortex.py` (Asynchronous Distillation)
-*   **Feature**: The system's "knowledge distillation pool." It uses asynchronous background workers to call lightweight LLMs, generalizing episodic data into concise bullet-point fact lists.
-
-### 3. Working Memory (Active Attention Layer)
-*   **Implementation**: `src/memory/working.py` (Weighted OrderedDict)
-*   **Feature**: The system's "instant focus." It dynamically calculates "Activation" scores based on **Temporal Proximity** and **Thematic Relevance**, ensuring the model's attention is always on the most relevant context.
-
----
-
-## 🔄 Supported Hosting & Providers
-ClawBrain supports a wide range of platforms through its universal translation layer:
-
-- **Local Infrastructure**:
-  - **Ollama**: Default backend with full audit support.
-  - **LM Studio**: Integrated via OpenAI-compatible protocol.
-  - **vLLM / SGLang**: For high-throughput production environments.
-- **Cloud APIs**:
-  - **OpenAI (GPT-4o/o1)**: Official REST interfaces.
-  - **DeepSeek**: Cost-effective OpenAI-compatible alternative.
-  - **Anthropic (Claude 3.5)**: Native API support (In Development).
-  - **OpenRouter / Together AI**: Aggregator gateway support.
-
----
-
-## ⚙️ Mounting & Configuration
-
-### 1. Entry Point
-By default, ClawBrain listens on local port **`11435`**.
-- **Default Base URL**: `http://127.0.0.1:11435`
-
-### 2. Client Integration (Example: OpenClaw)
-Modify your `~/.openclaw/openclaw.json` to route traffic through the Neural Gateway:
+### 1. Client-Side Configuration
+Point your `openclaw.json` or any other client's `baseUrl` to the local ClawBrain port **`11435`**:
 
 ```json
-"models": {
-  "providers": {
-    "ollama": {
-      "baseUrl": "http://127.0.0.1:11435", // Entry point to the neural brain
-      "api": "ollama",
-      "apiKey": "OLLAMA_API_KEY"
-    }
-  }
+"ollama": {
+  "baseUrl": "http://127.0.0.1:11435", // Route to ClawBrain instead of direct backend
+  "api": "ollama"
 }
 ```
 
-### 3. Model Prefixes & Routing
-Dynamically specify the backend via model name prefixes:
-- `ollama/gemma4:e4b`: Route to local Ollama (11434).
-- `lmstudio/llama-3`: Route to local LM Studio (1234).
-- `openai/gpt-4o`: Route to official OpenAI Cloud.
+### 2. Gateway-Side Configuration (ClawBrain)
+Configure your real upstream targets in the `.env` file at the ClawBrain root. The gateway automatically handles authentication injection and protocol translation.
+
+```env
+# Basic Gateway Settings
+GATEWAY_PORT=11435
+
+# --- Upstream Credentials ---
+
+# Local Ollama instance
+PROVIDER_OLLAMA_URL=http://127.0.0.1:11434
+
+# Local LM Studio instance
+PROVIDER_LMSTUDIO_URL=http://127.0.0.1:1234
+
+# Cloud OpenAI (Automatically handles Bearer Token injection)
+PROVIDER_OPENAI_URL=https://api.openai.com
+PROVIDER_OPENAI_KEY=sk-your-openai-key-here
+
+# Cloud DeepSeek
+PROVIDER_DEEPSEEK_URL=https://api.deepseek.com
+PROVIDER_DEEPSEEK_KEY=sk-your-deepseek-key-here
+```
+
+### 3. Model Routing Rules
+ClawBrain dispatches requests based on the model name prefix used in your client:
+- `ollama/gemma4:e4b` $\rightarrow$ Routed to local port 11434.
+- `lmstudio/llama-3` $\rightarrow$ Routed to local port 1234.
+- `deepseek/deepseek-chat` $\rightarrow$ Routed to Cloud API with automatic API Key injection.
 
 ---
 
 ## 🚀 Key Technical Features
-- 🔄 **Universal Translation Gateway**: Built-in protocol detector for seamless OpenAI/Ollama cross-protocol routing.
-- ✂️ **High-Ratio Context Distillation**: Regex-based compression with code-block protection to maximize context efficiency.
-- 🛡️ **Model Qualification (TIER)**: Classifies model capabilities and intercepts tool calls for underpowered models.
-- 🧪 **High-Fidelity Audit System**: Adheres to **GEMINI.md**, providing byte-level SHA-256 verification and mathematical derivation logs.
+- 🧠 **Tri-Layer Neural Memory**: Hippocampus (Lossless Archive), Neocortex (Async Summary), and Working Memory (Dual-Factor Attention).
+- 🛡️ **Model Qualification (TIER)**: Protects agent pipelines by intercepting complex tool calls for models under 7B.
+- 🔄 **Universal Translation Layer**: Seamlessly converts heterogeneous protocols (OpenAI/Ollama) and their streaming formats.
 
 ---
 
@@ -85,7 +69,10 @@ Dynamically specify the backend via model name prefixes:
 git clone https://github.com/winnerineast/ClawBrain.git
 cd ClawBrain && python3 -m venv venv
 source venv/bin/activate && pip install -r requirements.txt
+
+# Start Gateway (Ensure .env is configured)
+uvicorn src.main:app --host 127.0.0.1 --port 11435
 ```
 
 ---
-<p align="right">Generated by GEMINI CLI Agent based on Source Code v1.23</p>
+<p align="right">Generated by GEMINI CLI Agent v1.24</p>
