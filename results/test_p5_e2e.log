@@ -7,43 +7,21 @@ plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collecting ... collected 2 items
 
-tests/test_p5_e2e.py::test_e2e_ollama_chat_lifespan 
+tests/test_p5_e2e.py::test_e2e_ollama_chat_lifespan [MODEL_QUAL] Model: gemma4:e4b | Tier: TIER_1_EXPERT | Action: PASS
+
 [AUDIT START: E2E Non-Stream Lifespan Check]
 Input:    {'model': 'gemma4:e4b', 'messages': [{'role': 'user', 'content': '1+1=?'}], 'stream': False}
 Expected: 'Status 200'
 Actual:   200
 [AUDIT END]
 PASSED
-tests/test_p5_e2e.py::test_e2e_qualification_interception 
+tests/test_p5_e2e.py::test_e2e_qualification_interception [MODEL_QUAL] Model: qwen2.5:latest | Tier: TIER_3_BASIC | Action: BLOCK
+
 [AUDIT START: E2E Qualification Interception]
 Input:    {'model': 'qwen2.5:latest', 'messages': [{'role': 'user', 'content': 'test'}], 'tools': [{'type': 'function', 'function': {'name': 'test'}}]}
 Expected: 422
-Actual:   502
+Actual:   422
 [AUDIT END]
-FAILED
+PASSED
 
-=================================== FAILURES ===================================
-_____________________ test_e2e_qualification_interception ______________________
-
-    @pytest.mark.asyncio
-    async def test_e2e_qualification_interception():
-        """E2E: 验证准入拦截逻辑"""
-        # qwen2.5:latest (4.7B) 应被 TIER 3 判定拦截
-        payload = {
-            "model": "qwen2.5:latest",
-            "messages": [{"role": "user", "content": "test"}],
-            "tools": [{"type": "function", "function": {"name": "test"}}]
-        }
-    
-        with TestClient(app) as client:
-            response = client.post("/api/chat", json=payload)
-    
-            audit_log("E2E Qualification Interception", payload, 422, response.status_code)
->           assert response.status_code == 422
-E           assert 502 == 422
-E            +  where 502 = <Response [502 Bad Gateway]>.status_code
-
-tests/test_p5_e2e.py:45: AssertionError
-=========================== short test summary info ============================
-FAILED tests/test_p5_e2e.py::test_e2e_qualification_interception - assert 502...
-========================= 1 failed, 1 passed in 1.71s ==========================
+============================== 2 passed in 0.30s ===============================

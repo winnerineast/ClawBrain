@@ -1,48 +1,37 @@
-# design/gateway.md v1.16
+# design/gateway.md v1.17
 
 ## 1. 系统愿景 (Objective)
-生成名为 **ClawBrain Gateway** 的高性能异步 LLM 网关。该网关作为“外挂大脑”，在不侵入客户端的前提下实现多协议路由、模型准入审计、上下文压缩优化以及全局资源生命周期管理。
+生成 **ClawBrain Gateway**。作为 LLM 的质量守门员，通过“准入要素”判定模型等级，并强制执行对应的“行为 KPI”，确保 OpenClaw 自动化链路的可靠性。
 
-## 2. 核心架构与逻辑 (Architecture & Logic)
+## 2. 模型分级准入体系 (Model Qualification Framework)
 
-### 2.1 协议入口与路由 (Ingress & Routing)
-- **FastAPI 核心**：使用 APIRouter 管理路径。
-- **协议路由**：
-  - `POST /api/chat` -> 路由至 `OllamaAdapter`。
-  - `POST /v1/chat/completions` -> 路由至 `OpenAIAdapter` (Stub)。
-- **生命周期 (Lifespan)**：必须使用 `lifespan` 钩子初始化全局 `ModelScout` 和 `Adapters`。
+### 2.1 准入要素 (Tier Elements)
+网关必须基于以下三个硬性要素进行综合判定：
+1. **参数规模 (Scale)**：从模型标签（如 7b, 14b, 31b）或元数据提取。
+2. **架构能力 (Brain)**：通过模型族（如 qwen2.5, gemma4）识别其推理上限。
+3. **协议支持 (Protocol)**：元数据中是否声明 `TOOLS` 支持。
 
-### 2.2 模型准入引擎 (ModelScout)
-- **TIER 评级准则**：
-  - `TIER_1_NATIVE`: 参数 >= 7B 且 `ollama show` 元数据包含 `TOOLS` 支持。允许全功能通行。
-  - `TIER_2_REASONING`: 参数 >= 14B 但无原生工具支持。允许工具调用，但需注入补丁。
-  - `TIER_3_BASIC`: 参数 < 7B。若请求包含 `tools` 字段，**必须拦截并返回 HTTP 422**。
-- **缓存层**：内置 10 分钟 TTL 的 LRU 内存缓存，避免重复查询元数据。
+### 2.2 级别界定与行为 KPI (Tier Definitions & KPIs)
 
-### 2.3 拦截器流水线 (Interceptor Pipeline)
-- **WhitespaceCompressor**：
-  - 先使用正则 `(```[\s\S]*?```)` 提取并保护代码块。
-  - 仅对非代码区域执行：2+ 空格变为 1，3+ 换行变为 2。
-- **SafetyEnforcer**：
-  - 为 TIER_2 模型在消息首位注入 `[SYSTEM ENFORCEMENT]: Respond ONLY in JSON.` 补丁。
-  - 必须具备幂等性检查，防止重复注入。
+| 等级 (Tier) | 准入要素 (Elements) | 预期行为 KPI (KPIs) | 网关动作 (Action) |
+| :--- | :--- | :--- | :--- |
+| **TIER_1_EXPERT** | 参数 $\ge$ 20B 或 (参数 $\ge$ 7B 且支持 Tools) | 工具调用成功率 > 98%；支持多步推理。 | **全速通行**：无修饰透传所有请求。 |
+| **TIER_2_LEGACY** | 7B $\le$ 参数 < 20B 且不支持原生 Tools | 工具调用常伴随前导词；易发生格式偏移。 | **指令增强**：强制注入系统级 JSON 约束补丁。 |
+| **TIER_3_BASIC** | 参数 < 7B | 逻辑链极短；极高概率在工具调用中产生幻觉。 | **强制拦截**：检测到 `tools` 字段立即返回 **422**。 |
 
-### 2.4 后端适配器 (OllamaAdapter)
-- **资源管理**：使用 **惰性初始化 (Lazy Init)** 的 `httpx.AsyncClient` 连接池，确保与 Event Loop 绑定。
-- **流式容错**：透传后端流式数据前必须验证 `response.is_error`。后端异常时应生成 JSON 错误片段。
+## 3. 核心架构逻辑 (Core Logic)
 
-## 3. 测试驱动与审计规范 (TDD & Audit)
+### 3.1 确定性评级引擎 (Scout Engine)
+- **规则优先**：内置 `KnownModels` 映射表。`qwen2.5:latest` (4.7B) 必须被硬性标记为 `TIER_3`。
+- **异常收口**：Scout 内部的所有网络或解析异常必须被 `try-except` 捕获，并默认降级为 `TIER_3` 以保障安全。
 
-### 3.1 测试环境约束 (Critical)
-- **生命周期对齐**：所有测试用例必须使用 `with TestClient(app) as client:` 语法，以确保触发 FastAPI 的 `lifespan` 初始化逻辑。
+### 3.2 稳定流式转发 (Reliable Stream)
+- **生命周期**：由 FastAPI `lifespan` 提供全局单例 `httpx.AsyncClient`。
+- **状态校验**：转发前校验 `response.is_success`。
 
-### 3.2 验证维度
-- **精确匹配**：集成测试必须进行逐字符比对。
-- **审计日志**：日志必须包含 `Input` (repr)、`Expected` (repr) 和 `Actual` (repr)。
+## 4. 测试与审计规范 (TDD)
+- **E2E 拦截审计**：`qwen2.5:latest` 带工具请求必须产生 422 响应。
+- **审计证据**：日志必须明确打印：`[MODEL_QUAL] Model: <name> | Elements: [params, tools] | Assigned: <Tier> | KPI Action: <Block/Enforce/Pass>`。
 
-## 4. 生成目标 (Output Targets)
-- `src/main.py`: 入口与 Lifespan。
-- `src/scout.py`: 评级引擎与缓存。
-- `src/pipeline.py`: 压缩与增强流水线。
-- `src/adapters/ollama.py`: 适配器实现。
-- `tests/test_p5_e2e.py`: 遵循生命周期规范的 E2E 测试脚本。
+## 5. 生成目标
+- `src/main.py`, `src/scout.py`, `src/pipeline.py`, `src/adapters/ollama.py`, `tests/test_p5_e2e.py`。
