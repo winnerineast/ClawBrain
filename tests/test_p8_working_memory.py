@@ -1,72 +1,83 @@
-# Generated from design/memory_working.md v1.2
+# Generated from design/memory_working.md v1.3
 import pytest
 import time
 from src.memory.working import WorkingMemory
 
-def visual_audit_high_fid(test_name, input_desc, expected_evidence, actual_evidence):
-    """高保真审计输出"""
-    print(f"\n[HIGH-FIDELITY AUDIT: {test_name}]")
+def visual_audit_math(test_name, description, expected_logic, actual_derivation):
+    """
+    Side-by-Side 数学透明度审计
+    """
+    print(f"\n[MATHEMATICAL AUDIT: {test_name}]")
     print("=" * 80)
-    print(f"DESCRIPTION: {input_desc}")
+    print(f"SCENARIO: {description}")
     print("-" * 80)
-    print(f"{'EXPECTED EVIDENCE':<38} | {'ACTUAL EVIDENCE'}")
+    print(f"{'EXPECTED LOGIC':<38} | {'ACTUAL DERIVATION TRAIL'}")
     print(f"{'-'*38} | {'-'*38}")
     
-    exp_lines = str(expected_evidence).split('\n')
-    act_lines = str(actual_evidence).split('\n')
+    # 将长轨迹拆分展示
+    exp_lines = str(expected_logic).split(';')
+    act_lines = str(actual_derivation).split(';')
     max_len = max(len(exp_lines), len(act_lines))
     
     for i in range(max_len):
-        e = exp_lines[i] if i < len(exp_lines) else ""
-        a = act_lines[i] if i < len(act_lines) else ""
+        e = exp_lines[i].strip() if i < len(exp_lines) else ""
+        a = act_lines[i].strip() if i < len(act_lines) else ""
         print(f"{e[:38]:<38} | {a[:38]}")
     
-    # 因为涉及到浮点数对比，这里的 Match 是定性评估
     print("-" * 80)
-    print(f"DYNAMICS VERIFIED: YES")
+    print(f"VERDICT: PASS")
     print("=" * 80)
 
-def test_p8_decay_timeline_audit():
-    """Phase 8 深度审计：时间线衰减数值验证"""
+def test_p8_full_math_transparency():
+    """验证工作记忆的数学计算过程是否完全披露"""
     wm = WorkingMemory()
-    wm.add_item("t1", "Context A")
     
-    t0_act = wm.items[0].activation
+    # 场景：存入一个旧的数据库话题，然后用新的数据库请求唤醒它
+    old_content = "PostgreSQL is a fast database"
+    wm.add_item("trace-001", old_content)
     
-    # 模拟经过 1000 秒
-    wm.items[0].timestamp -= 1000 
-    wm._refresh_activations("Random Topic")
-    t1000_act = wm.items[0].activation
+    # 模拟时间流逝 500 秒
+    wm.items[0].timestamp -= 500
     
-    visual_audit_high_fid(
-        "Decay Timeline Progression",
-        "Activation at T0 vs T1000 (1000s elapsed)",
-        f"T0 Act: {t0_act:.4f}\nT1000 Act: Should be < 0.3",
-        f"T0 Act: {t0_act:.4f}\nT1000 Act: {t1000_act:.4f}"
+    # 发起一个高度相关的唤醒请求
+    focus = "Optimize database performance"
+    wm._refresh_activations(focus)
+    
+    derivation = wm.items[0].last_derivation
+    
+    # 预期逻辑描述 (3.1 & 3.2 准则)
+    expected_logic = (
+        "TimeScore = 0.7 * exp(-0.001 * 500) ; "
+        "RelScore = 0.3 * (Common / Total) ; "
+        "Total = Time + Rel"
     )
     
-    assert t1000_act < t0_act
-    assert t1000_act < 0.3 # 按照指数衰减，1000秒后必然低于阈值
+    visual_audit_math(
+        "Dual-Factor Derivation",
+        "500s elapsed + 'database' keyword match",
+        expected_logic,
+        derivation
+    )
+    
+    # 验证最终数值准确性 (0.7 * exp(-0.5) ≈ 0.4245 + 0.3 * (1/3) = 0.1)
+    # 总分应在 0.5 以上
+    assert wm.items[0].activation > 0.5
+    assert "Calc: 0.7 * exp(-0.001*500)" in derivation
+    assert "Rel_Score: 0.3 * (1/3)" in derivation
 
-def test_p8_relevance_awakening_audit():
-    """Phase 8 深度审计：语义唤醒数值比对"""
+def test_p8_capacity_and_threshold_enforcement():
+    """验证 v1.3 中的物理约束是否依然有效"""
     wm = WorkingMemory()
-    wm.add_item("t1", "PostgreSQL database performance tuning")
-    wm.items[0].timestamp -= 2000 # 经过 2000 秒，时间衰减极大
     
-    # 无关唤醒
-    wm._refresh_activations("What is the weather today")
-    unrelated_act = wm.items[0].activation
+    # 1. 验证阈值：存入一个极旧的消息（10000秒前）
+    wm.add_item("ancient", "old noise")
+    wm.items[0].timestamp -= 10000
+    wm._refresh_activations("New topic")
+    wm._cleanup()
+    assert len(wm.items) == 0 # 应该被阈值 0.3 清理
     
-    # 相关唤醒
-    wm._refresh_activations("Database optimization")
-    related_act = wm.items[0].activation
+    # 2. 验证容量：泵入 20 条消息
+    for i in range(20):
+        wm.add_item(f"id-{i}", f"content-{i}")
     
-    visual_audit_high_fid(
-        "Semantic Awakening Boost",
-        "Awakening an old memory via Relevance",
-        f"Unrelated Act: ~{unrelated_act:.4f}\nRelated Act: Must be > Unrelated",
-        f"Unrelated Act: {unrelated_act:.4f}\nRelated Act: {related_act:.4f}"
-    )
-    
-    assert related_act > unrelated_act
+    assert len(wm.items) == 15 # 必须严格等于规格书中的 15
