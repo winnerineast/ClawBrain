@@ -1,0 +1,30 @@
+{
+  "name": "@clawbrain/openclaw",
+  "version": "1.0.0",
+  "description": "ClawBrain Context Engine plugin for OpenClaw — tri-layer neural memory via localhost HTTP",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["openclaw", "clawbrain", "context-engine", "memory", "llm"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0",
+    "@types/node": "^20.14.0"
+  }
+}

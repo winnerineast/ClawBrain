@@ -7,3 +7,5 @@ tests/data/**/*.db
 tests/data/**/*.json
 tests/data/**/blobs/
 data/*.db
+packages/openclaw/node_modules/
+packages/openclaw/dist/
