@@ -1,4 +1,4 @@
-# Generated from design/gateway.md v1.40 / design/config.md v1.0 / design/management_api.md v1.0
+# Generated from design/gateway.md v1.40 / design/config.md v1.0 / design/management_api.md v1.0 / design/context_engine_api.md v1.0
 import json
 import httpx
 import logging
@@ -6,6 +6,7 @@ import os
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
 from src.scout import ModelScout, ModelTier
@@ -193,7 +194,154 @@ async def clear_memory_session(session_id: str, request: Request):
 
 @app.post("/v1/memory/{session_id}/distill")
 async def manual_distill(session_id: str, request: Request):
-    """手动触发指定 session 的异步提纯任务"""
+    """Manually trigger async Neocortex distillation for a session."""
     mr: MemoryRouter = request.app.state.memory_router
     asyncio.create_task(mr._auto_distill_worker(session_id))
     return {"status": "distillation_triggered", "session_id": session_id}
+
+
+# ── P23 Context Engine Internal API ─────────────────────────────────────────
+# These endpoints implement the four OpenClaw Context Engine lifecycle hooks.
+# They are called by the @clawbrain/openclaw TypeScript plugin over localhost.
+# Never expose these on a public network interface.
+
+class IngestRequest(BaseModel):
+    session_id: str
+    role: str
+    content: str
+    is_heartbeat: bool = False
+
+class AssembleRequest(BaseModel):
+    session_id: str
+    current_focus: str = ""
+    token_budget: int = 4096
+
+class CompactRequest(BaseModel):
+    session_id: str
+    force: bool = False
+
+class AfterTurnRequest(BaseModel):
+    session_id: str
+
+
+@app.post("/internal/ingest")
+async def internal_ingest(body: IngestRequest, request: Request):
+    """
+    Context Engine hook: ingest.
+    Archive a single raw message into Hippocampus and update Working Memory.
+    Heartbeat messages are silently skipped.
+    """
+    mr: MemoryRouter = request.app.state.memory_router
+
+    if body.is_heartbeat:
+        logger.debug(f"[INT_INGEST] Heartbeat skipped | session={body.session_id}")
+        return {"trace_id": None, "ingested": False}
+
+    payload = {"messages": [{"role": body.role, "content": body.content}]}
+    trace_id = await mr.ingest(payload, context_id=body.session_id)
+    logger.info(f"[INT_INGEST] session={body.session_id} role={body.role} trace={trace_id}")
+    return {"trace_id": trace_id, "ingested": True}
+
+
+@app.post("/internal/assemble")
+async def internal_assemble(body: AssembleRequest, request: Request):
+    """
+    Context Engine hook: assemble.
+    Query tri-layer memory and return a system_prompt_addition string.
+    Always returns HTTP 200; empty memory yields an empty addition.
+    """
+    mr: MemoryRouter = request.app.state.memory_router
+
+    # Rough heuristic: 1 token ≈ 3 chars; hard-cap by CLAWBRAIN_MAX_CONTEXT_CHARS
+    max_chars = int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", "2000"))
+    char_budget = min(body.token_budget * 3, max_chars)
+
+    focus = body.current_focus or ""
+    context = await mr.get_combined_context(body.session_id, focus)
+
+    if context.strip():
+        addition = (
+            "[CLAWBRAIN MEMORY — injected by ClawBrain context engine]\n"
+            f"{context}\n"
+            "[END CLAWBRAIN MEMORY]"
+        )
+    else:
+        addition = ""
+
+    chars_used = len(addition)
+    logger.info(
+        f"[INT_ASSEMBLE] session={body.session_id} "
+        f"chars_used={chars_used} budget={char_budget}"
+    )
+    return {
+        "system_prompt_addition": addition,
+        "chars_used": chars_used,
+        "budget_chars": char_budget,
+    }
+
+
+@app.post("/internal/compact")
+async def internal_compact(body: CompactRequest, request: Request):
+    """
+    Context Engine hook: compact (ownsCompaction=true).
+    Distil recent traces into Neocortex and prune Working Memory.
+    The session transcript cleanup is left to OpenClaw.
+    """
+    mr: MemoryRouter = request.app.state.memory_router
+    keep_recent = int(os.getenv("CLAWBRAIN_WM_COMPACT_KEEP_RECENT", "5"))
+
+    # Distil recent traces into Neocortex
+    rows = mr.hippo.get_recent_traces(limit=mr.distill_threshold, context_id=body.session_id)
+    traces = []
+    for row in rows:
+        raw = row.get("raw_content") or mr.hippo.get_content(row["trace_id"])
+        if raw:
+            try:
+                traces.append(json.loads(raw))
+            except Exception:
+                pass
+
+    if traces:
+        await mr.neo.distill(body.session_id, traces)
+
+    # Prune Working Memory to keep_recent most-recent items
+    wm = mr._get_wm(body.session_id)
+    if len(wm.items) > keep_recent:
+        wm.items = sorted(wm.items, key=lambda x: x.timestamp)[-keep_recent:]
+    mr.hippo.save_wm_state(body.session_id, wm.items)
+
+    pruned = max(0, len(rows) - keep_recent)
+    logger.info(
+        f"[INT_COMPACT] session={body.session_id} "
+        f"traces_distilled={len(traces)} wm_kept={len(wm.items)}"
+    )
+    return {
+        "ok": True,
+        "compacted": True,
+        "traces_distilled": len(traces),
+        "wm_pruned": pruned,
+    }
+
+
+@app.post("/internal/after-turn")
+async def internal_after_turn(body: AfterTurnRequest, request: Request):
+    """
+    Context Engine hook: afterTurn.
+    Persist Working Memory snapshot and optionally trigger background distillation.
+    """
+    mr: MemoryRouter = request.app.state.memory_router
+
+    wm = mr._get_wm(body.session_id)
+    mr.hippo.save_wm_state(body.session_id, wm.items)
+
+    mr._trace_counter += 1
+    if mr._trace_counter >= mr.distill_threshold:
+        logger.info(
+            f"[INT_AFTER_TURN] Distillation threshold reached — "
+            f"spawning worker for session={body.session_id}"
+        )
+        asyncio.create_task(mr._auto_distill_worker(body.session_id))
+        mr._trace_counter = 0
+
+    logger.info(f"[INT_AFTER_TURN] session={body.session_id} wm_items={len(wm.items)}")
+    return {"ok": True}

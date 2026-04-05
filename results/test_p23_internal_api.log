@@ -1,0 +1,180 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/nvidia/ClawBrain/venv/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-20-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'asyncio': '1.3.0', 'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
+rootdir: /home/nvidia/ClawBrain
+plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 9 items
+
+tests/test_p23_internal_api.py::test_p23_ingest_normal_message 
+[AUDIT: Ingest: ingested flag]
+======================================================================
+DESCRIPTION: must be True
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Ingest: trace_id present]
+======================================================================
+DESCRIPTION: must have a trace_id
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p23_internal_api.py::test_p23_ingest_heartbeat_skipped 
+[AUDIT: Ingest heartbeat: ingested=False]
+======================================================================
+DESCRIPTION: heartbeat must be skipped
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+False                             | False
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Ingest heartbeat: trace_id=None]
+======================================================================
+DESCRIPTION: no trace for heartbeat
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+None                              | None
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p23_internal_api.py::test_p23_ingest_trace_persisted_in_db 
+[AUDIT: Ingest persisted: WM count ≥ 1]
+======================================================================
+DESCRIPTION: WM must have the ingested item
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p23_internal_api.py::test_p23_assemble_returns_memory_addition 
+[AUDIT: Assemble: addition non-empty]
+======================================================================
+DESCRIPTION: must contain memory content
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Assemble: chars_used > 0]
+======================================================================
+DESCRIPTION: memory was assembled
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Assemble: CLAWBRAIN header present]
+======================================================================
+DESCRIPTION: addition must carry ClawBrain header
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p23_internal_api.py::test_p23_assemble_empty_session_returns_200 
+[AUDIT: Assemble empty: HTTP 200]
+======================================================================
+DESCRIPTION: must not error on empty session
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+200                               | 200
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p23_internal_api.py::test_p23_compact_distils_and_prunes_wm 
+[AUDIT: Compact: ok=True]
+======================================================================
+DESCRIPTION: compact must succeed
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Compact: compacted=True]
+======================================================================
+DESCRIPTION: must report compacted
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Compact: traces_distilled > 0]
+======================================================================
+DESCRIPTION: must have processed traces
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p23_internal_api.py::test_p23_after_turn_persists_wm_snapshot 
+[AUDIT: After-turn: ok=True]
+======================================================================
+DESCRIPTION: must return ok
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p23_internal_api.py::test_p23_after_turn_wm_in_db 
+[AUDIT: After-turn: WM count ≥ 1]
+======================================================================
+DESCRIPTION: snapshot must be in DB
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p23_internal_api.py::test_p23_full_hook_sequence 
+[AUDIT: Full sequence: assemble has content]
+======================================================================
+DESCRIPTION: addition must be non-empty after ingest
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Full sequence: after-turn ok]
+======================================================================
+DESCRIPTION: after-turn must succeed
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+
+============================== 9 passed in 10.93s ==============================
