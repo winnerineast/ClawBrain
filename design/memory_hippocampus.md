@@ -1,4 +1,4 @@
-# design/memory_hippocampus.md v1.7
+# design/memory_hippocampus.md v1.8
 
 ## 1. 任务目标 (Objective)
 从零实现 **ClawBrain Hippocampus (海马体)** 存储引擎。该引擎负责交互轨迹的无损持久化、大文件流式落盘以及基于 SQLite FTS5 的全文检索。同时，必须实现最高级别的字节级存证审计。核心改进：实现基于模型上下文窗口的动态分流阈值。
@@ -69,6 +69,15 @@
   - `save_trace(..., context_id: str = "default")`：将 `context_id` 写入 `traces` 和 `search_idx`。
   - `search(query, context_id: str = "default")`：在 `WHERE content MATCH ? AND context_id = ?` 中过滤，两级搜索均携带此过滤条件。
   - `get_recent_traces(limit, context_id: str = None)`：若传入 `context_id` 则加 `WHERE context_id = ?` 过滤。
+
+### 2.7 TTL 自动清理与脏数据清除 (P20 新增)
+- **背景**：早期 bug（timestamp=0.0）遗留大量无效记录；长期运行的生产 DB 会无限膨胀。
+- **清理策略（在 `_init_db()` 末尾自动执行）**：
+  1. **脏数据清除**：DELETE traces WHERE `timestamp = 0.0`（早期时间戳 bug 遗留）；同步 DELETE search_idx WHERE trace_id IN (已删除 ID)。
+  2. **TTL 过期清除**：从 `CLAWBRAIN_TRACE_TTL_DAYS` 环境变量读取天数（默认 30）；DELETE traces WHERE `timestamp > 0 AND timestamp < now - ttl_seconds`；同步清理对应 search_idx 行与 blob 文件。
+  3. **孤儿 blob 清理**：`get_orphan_blobs()` 扫描 `blobs/` 目录中存在但 traces 表中 `blob_path` 无对应记录的 `.json` 文件，予以删除。
+- **env var**：`CLAWBRAIN_TRACE_TTL_DAYS`（整数，默认 30；设为 0 表示禁用 TTL）。
+- **日志埋点**：清理完成后 logger.info `[HP_CLEAN] Purged dirty={N} expired={N} orphan_blobs={N}`。
 
 ## 4. 生成目标 (Output Targets)
 1. `src/memory/storage.py`: 严格按照上述逻辑实现 SQLite 交互，支持动态阈值。

@@ -1,0 +1,136 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/nvidia/ClawBrain/venv/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-20-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'asyncio': '1.3.0', 'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
+rootdir: /home/nvidia/ClawBrain
+plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 5 items
+
+tests/test_p20_ttl_cleanup.py::test_p20_dirty_data_purged_on_init 
+[AUDIT: Dirty purge: dirty-1 removed]
+======================================================================
+DESCRIPTION: timestamp=0.0 record must be gone
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+False                             | False
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Dirty purge: dirty-2 removed]
+======================================================================
+DESCRIPTION: timestamp=0.0 record must be gone
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+False                             | False
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Dirty purge: clean-1 kept]
+======================================================================
+DESCRIPTION: valid record must survive
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p20_ttl_cleanup.py::test_p20_ttl_expired_traces_purged 
+[AUDIT: TTL: expired-1 purged]
+======================================================================
+DESCRIPTION: 3-day-old record with TTL=1d must be gone
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+False                             | False
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: TTL: fresh-1 kept]
+======================================================================
+DESCRIPTION: recent record must survive
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p20_ttl_cleanup.py::test_p20_ttl_zero_disables_expiry 
+[AUDIT: TTL=0: old record kept]
+======================================================================
+DESCRIPTION: TTL disabled, 1-year-old record must survive
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p20_ttl_cleanup.py::test_p20_orphan_blobs_deleted 
+[AUDIT: Before cleanup: orphan exists]
+======================================================================
+DESCRIPTION: orphan file present before re-init
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: After cleanup: orphan removed]
+======================================================================
+DESCRIPTION: orphan blob must be deleted on re-init
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+False                             | False
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: After cleanup: real blob kept]
+======================================================================
+DESCRIPTION: blob with valid traces record must survive
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+tests/test_p20_ttl_cleanup.py::test_p20_production_db_migration 
+[AUDIT: Migration: context_id column added]
+======================================================================
+DESCRIPTION: schema must have context_id
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Migration: legacy-dirty removed]
+======================================================================
+DESCRIPTION: dirty record purged after migration
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+False                             | False
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+
+[AUDIT: Migration: legacy-clean kept]
+======================================================================
+DESCRIPTION: valid record preserved
+----------------------------------------------------------------------
+EXPECTED                          | ACTUAL
+True                              | True
+----------------------------------------------------------------------
+MATCH: YES
+======================================================================
+PASSED
+
+============================== 5 passed in 0.27s ===============================

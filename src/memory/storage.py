@@ -1,10 +1,14 @@
-# Generated from design/memory_hippocampus.md v1.7
+# Generated from design/memory_hippocampus.md v1.8
 import sqlite3
 import json
 import time
+import os
 import hashlib
+import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+logger = logging.getLogger("GATEWAY.MEMORY")
 
 class Hippocampus:
     DEFAULT_THRESHOLD = 512 * 1024
@@ -56,6 +60,69 @@ class Hippocampus:
                 CREATE VIRTUAL TABLE IF NOT EXISTS search_idx
                 USING fts5(trace_id UNINDEXED, context_id UNINDEXED, content)
             """)
+
+        # P20: 启动时自动清理脏数据与过期记录
+        self._startup_cleanup()
+
+    def _startup_cleanup(self):
+        """P20: 清除 timestamp=0.0 脏数据、TTL 过期记录、孤儿 blob 文件。"""
+        dirty_count = 0
+        expired_count = 0
+        orphan_count = 0
+
+        ttl_days = int(os.getenv("CLAWBRAIN_TRACE_TTL_DAYS", "30"))
+        cutoff = time.time() - ttl_days * 86400 if ttl_days > 0 else None
+
+        with sqlite3.connect(self.db_path) as conn:
+            # 1. 脏数据（timestamp = 0.0）
+            dirty_ids = [r[0] for r in conn.execute(
+                "SELECT trace_id FROM traces WHERE timestamp = 0.0"
+            ).fetchall()]
+            if dirty_ids:
+                placeholders = ",".join("?" * len(dirty_ids))
+                conn.execute(f"DELETE FROM traces WHERE trace_id IN ({placeholders})", dirty_ids)
+                conn.execute(f"DELETE FROM search_idx WHERE trace_id IN ({placeholders})", dirty_ids)
+                dirty_count = len(dirty_ids)
+
+            # 2. TTL 过期记录（timestamp > 0 且早于截止时间）
+            if cutoff:
+                expired_rows = conn.execute(
+                    "SELECT trace_id, is_blob, blob_path FROM traces WHERE timestamp > 0 AND timestamp < ?",
+                    (cutoff,)
+                ).fetchall()
+                if expired_rows:
+                    exp_ids = [r[0] for r in expired_rows]
+                    placeholders = ",".join("?" * len(exp_ids))
+                    conn.execute(f"DELETE FROM traces WHERE trace_id IN ({placeholders})", exp_ids)
+                    conn.execute(f"DELETE FROM search_idx WHERE trace_id IN ({placeholders})", exp_ids)
+                    # 清理 blob 文件
+                    for _, is_blob, blob_path in expired_rows:
+                        if is_blob and blob_path:
+                            try:
+                                Path(blob_path).unlink(missing_ok=True)
+                            except Exception:
+                                pass
+                    expired_count = len(exp_ids)
+
+            # 3. 孤儿 blob 清理
+            valid_paths = set(
+                r[0] for r in conn.execute(
+                    "SELECT blob_path FROM traces WHERE is_blob = 1 AND blob_path != ''"
+                ).fetchall()
+            )
+
+        for blob_file in self.blob_dir.glob("*.json"):
+            if str(blob_file.absolute()) not in valid_paths:
+                try:
+                    blob_file.unlink()
+                    orphan_count += 1
+                except Exception:
+                    pass
+
+        if dirty_count or expired_count or orphan_count:
+            logger.info(
+                f"[HP_CLEAN] Purged dirty={dirty_count} expired={expired_count} orphan_blobs={orphan_count}"
+            )
 
     def save_trace(self, trace_id: str, payload: Dict[str, Any],
                    search_text: str = "", threshold: int = None,
@@ -145,7 +212,7 @@ class Hippocampus:
             if is_blob:
                 try:
                     return Path(blob_path).read_text(encoding="utf-8")
-                except:
+                except Exception:
                     return None
             return raw_content
 
@@ -173,5 +240,5 @@ class Hippocampus:
                     "SELECT DISTINCT context_id FROM traces WHERE context_id IS NOT NULL"
                 )
                 return [row[0] for row in cursor.fetchall()]
-            except:
+            except Exception:
                 return []
