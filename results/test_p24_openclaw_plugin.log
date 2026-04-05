@@ -1,20 +1,30 @@
 
-> @clawbrain/openclaw@1.0.0 test
-> vitest run
+> @clawbrain/openclaw@1.0.0 test:all
+> vitest run && vitest run --config vitest.integration.config.ts
 
 
  RUN  v1.6.1 /home/nvidia/ClawBrain/packages/openclaw
 
- ✓ tests/engine.test.ts  (10 tests) 5ms
 stderr | tests/engine.test.ts > ClawBrainContextEngine > P24-E1: network error in ingest → returns ingested=false, no throw
 [clawbrain] ingest failed for session=offline: Error: ECONNREFUSED
 
+ ✓ tests/engine.test.ts  (10 tests) 7ms
 stderr | tests/engine.test.ts > ClawBrainContextEngine > P24-E2: network error in assemble → returns original messages, no throw
 [clawbrain] assemble failed for session=offline: Error: ECONNREFUSED
 
 
  Test Files  1 passed (1)
       Tests  10 passed (10)
-   Start at  21:12:20
-   Duration  467ms (transform 35ms, setup 0ms, collect 36ms, tests 5ms, environment 0ms, prepare 91ms)
+   Start at  21:16:34
+   Duration  522ms (transform 40ms, setup 0ms, collect 35ms, tests 7ms, environment 0ms, prepare 287ms)
+
+
+ RUN  v1.6.1 /home/nvidia/ClawBrain/packages/openclaw
+
+ ✓ tests/integration.test.ts  (8 tests) 4070ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  21:16:35
+   Duration  5.47s (transform 26ms, setup 0ms, collect 22ms, tests 4.07s, environment 0ms, prepare 25ms)
 
