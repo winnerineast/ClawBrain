@@ -1,4 +1,4 @@
-# design/memory_hippocampus.md v1.5
+# design/memory_hippocampus.md v1.7
 
 ## 1. 任务目标 (Objective)
 从零实现 **ClawBrain Hippocampus (海马体)** 存储引擎。该引擎负责交互轨迹的无损持久化、大文件流式落盘以及基于 SQLite FTS5 的全文检索。同时，必须实现最高级别的字节级存证审计。核心改进：实现基于模型上下文窗口的动态分流阈值。
@@ -30,6 +30,13 @@
   - 必须对传入的 `query` 字符串使用双引号包裹 (如 `f'"{query}"'`)，防止 FTS5 解析异常。
   - 如果仍发生 `OperationalError`，需捕获并返回空列表 `[]`。
 
+### 2.5 FTS 降级回退策略 (P15 新增)
+- **背景**：精确短语匹配（整句加引号）召回率极低；用户输入自然语言时命中率接近零。
+- **两级搜索策略**：
+  - **Level 1 (精确短语)**：先执行 `content MATCH '"完整 query 字符串"'`。若有结果，直接返回。
+  - **Level 2 (关键词 AND)**：若 Level 1 结果为空，将 query 按空格切分，过滤长度 ≤ 2 的词与包含 FTS5 特殊符号（`"*^()[]{}`）的词，对剩余关键词各自加引号后拼为 `"词1" "词2" ...`（FTS5 AND 语义），最多取前 5 个关键词执行查询。
+  - Level 2 同样需要捕获 `OperationalError`，失败则返回空列表。
+
 ### 2.4 数据提取接口 (New for Priority 1 & 2)
 - **方法 `get_content(trace_id: str) -> Optional[str]`**：
   - 根据 ID 查询。如果是 `is_blob`，则从物理路径读取 JSON 字符串；否则直接返回 `raw_content` 内容。
@@ -52,6 +59,16 @@
 - **审计要求**：
   - 执行 `search("SILVER-FOX-42")`。
   - **日志展示**：在 Side-by-Side 格式中，EXPECTED 打印预期的 `trace_id`，ACTUAL 打印实际检索返回的 ID 列表内容（不能只打印 True/False）。
+
+### 2.6 会话隔离存储 (P18 新增)
+- **背景**：`search_idx` 无 session 字段，跨会话查询会相互污染；`traces` 无 context_id，无法按会话过滤历史。
+- **Schema 变更**：
+  - `traces` 表新增列 `context_id TEXT DEFAULT 'default'`（兼容性迁移：`ALTER TABLE` 失败则忽略）。
+  - `search_idx` 新增 `context_id UNINDEXED` 列。由于 FTS5 虚拟表不支持 `ALTER TABLE`，需检测旧 schema：若查询 `context_id` 列报 `OperationalError`，则 `DROP TABLE IF EXISTS search_idx` 后重建。
+- **API 变更**：
+  - `save_trace(..., context_id: str = "default")`：将 `context_id` 写入 `traces` 和 `search_idx`。
+  - `search(query, context_id: str = "default")`：在 `WHERE content MATCH ? AND context_id = ?` 中过滤，两级搜索均携带此过滤条件。
+  - `get_recent_traces(limit, context_id: str = None)`：若传入 `context_id` 则加 `WHERE context_id = ?` 过滤。
 
 ## 4. 生成目标 (Output Targets)
 1. `src/memory/storage.py`: 严格按照上述逻辑实现 SQLite 交互，支持动态阈值。

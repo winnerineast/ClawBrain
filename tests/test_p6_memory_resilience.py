@@ -56,7 +56,7 @@ async def test_memory_router_ingest_resilience():
     tid = await router.ingest(payload)
     
     # 2. 验证 L1 (Working Memory) 活性
-    active_items = router.wm.get_active_contents()
+    active_items = router._get_wm("default").get_active_contents()
     visual_audit("Working Memory Activity", "Ingest: Keep this alive", "True", "Keep this alive" in str(active_items))
     
     # 3. 验证 L2 (Hippocampus) 存储

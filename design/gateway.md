@@ -1,4 +1,4 @@
-# design/gateway.md v1.38
+# design/gateway.md v1.40
 
 ## 1. 任务目标 (Objective)
 全量实现 ClawBrain Gateway 对主流 LLM 提供商（Google Gemini, Mistral, xAI, OpenRouter 等）的协议适配。构建一个真正的“万能神经翻译器”，确保所有在 README 中承诺的平台都能通过 ClawBrain 进行记忆增强。同时，全量补齐结构化日志系统，确保每一项神经活动均具备透明度。
@@ -38,6 +38,22 @@
 - **异步确证**：针对异步存储或流式请求，测试代码必须具备 **1.5s (存储) 或 15s (提纯)** 的显式等待机制。
 - **语义召回断言**：在马拉松长对话测试中，系统必须执行硬断言，验证金丝雀关键词（如 `Health Check` 或 `Observability`）。
 - **自适应实战验证**：针对 LM Studio 等本地服务，测试脚本必须自动探测 `/v1/models` 获取实际加载的模型 ID。
+
+### 2.5 流式响应记忆捕获 (P15 新增)
+- **背景**：流式请求的 reaction 被写死为 `[Streamed]`，记忆系统对所有流式会话完全失明。
+- **修复逻辑（`stream_generator` 内）**：在 `yield chunk` 的同时，尝试从 chunk 中实时提取 assistant 内容，追加到 `collected_content` 列表：
+  - 先将 bytes 解码为 UTF-8 字符串，去除首尾空白。
+  - 若以 `data:` 开头（SSE 格式），剥离前缀；若内容为 `[DONE]`，跳过。
+  - 尝试 JSON 解析：Ollama 格式取 `message.content`；OpenAI SSE 格式取 `choices[0].delta.content`。
+  - 任何解析失败均静默跳过，不影响正常流式输出。
+- **流结束后**：将 `collected_content` 拼接为完整字符串，作为真实 reaction 调用 `memory_router.ingest`。若收集为空则回退为 `[Streamed]`。
+
+### 2.6 context_id 全链路透传 (P18 新增)
+- **背景**：`main.py` 已从 Header 提取 `context_id`，但调用 `memory_router.ingest()` 时未传入，导致所有记录写入 `"default"` session。
+- **修复**：在非流式和流式两处 `ingest` 调用中，均显式传入 `context_id` 参数：`await memory_router.ingest(raw_body, resp_json, context_id=context_id)`。
+
+## 5. P19 死代码清除 (Dead Code Removal)
+`src/adapters/` 目录（`base.py`, `lmstudio.py`, `ollama.py`, `openai.py`, `__init__.py`）已被 `src/gateway/translator.py` 和 `src/gateway/registry.py` 完全取代。无任何 import 引用。P19 阶段予以全量删除，不保留兼容层。
 
 ## 4. 生成目标
 - `src/main.py`: 修复 Google 终点构造的模型名截断逻辑。

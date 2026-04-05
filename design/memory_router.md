@@ -1,4 +1,4 @@
-# design/memory_router.md v1.8
+# design/memory_router.md v1.10
 
 ## 1. 任务目标 (Objective)
 实现 **ClawBrain MemoryRouter (记忆路由)**。作为大脑中枢，平衡“即时注意力”与“长程语义整合”。引入基于 Context 预算的动态分流与自适应提纯机制。
@@ -48,6 +48,22 @@
 
 ### 3.2 动态分流精准度审计
 - **验证点**：传入 1MB 数据，并设置 `offload_threshold=500KB`，验证分流 100% 触发。
+
+### 2.6 Context 注入预算控制 (P15 新增)
+- **背景**：`get_combined_context` 无上限，长期运行后注入内容可能超出模型窗口，挤占有效对话空间。
+- **环境变量 `CLAWBRAIN_MAX_CONTEXT_CHARS`**：默认 `2000`，控制注入给 LLM 的总记忆字符数上限。
+- **优先级贪心分配策略**：按价值密度从高到低依次占用预算，不设固定比例。
+  1. **L3 新皮层摘要优先**：先将 Neocortex summary 全量注入；若超出总预算则截断并追加 `...`。
+  2. **L2 海马体次之**：用剩余预算按召回顺序逐条追加，某条内容超出剩余空间则停止。
+  3. **L1 工作记忆最后**：用剩余预算注入活跃消息，超出则截断。
+- **日志埋点**：`[CTX_BUDGET] Budget: N | Used(L3): N | Used(L2): N | Used(L1): N`。
+
+### 2.7 工作记忆会话隔离 (P18 新增)
+- **背景**：`WorkingMemory` 是全局单例，所有 session 共享同一注意力队列，A 会话的记忆会污染 B 会话的上下文。
+- **修复方案**：`MemoryRouter` 将 `self.wm: WorkingMemory` 改为 `self._wm_sessions: Dict[str, WorkingMemory] = {}`，通过 `_get_wm(context_id)` 按需创建并缓存每个 session 的 WM 实例。
+- **`ingest` 签名变更**：新增 `context_id: str = "default"` 参数，用于正确路由至对应 WM 实例，并传递给 `hippo.save_trace`。
+- **`_hydrate` 变更**：启动时从 `traces` 表查询 `DISTINCT context_id`，对每个 session 分别调用 `hippo.get_recent_traces(limit=15, context_id=session)` 恢复对应 WM。
+- **`get_combined_context` 变更**：调用 `_get_wm(context_id).get_active_contents()` 和 `hippo.search(query, context_id=context_id)`，确保全路径按 session 隔离。
 
 ## 4. 生成目标
 - `src/memory/router.py`, `src/memory/storage.py`, `tests/test_p10_memory_router.py`。

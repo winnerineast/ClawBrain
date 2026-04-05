@@ -1,4 +1,4 @@
-# Generated from design/memory_neocortex.md v1.2
+# Generated from design/memory_neocortex.md v1.2 / design/management_api.md v1.0
 import sqlite3
 import httpx
 import time
@@ -54,20 +54,26 @@ class Neocortex:
                     return f"[Error] Distillation failed with status: {resp.status_code}"
                 
                 summary = resp.json().get("response", "")
-                
-                # 3. 持久化
-                with sqlite3.connect(self.db_path) as conn:
-                    conn.execute("""
-                        INSERT OR REPLACE INTO neocortex_summaries (context_id, summary_text, last_updated)
-                        VALUES (?, ?, ?)
-                    """, (context_id, summary, time.time()))
-                
+                self._save_summary(context_id, summary)
                 return summary
         except Exception as e:
             return f"[Error] Distillation error: {str(e)}"
+
+    def _save_summary(self, context_id: str, summary: str):
+        """内部写入摘要（供测试与 distill 共用）"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO neocortex_summaries (context_id, summary_text, last_updated) VALUES (?, ?, ?)",
+                (context_id, summary, time.time())
+            )
 
     def get_summary(self, context_id: str) -> Optional[str]:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT summary_text FROM neocortex_summaries WHERE context_id = ?", (context_id,))
             row = cursor.fetchone()
             return row[0] if row else None
+
+    def clear_summary(self, context_id: str):
+        """P17 管理 API：清除指定 session 的新皮层摘要"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM neocortex_summaries WHERE context_id = ?", (context_id,))

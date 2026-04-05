@@ -2,3 +2,5 @@ venv/
 __pycache__/
 .env
 results/*.json
+tests/data/**/*.db
+tests/data/**/blobs/
