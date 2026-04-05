@@ -6,7 +6,45 @@ English | [中文版](./README_CN.md)
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain is a biomimetically designed **Transparent Neural Relay Gateway**. It goes beyond multi-protocol routing by simulating the evolutionary logic of human memory, giving every LLM an "External Brain" with tri-layer memory synergy. In VRAM-constrained environments, ClawBrain significantly boosts agentic context efficiency and logical consistency.
+ClawBrain is the **memory layer for [OpenClaw](https://github.com/openclaw/openclaw)**. It intercepts every LLM request as a transparent relay, injects relevant long-term memory into the context, and archives every interaction — so your personal AI assistant actually remembers who you are, what you care about, and what happened last week.
+
+---
+
+## The Problem: OpenClaw Forgets
+
+[OpenClaw](https://github.com/openclaw/openclaw) is an excellent personal AI assistant. It connects your WhatsApp, Telegram, Slack, Discord and 20+ other channels to a single intelligent agent. The experience feels seamless — until you start a new conversation.
+
+**Every session starts from zero.**
+
+This is not a bug in OpenClaw. It is a fundamental constraint of how Large Language Models work:
+
+| Constraint | What it means in practice |
+|------------|--------------------------|
+| **Stateless by design** | The LLM has no memory of previous conversations. Each request is independent. |
+| **Context window is finite** | Even if you stuff prior history into the prompt, you quickly hit the token limit — especially with local models on constrained hardware. |
+| **No cross-channel continuity** | You mention a project deadline on WhatsApp. You ask a follow-up on Telegram. The assistant has no idea they are connected. |
+| **Repetition tax** | You re-explain your preferences, your tech stack, your goals — every single session. Time wasted, immersion broken. |
+
+The result: your AI assistant is as smart as GPT-4, but has the memory of a goldfish.
+
+## The Solution: ClawBrain
+
+ClawBrain sits between OpenClaw and its LLM backend as a **zero-config transparent proxy**. OpenClaw sends a request to `http://localhost:11435` exactly as it would to any model provider. ClawBrain intercepts it, enriches it with relevant memories, forwards it, and archives the response — all invisibly.
+
+```
+OpenClaw  →  ClawBrain (port 11435)  →  Ollama / OpenAI / Claude / Gemini
+                    ↑
+          Tri-layer memory engine
+          (remembers everything)
+```
+
+Your assistant now:
+- **Recalls facts** from sessions weeks ago — project names, decisions made, preferences stated
+- **Adapts without being told** — it already knows your stack, your style, your context
+- **Works across every channel** — memory is session-scoped but persists across restarts
+- **Runs entirely on your hardware** — no data leaves your machine
+
+ClawBrain does not replace OpenClaw's intelligence. It gives it a **hippocampus**.
 
 ---
 

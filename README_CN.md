@@ -6,7 +6,45 @@
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain 是一个基于仿生学设计的**透明神经中继网关**。它不仅解决了多协议路由的兼容性问题，更通过模拟人类大脑的记忆演变逻辑，为大语言模型（LLM）提供了一个能够自我进化、具备长短期记忆协同的"外挂大脑"。在受限的显存硬件环境下，ClawBrain 能显著提升智能体的上下文利用效率与任务执行的逻辑一致性。
+ClawBrain 是 **[OpenClaw](https://github.com/openclaw/openclaw) 的记忆增强层**。它以透明代理的方式拦截每一个 LLM 请求，将相关的长期记忆注入上下文，并归档每一次交互——让你的个人 AI 助手真正记住你是谁、你关心什么、上周发生了什么。
+
+---
+
+## 问题所在：OpenClaw 会遗忘
+
+[OpenClaw](https://github.com/openclaw/openclaw) 是一款出色的个人 AI 助手框架。它将你的 WhatsApp、Telegram、Slack、Discord 等 20+ 渠道统一接入同一个智能体，体验流畅——直到你开始下一次对话。
+
+**每次会话都从零开始。**
+
+这不是 OpenClaw 的 bug，而是大语言模型的根本性约束：
+
+| 约束 | 实际影响 |
+|------|----------|
+| **无状态设计** | LLM 对历史对话没有任何记忆，每次请求都是独立的 |
+| **上下文窗口有限** | 即使把历史记录塞进 prompt，也会很快触及 token 上限——在本地小模型上尤为突出 |
+| **跨渠道无法连续** | 你在 WhatsApp 提到了项目截止日，在 Telegram 追问进展——助手完全不知道这两件事有关联 |
+| **重复解释的成本** | 每次新会话都要重新介绍你的偏好、技术栈、背景——浪费时间，打断节奏 |
+
+结果是：你的 AI 助手拥有 GPT-4 级别的智能，却有金鱼般的记忆。
+
+## 解决方案：ClawBrain
+
+ClawBrain 作为**零配置透明代理**，插入 OpenClaw 与其 LLM 后端之间。OpenClaw 像往常一样把请求发往 `http://localhost:11435`，ClawBrain 在无感知的情况下拦截请求、注入相关记忆、转发请求、归档响应。
+
+```
+OpenClaw  →  ClawBrain（端口 11435）  →  Ollama / OpenAI / Claude / Gemini
+                    ↑
+          三层记忆引擎
+          （记住一切）
+```
+
+你的助手从此能够：
+- **调取数周前的事实**——项目名称、已做的决定、表达过的偏好
+- **无需提示即可适应**——它已经了解你的技术栈、风格和上下文
+- **跨渠道一致**——记忆按 session 隔离，但跨重启持久化
+- **完全本地运行**——数据不离开你的设备
+
+ClawBrain 不替代 OpenClaw 的智能，它赋予它一个**海马体**。
 
 ---
 
