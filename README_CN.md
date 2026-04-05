@@ -6,45 +6,58 @@
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain 是 **[OpenClaw](https://github.com/openclaw/openclaw) 的记忆增强层**。它以透明代理的方式拦截每一个 LLM 请求，将相关的长期记忆注入上下文，并归档每一次交互——让你的个人 AI 助手真正记住你是谁、你关心什么、上周发生了什么。
+ClawBrain 是 **[OpenClaw](https://github.com/openclaw/openclaw) 的基础设施层记忆引擎**。它作为透明代理插入 OpenClaw 与 LLM 后端之间——自动捕获每一次交互、将其提纯为持久知识、并在恰当时机注入正确的上下文。无需修改 OpenClaw 的配置或代码。
 
 ---
 
-## 问题所在：OpenClaw 会遗忘
+## 既然 OpenClaw 已有记忆系统，为什么还需要 ClawBrain？
 
-[OpenClaw](https://github.com/openclaw/openclaw) 是一款出色的个人 AI 助手框架。它将你的 WhatsApp、Telegram、Slack、Discord 等 20+ 渠道统一接入同一个智能体，体验流畅——直到你开始下一次对话。
+OpenClaw 自带了一套设计精良的记忆系统：`MEMORY.md` 存储长期事实，每日笔记文件存储近期上下文，FTS5 + 向量混合检索，以及实验性的 Dreaming 机制将短期记录提升为长期记忆。这套设计是认真的。
 
-**每次会话都从零开始。**
+但存在四个结构性限制，ClawBrain 在基础设施层面解决了它们。
 
-这不是 OpenClaw 的 bug，而是大语言模型的根本性约束：
+### 1. 记忆依赖模型主动决定去写
 
-| 约束 | 实际影响 |
-|------|----------|
-| **无状态设计** | LLM 对历史对话没有任何记忆，每次请求都是独立的 |
-| **上下文窗口有限** | 即使把历史记录塞进 prompt，也会很快触及 token 上限——在本地小模型上尤为突出 |
-| **跨渠道无法连续** | 你在 WhatsApp 提到了项目截止日，在 Telegram 追问进展——助手完全不知道这两件事有关联 |
-| **重复解释的成本** | 每次新会话都要重新介绍你的偏好、技术栈、背景——浪费时间，打断节奏 |
+OpenClaw 的记忆是**按需写入**的——模型必须自己注意到某事值得记录、选择调用 `memory_write`、并准确措辞。在对话节奏快、上下文压力大或模型注意力分散时，这一步往往被跳过。重要的决策、用户偏好、已解决的问题就此悄然消失。
 
-结果是：你的 AI 助手拥有 GPT-4 级别的智能，却有金鱼般的记忆。
+ClawBrain 在**网络层**自动捕获每一次交互，无需模型决策，没有任何遗漏。
 
-## 解决方案：ClawBrain
+### 2. `MEMORY.md` 每轮都注入上下文——而且会越来越大
 
-ClawBrain 作为**零配置透明代理**，插入 OpenClaw 与其 LLM 后端之间。OpenClaw 像往常一样把请求发往 `http://localhost:11435`，ClawBrain 在无感知的情况下拦截请求、注入相关记忆、转发请求、归档响应。
+OpenClaw 在每次会话开始时将 `MEMORY.md` 注入 system prompt。这个设计本身是合理的，但有一个持续累积的代价：文件越大，每轮消耗的 token 越多，触发 compaction 的频率越高，API 费用也随之上升。OpenClaw 自己的文档也警告：*"保持 MEMORY.md 简洁——它会随时间增长，可能导致 context 使用量意外激增。"*
+
+ClawBrain 使用**贪心 context 预算**（L3 → L2 → L1，默认 2000 字符），只注入与当前查询相关的内容，而非整个记忆文件。完整的归档存储在 SQLite 中，按需检索。
+
+### 3. 语义搜索依赖云端 Embedding API Key
+
+OpenClaw 的向量搜索功能强大，但需要 OpenAI、Gemini、Voyage 或 Mistral 的 API key。没有 key 时，只有 FTS5 关键词搜索可用。对于完全本地化部署（Ollama、LM Studio）的用户，这意味着召回质量大幅下降。
+
+ClawBrain 的两级 FTS5 搜索（精确短语 → 关键词 AND 降级）完全离线运行。不需要 Embedding API，不依赖云端，本地优先。
+
+### 4. Dreaming 是实验性功能，默认关闭
+
+OpenClaw 的 Dreaming 功能——将每日短期记录提升至 `MEMORY.md` 长期存储——默认禁用，需要手动配置，且标注为实验性。大多数用户从未启用它。
+
+ClawBrain 的 Neocortex 提纯自动在后台运行。每 N 次交互，后台任务自动将近期记录整合为持久化的语义摘要——无需配置，始终开启。
+
+---
+
+## 工作原理
+
+ClawBrain 是**零配置透明代理**。将 OpenClaw 的模型端点指向 `http://localhost:11435`，其他什么都不用改。
 
 ```
 OpenClaw  →  ClawBrain（端口 11435）  →  Ollama / OpenAI / Claude / Gemini
-                    ↑
-          三层记忆引擎
-          （记住一切）
+                    │
+         ┌──────────┴──────────┐
+         │    每次请求时       │
+         │  1. 归档交互轨迹   │  ← 自动捕获刺激与响应，无需模型决策
+         │  2. 检索相关记忆   │  ← FTS5 召回，按 session 隔离
+         │  3. 注入上下文     │  ← 贪心预算，高价值事实优先
+         └─────────────────────┘
 ```
 
-你的助手从此能够：
-- **调取数周前的事实**——项目名称、已做的决定、表达过的偏好
-- **无需提示即可适应**——它已经了解你的技术栈、风格和上下文
-- **跨渠道一致**——记忆按 session 隔离，但跨重启持久化
-- **完全本地运行**——数据不离开你的设备
-
-ClawBrain 不替代 OpenClaw 的智能，它赋予它一个**海马体**。
+模型收到了更丰富的上下文；OpenClaw 看到的是正常的模型响应；完整交互被归档供未来检索。一切发生在代理层，对两端均不可见。
 
 ---
 

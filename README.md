@@ -6,45 +6,58 @@ English | [中文版](./README_CN.md)
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain is the **memory layer for [OpenClaw](https://github.com/openclaw/openclaw)**. It intercepts every LLM request as a transparent relay, injects relevant long-term memory into the context, and archives every interaction — so your personal AI assistant actually remembers who you are, what you care about, and what happened last week.
+ClawBrain is the **infrastructure-layer memory engine for [OpenClaw](https://github.com/openclaw/openclaw)**. It sits between OpenClaw and its LLM backend as a transparent relay — capturing every interaction automatically, distilling it into persistent knowledge, and injecting the right context at the right time. All without touching OpenClaw's config or code.
 
 ---
 
-## The Problem: OpenClaw Forgets
+## Why ClawBrain, When OpenClaw Already Has Memory?
 
-[OpenClaw](https://github.com/openclaw/openclaw) is an excellent personal AI assistant. It connects your WhatsApp, Telegram, Slack, Discord and 20+ other channels to a single intelligent agent. The experience feels seamless — until you start a new conversation.
+OpenClaw ships with a thoughtful memory system: `MEMORY.md` for long-term facts, daily note files for recent context, hybrid FTS5 + vector search, and an experimental Dreaming pass that promotes daily notes to long-term storage. It is genuinely well-designed.
 
-**Every session starts from zero.**
+But there are four structural limitations that ClawBrain addresses at the infrastructure level.
 
-This is not a bug in OpenClaw. It is a fundamental constraint of how Large Language Models work:
+### 1. Memory depends on the model deciding to write it
 
-| Constraint | What it means in practice |
-|------------|--------------------------|
-| **Stateless by design** | The LLM has no memory of previous conversations. Each request is independent. |
-| **Context window is finite** | Even if you stuff prior history into the prompt, you quickly hit the token limit — especially with local models on constrained hardware. |
-| **No cross-channel continuity** | You mention a project deadline on WhatsApp. You ask a follow-up on Telegram. The assistant has no idea they are connected. |
-| **Repetition tax** | You re-explain your preferences, your tech stack, your goals — every single session. Time wasted, immersion broken. |
+OpenClaw's memory is **write-on-demand**. The model must notice something is worth remembering, choose to call `memory_write`, and phrase it correctly. Under load, context pressure, or a fast-moving conversation, it skips this step. Important decisions, stated preferences, and resolved problems silently disappear.
 
-The result: your AI assistant is as smart as GPT-4, but has the memory of a goldfish.
+ClawBrain captures **every interaction** at the wire level — no model decision required. Nothing is left to discretion.
 
-## The Solution: ClawBrain
+### 2. `MEMORY.md` is injected on every turn — and it grows
 
-ClawBrain sits between OpenClaw and its LLM backend as a **zero-config transparent proxy**. OpenClaw sends a request to `http://localhost:11435` exactly as it would to any model provider. ClawBrain intercepts it, enriches it with relevant memories, forwards it, and archives the response — all invisibly.
+OpenClaw injects `MEMORY.md` into the system prompt at the start of every session. This is the right design choice for OpenClaw, but it has a compounding cost: as the file grows, it consumes more tokens on every turn, increases compaction frequency, and raises API costs. OpenClaw itself warns: *"Keep MEMORY.md concise — it can grow over time and lead to unexpectedly high context usage."*
+
+ClawBrain operates on a **greedy context budget** (L3 → L2 → L1, default 2000 chars). It injects only what is relevant to the current query — not the entire memory file. The full archive lives in SQLite and is retrieved on demand.
+
+### 3. Semantic search requires a cloud embedding API key
+
+OpenClaw's vector search is excellent when configured, but it requires an API key from OpenAI, Gemini, Voyage, or Mistral. Without one, only keyword FTS5 search is available. For users running fully local setups (Ollama, LM Studio), this means degraded recall.
+
+ClawBrain's two-level FTS5 search (exact phrase → keyword AND fallback) works entirely offline. No embedding API. No cloud dependency. Local-first by design.
+
+### 4. Dreaming is experimental and opt-in
+
+OpenClaw's Dreaming feature — which promotes short-term daily notes to long-term `MEMORY.md` — is disabled by default, requires explicit configuration, and is labelled experimental. Most users never enable it.
+
+ClawBrain's Neocortex distillation runs automatically in the background. Every N interactions, a background task consolidates recent traces into a persistent semantic summary — always on, no configuration required.
+
+---
+
+## How It Works
+
+ClawBrain is a **zero-config transparent proxy**. Point OpenClaw's model endpoint at `http://localhost:11435`. Nothing else changes.
 
 ```
 OpenClaw  →  ClawBrain (port 11435)  →  Ollama / OpenAI / Claude / Gemini
-                    ↑
-          Tri-layer memory engine
-          (remembers everything)
+                    │
+         ┌──────────┴──────────┐
+         │   On every request  │
+         │  1. Archive trace   │  ← captures stimulus + reaction automatically
+         │  2. Search memory   │  ← FTS5 recall scoped to this session
+         │  3. Inject context  │  ← greedy budget, highest-value facts first
+         └─────────────────────┘
 ```
 
-Your assistant now:
-- **Recalls facts** from sessions weeks ago — project names, decisions made, preferences stated
-- **Adapts without being told** — it already knows your stack, your style, your context
-- **Works across every channel** — memory is session-scoped but persists across restarts
-- **Runs entirely on your hardware** — no data leaves your machine
-
-ClawBrain does not replace OpenClaw's intelligence. It gives it a **hippocampus**.
+The model receives richer context. OpenClaw sees a normal model response. The full interaction is archived for future retrieval. Everything happens in the relay — invisible to both sides.
 
 ---
 
