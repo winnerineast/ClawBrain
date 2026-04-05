@@ -183,9 +183,12 @@ async def get_memory_state(session_id: str, request: Request):
 
 @app.delete("/v1/memory/{session_id}")
 async def clear_memory_session(session_id: str, request: Request):
-    """清除指定 session 的新皮层摘要"""
+    """清除指定 session 的新皮层摘要与工作记忆快照"""
     mr: MemoryRouter = request.app.state.memory_router
     mr.neo.clear_summary(session_id)
+    mr.hippo.clear_wm_state(session_id)
+    if session_id in mr._wm_sessions:
+        del mr._wm_sessions[session_id]
     return {"status": "cleared", "session_id": session_id}
 
 @app.post("/v1/memory/{session_id}/distill")

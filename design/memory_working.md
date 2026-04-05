@@ -1,4 +1,4 @@
-# design/memory_working.md v1.3
+# design/memory_working.md v1.4
 
 ## 1. 任务目标 (Objective)
 从零实现 **ClawBrain WorkingMemory (工作记忆)**。必须实现具备“双因子动力学”的消息驻留模型，并在审计日志中完整披露计算公式与分值来源，确保注意力的聚焦与衰减逻辑 100% 可审计。
@@ -39,6 +39,21 @@ $$A = \text{TimeScore} + \text{RelevanceScore}$$
 ### 3.3 状态对比展示 (Rule 8)
 - 必须展示每一轮请求后，工作记忆中残留消息的 ID 列表及其对应的激活值。
 
+### 2.4 持久化机制 (P22 新增)
+- **背景**：WorkingMemory 纯粹在内存中，服务重启后 `_hydrate` 只能从 Hippocampus 最近记录重建，丢失了精确的 `activation` 值和原始 `timestamp`，导致重启后注意力状态与重启前不一致。
+- **方案**：在 `hippocampus.db` 中新增 `wm_state` 表，每次 `ingest` 后将当前活跃 WM 快照写入 DB。
+- **Schema**：`wm_state(session_id TEXT, trace_id TEXT, content TEXT, activation REAL, timestamp REAL, PRIMARY KEY (session_id, trace_id))`
+- **写入时机**：`MemoryRouter.ingest()` 在 `_get_wm(ctx).add_item()` 之后，调用 `hippo.save_wm_state(context_id, wm.items)` 覆盖写入该 session 的全量快照（先 DELETE 再 INSERT REPLACE）。
+- **读取时机**：`_hydrate()` 优先从 `wm_state` 加载（精确恢复 activation + timestamp）；若该 session 无快照记录，则降级为旧的从 `traces` 重建逻辑。
+- **清理联动**：`DELETE /v1/memory/{session_id}` 同步清除对应 `wm_state` 行；TTL 清理同步清除过期 session 的 `wm_state`。
+- **`Hippocampus` 新增方法**：
+  - `save_wm_state(session_id, items: List[WorkingMemoryItem])`
+  - `load_wm_state(session_id) -> List[dict]`（返回字段：trace_id, content, activation, timestamp）
+  - `clear_wm_state(session_id)`
+
 ## 4. 生成目标 (Output Targets)
 1. `src/memory/working.py`: 支持计算过程返回的工作记忆逻辑。
-2. `tests/test_p8_working_memory.py`: 高透明度验收测试。
+2. `src/memory/storage.py`: 新增 `wm_state` 表及 save/load/clear 方法。
+3. `src/memory/router.py`: `ingest()` 写入快照，`_hydrate()` 优先从快照恢复。
+4. `src/main.py`: `DELETE /v1/memory/{session_id}` 同步调用 `clear_wm_state`。
+5. `tests/test_p22_wm_persistence.py`: 验证精确恢复 activation、跨重启一致性。

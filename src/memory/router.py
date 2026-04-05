@@ -1,4 +1,4 @@
-# Generated from design/memory_router.md v1.10
+# Generated from design/memory_router.md v1.11
 import uuid
 import json
 import os
@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from src.memory.storage import Hippocampus
-from src.memory.working import WorkingMemory
+from src.memory.working import WorkingMemory, WorkingMemoryItem
 from src.memory.neocortex import Neocortex
 from src.memory.signals import SignalDecomposer
 
@@ -36,10 +36,26 @@ class MemoryRouter:
         return self._wm_sessions[context_id]
 
     def _hydrate(self):
-        """按 session 分别恢复工作记忆（P18 更新）"""
+        """按 session 分别恢复工作记忆（P22: 优先从 wm_state 精确恢复）"""
         try:
             sessions = self.hippo.get_all_session_ids()
             for session in sessions:
+                # P22: 优先从精确快照恢复（保留 activation + timestamp）
+                snapshot = self.hippo.load_wm_state(session)
+                if snapshot:
+                    wm = self._get_wm(session)
+                    for row in snapshot:
+                        item = WorkingMemoryItem(
+                            trace_id=row["trace_id"],
+                            content=row["content"],
+                            timestamp=row["timestamp"]
+                        )
+                        item.activation = row["activation"]
+                        wm.items.append(item)
+                    logger.info(f"[WM_HYDRATE] Exact restore: session={session} items={len(snapshot)}")
+                    continue
+
+                # 降级：从 traces 重建（旧行为）
                 recent = self.hippo.get_recent_traces(limit=15, context_id=session)
                 wm = self._get_wm(session)
                 for row in reversed(recent):
@@ -51,6 +67,7 @@ class MemoryRouter:
                             wm.add_item(row["trace_id"], intent)
                         except:
                             pass
+                logger.info(f"[WM_HYDRATE] Fallback rebuild: session={session} items={len(recent)}")
         except Exception as e:
             logger.error(f"Hydration failed: {e}")
 
@@ -69,8 +86,10 @@ class MemoryRouter:
         )
         logger.info(f"[HP_STOR] Action: {'BLOB' if res['is_blob'] else 'SQL'} | TraceID: {trace_id} | Session: {context_id}")
 
-        # 工作记忆：写入对应 session 的 WM
-        self._get_wm(context_id).add_item(trace_id, intent)
+        # 工作记忆：写入对应 session 的 WM，并持久化快照（P22）
+        wm = self._get_wm(context_id)
+        wm.add_item(trace_id, intent)
+        self.hippo.save_wm_state(context_id, wm.items)
 
         # 自动提纯触发
         self._trace_counter += 1

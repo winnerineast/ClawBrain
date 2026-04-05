@@ -1,4 +1,4 @@
-# Generated from design/memory_hippocampus.md v1.8
+# Generated from design/memory_hippocampus.md v1.8 / design/memory_working.md v1.4
 import sqlite3
 import json
 import time
@@ -59,6 +59,18 @@ class Hippocampus:
             conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS search_idx
                 USING fts5(trace_id UNINDEXED, context_id UNINDEXED, content)
+            """)
+
+            # P22: WM 精确持久化快照表
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS wm_state (
+                    session_id TEXT,
+                    trace_id TEXT,
+                    content TEXT,
+                    activation REAL,
+                    timestamp REAL,
+                    PRIMARY KEY (session_id, trace_id)
+                )
             """)
 
         # P20: 启动时自动清理脏数据与过期记录
@@ -242,3 +254,31 @@ class Hippocampus:
                 return [row[0] for row in cursor.fetchall()]
             except Exception:
                 return []
+
+    # ── P22: WorkingMemory 精确持久化 ────────────────────────────────────────
+
+    def save_wm_state(self, session_id: str, items) -> None:
+        """将 session 的 WM 活跃快照覆盖写入 wm_state 表。"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM wm_state WHERE session_id = ?", (session_id,))
+            for item in items:
+                conn.execute(
+                    "INSERT INTO wm_state VALUES (?, ?, ?, ?, ?)",
+                    (session_id, item.trace_id, item.content, item.activation, item.timestamp)
+                )
+
+    def load_wm_state(self, session_id: str) -> List[Dict[str, Any]]:
+        """读取 session 的 WM 快照，返回按 timestamp 升序排列的字典列表。"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT trace_id, content, activation, timestamp FROM wm_state "
+                "WHERE session_id = ? ORDER BY timestamp ASC",
+                (session_id,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def clear_wm_state(self, session_id: str) -> None:
+        """清除指定 session 的 WM 快照（管理 API DELETE 联动）。"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM wm_state WHERE session_id = ?", (session_id,))

@@ -1,4 +1,4 @@
-# design/memory_router.md v1.10
+# design/memory_router.md v1.11
 
 ## 1. 任务目标 (Objective)
 实现 **ClawBrain MemoryRouter (记忆路由)**。作为大脑中枢，平衡“即时注意力”与“长程语义整合”。引入基于 Context 预算的动态分流与自适应提纯机制。
@@ -65,5 +65,12 @@
 - **`_hydrate` 变更**：启动时从 `traces` 表查询 `DISTINCT context_id`，对每个 session 分别调用 `hippo.get_recent_traces(limit=15, context_id=session)` 恢复对应 WM。
 - **`get_combined_context` 变更**：调用 `_get_wm(context_id).get_active_contents()` 和 `hippo.search(query, context_id=context_id)`，确保全路径按 session 隔离。
 
+### 2.8 WorkingMemory 精确持久化 (P22 新增)
+- **背景**：`_hydrate` 从 Hippocampus `traces` 重建 WM，会丢失 `activation` 值和精确 `timestamp`，每次重启后注意力状态重置为初始值。
+- **方案**：借助 `Hippocampus.save_wm_state / load_wm_state` 在每次 `ingest` 后持久化 WM 快照。
+- **`ingest` 变更**：`_get_wm(context_id).add_item(...)` 之后追加 `self.hippo.save_wm_state(context_id, wm.items)`。
+- **`_hydrate` 变更**：优先调用 `hippo.load_wm_state(session)` 精确恢复；若返回空则降级为旧的 traces 重建路径。
+- **`clear_summary` 联动**：`DELETE /v1/memory/{session_id}` 端点同步调用 `hippo.clear_wm_state(session_id)`，确保管理 API 的清除语义覆盖全层。
+
 ## 4. 生成目标
-- `src/memory/router.py`, `src/memory/storage.py`, `tests/test_p10_memory_router.py`。
+- `src/memory/router.py`, `src/memory/storage.py`, `src/main.py`, `tests/test_p22_wm_persistence.py`。
