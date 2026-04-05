@@ -55,7 +55,7 @@ async def _process_request(request: Request):
     context_id = raw_headers.get("x-clawbrain-session", "default")
     logger.info(f"[DETECTOR] Proto: {source_protocol} | Model: {std_req.model}")
 
-    # 2. 严谨路由分发 (2.2 准则修正)
+    # 2. 严谨路由分发
     provider_name, provider_config = registry.resolve_provider(std_req.model)
     if not provider_config:
         logger.warning(f"[ROUTER] 501 Block: {std_req.model}")
@@ -75,15 +75,12 @@ async def _process_request(request: Request):
     if action == "BLOCK":
         raise HTTPException(status_code=422, detail=f"Model {std_req.model} too small for tools.")
 
-    # 4. 神经增强 (2.4 准则：增强显著性)
+    # 4. 神经增强
     last_msg_content = std_req.messages[-1].content if std_req.messages else ""
     intent = pipeline.compressor.compress(last_msg_content)
     enriched_context = await memory_router.get_combined_context(context_id, intent)
-    
-    # 使用显著分隔符与指令加固记忆块
     prominent_context = f"\n[IMPORTANT: PRIORITIZE THESE FACTS]\n{enriched_context}\n"
     std_req.messages.insert(0, Message(role="system", content=prominent_context))
-    
     std_req = pipeline.run(std_req, tier)
 
     # 5. 方言翻译
@@ -92,8 +89,9 @@ async def _process_request(request: Request):
         endpoint = f"{provider_config.base_url}/api/chat"
     elif target_protocol == "google":
         target_payload = DialectTranslator.to_google(std_req)
-        model_name = std_req.model.split("/")[-1]
-        endpoint = f"{provider_config.base_url}/v1beta/models/{model_name}:generateContent"
+        # Google 需要剥离网关前缀
+        model_id = std_req.model.split("/", 1)[1] if "/" in std_req.model else std_req.model
+        endpoint = f"{provider_config.base_url}/v1beta/models/{model_id}:generateContent"
     elif target_protocol == "anthropic":
         target_payload = DialectTranslator.to_anthropic(std_req)
         endpoint = f"{provider_config.base_url}/v1/messages"
@@ -106,6 +104,9 @@ async def _process_request(request: Request):
         if std_req.stream:
             async def stream_generator():
                 async with client.stream("POST", endpoint, json=target_payload, headers=pass_headers) as resp:
+                    if resp.is_error:
+                        yield json.dumps({"error": f"Upstream Error {resp.status_code}"}).encode()
+                        return
                     async for chunk in resp.aiter_bytes():
                         yield chunk
                 await memory_router.ingest(raw_body, {"message": {"content": "[Streamed]"}})

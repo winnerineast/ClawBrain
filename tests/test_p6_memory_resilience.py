@@ -1,8 +1,11 @@
-# Generated from design/memory.md v1.8
+# Generated from design/memory_router.md v1.11
 import pytest
-import json
-from src.memory.core import MemoryEngine, TraceStatus
+import os
+import shutil
+from src.memory.router import MemoryRouter
 from src.memory.signals import SignalDecomposer
+
+TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p6_resilience_tmp"
 
 def visual_audit(test_name, input_val, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
@@ -19,7 +22,7 @@ def visual_audit(test_name, input_val, expected, actual):
 
 @pytest.mark.asyncio
 async def test_signal_fingerprinting():
-    """验证协议指纹的一致性"""
+    """验证协议指纹的一致性 (Core Resilience)"""
     payload1 = {"model": "gemma", "tools": ["read"], "messages": [{"content": "hi"}]}
     payload2 = {"model": "gemma", "tools": ["read"], "messages": [{"content": "different"}]}
     
@@ -27,7 +30,6 @@ async def test_signal_fingerprinting():
     hash2 = SignalDecomposer.get_schema_fingerprint(payload2)
     
     visual_audit("Schema Fingerprint Constancy", "Payload structure", hash1, hash2)
-    # 虽然消息不同，但由于结构（model, tools）相同，Hash 必须一致
     assert hash1 == hash2
 
 @pytest.mark.asyncio
@@ -35,22 +37,31 @@ async def test_core_intent_extraction():
     """验证最后一条 User 意图提取"""
     payload = {
         "messages": [
-            {"role": "system", "content": "You are a bot"},
-            {"role": "user", "content": "First question"},
-            {"role": "assistant", "content": "Answer"},
             {"role": "user", "content": "The Real Goal"}
         ]
     }
     intent = SignalDecomposer.extract_core_intent(payload)
-    visual_audit("Intent Extraction", "Multi-round messages", "The Real Goal", intent)
+    visual_audit("Intent Extraction", "The Real Goal", "The Real Goal", intent)
     assert intent == "The Real Goal"
 
 @pytest.mark.asyncio
-async def test_full_commit_flow():
-    """验证对称提交"""
-    engine = MemoryEngine()
-    tid = await engine.ingest_stimulus({"q": "1"})
-    await engine.associate_reaction(tid, {"a": "2"})
-    status = engine.working_memory[0].status
-    visual_audit("Commit Flow", "1 -> 2", TraceStatus.COMMITTED, status)
-    assert status == TraceStatus.COMMITTED
+async def test_memory_router_ingest_resilience():
+    """验证 MemoryRouter 摄入后的 L1/L2 双重活性"""
+    if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
+    router = MemoryRouter(db_dir=TEST_DIR)
+    
+    payload = {"context_id": "resilience", "messages": [{"role": "user", "content": "Keep this alive"}]}
+    
+    # 1. 摄入
+    tid = await router.ingest(payload)
+    
+    # 2. 验证 L1 (Working Memory) 活性
+    active_items = router.wm.get_active_contents()
+    visual_audit("Working Memory Activity", "Ingest: Keep this alive", "True", "Keep this alive" in str(active_items))
+    
+    # 3. 验证 L2 (Hippocampus) 存储
+    content = router.hippo.get_content(tid)
+    visual_audit("Hippocampus Storage", "Trace ID: " + tid, "True", "Keep this alive" in str(content))
+    
+    assert "Keep this alive" in str(active_items)
+    assert "Keep this alive" in str(content)

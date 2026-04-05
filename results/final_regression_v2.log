@@ -1,0 +1,568 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/nvidia/ClawBrain/venv/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-20-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'asyncio': '1.3.0', 'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
+rootdir: /home/nvidia/ClawBrain
+plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 31 items
+
+tests/test_p10_auto_trigger.py::test_p10_auto_distill_trigger_audit 
+[MARATHON TRIGGER TEST] Pumping 50 messages...
+
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: dbccb079-fce2-43d7-956d-d1b4290a12b3
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 283ace73-7953-4152-92ad-078a4a97e705
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 562497cc-8b24-4a7b-a99c-4c4617770c2b
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 6b9c5784-e962-4a0a-8d2c-acb839703bd4
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 0878299f-03ac-4632-a270-d1692691c4ed
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: d1c22975-44c1-4e2d-9344-490beb3956d2
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 485b8b8c-2273-4679-a4bf-353c43f8925c
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 481c1d43-b994-4110-87de-2fc8fee95bd0
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: d6eb6d9f-0dbd-4251-864f-d897e374ec57
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 3386b993-34e1-47ed-9166-e441fd324027
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 2b36d5e0-9f2d-4750-b775-66edd4b28c23
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: cb739f20-6922-419b-baa9-48a77b81b507
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: d644b9d7-40e9-47d3-b818-6afb5e25a67f
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: bdb1c52c-e3a5-4868-ab5d-b8daaf7956e1
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: c0e95a0c-c924-4e30-8ea9-42ca8411836a
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 851ab9fc-db66-41b2-bbb4-74d040bdee99
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: dc7d4e8d-f572-4cb5-95b0-eccfe1594766
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 4a409b9a-fa2f-4eee-bfc3-a05ab9e23685
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: ad4d591a-155d-4493-bbca-6e2fb69d9380
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 8a14e32c-3af8-4619-a75d-baed4a43efab
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 7a8835f3-d187-4c08-8807-855c6cca255e
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: dd1fa1cb-7498-4241-b0f1-620700670982
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: a4169afb-d74d-4278-a8cf-5b1e89713176
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: d3364431-f5d6-453c-a676-3bd016110ef4
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: d5061fed-63bb-46cc-a698-c74abdd38fe8
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 2748de3d-a2da-450d-af4e-8752413c4ad6
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: c57cbe78-44eb-49b4-b92d-5b3206c4eff2
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 8c5d844c-1459-4999-a8e2-3285515b6c3d
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 372e8347-7799-45d7-8c0c-8e0892cf6983
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 52fec21c-71aa-41f7-ade2-0cf658e67bdf
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 80029cf0-2c05-4404-a10a-af9f7c01ab74
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 3ea16a8e-91b7-4a26-9ba9-22f7a5564f72
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 191358b2-6849-45cb-88d9-b530bc32ca29
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: c8724b51-975e-4488-a5e1-44b614738d9b
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 8f6ea268-e1d2-44a7-82c9-d11ded616e2a
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: cdcd2388-d0fd-4ea7-a12f-bde94e03d6ab
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: f671ae0d-b58c-45dd-9c34-dfce6ab9d2d1
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 216bcc8e-580f-4ee6-80ef-6ab7938f7666
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: c70ae110-51c7-4b0f-8931-f26cd6e21b01
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 9aac1abd-5024-4ecc-8951-6f75c0e01b50
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 8f386701-b4f8-460c-9837-d7a13b0c69ce
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 95f3c8d3-e4cb-4c56-8d76-eb4ad31b0231
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: d893d2d0-097a-4503-b56d-ed96a839d0ac
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: dc761da6-ad94-46a6-94e2-d19686d09688
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: f14b896f-340d-4c7b-a971-08acd357f4ce
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 46b56f65-d0d7-4c65-932a-c04566d92cbf
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 4811e1cf-ec90-4d21-b7ee-c84627e7259b
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 66b5fe8c-dd4a-4a83-a713-521df265ae20
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 8893e4da-eeb6-4a5a-b213-d1d8198b866c
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: b8bfe977-966a-4ece-99d7-20f2d9eab4db
+INFO     GATEWAY.MEMORY:router.py:62 [NC_DIST] Threshold Reached (50) -> Spawning Worker.
+Pumping complete. Waiting 15s for LLM Distillation (NC_DIST)...
+INFO     httpx:_client.py:1740 HTTP Request: POST http://127.0.0.1:11434/api/generate "HTTP/1.1 200 OK"
+INFO     GATEWAY.MEMORY:router.py:88 [NC_DIST] Distillation Complete for session: marathon_audit (Traces: 50)
+
+[DATABASE PENETRATION AUDIT]
+Captured Summary: **核心技术决策**
+*   系统组件的验证（Verification）是核心流程，范围覆盖了组件 0 到组件 49。
+*   采取了系统性的、组件级的验证（Fact #N: Component N is verified），确保了全部关键部分的通过性。
+
+**用户偏好**
+*   追求全面的、无遗...
+AUDIT SUCCESS: Real knowledge found in Neocortex.
+PASSED
+tests/test_p10_memory_router.py::test_p10_dynamic_offload_audit 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: b26bff6e-994b-4f7c-ab75-5de8ced99513
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: BLOB | TraceID: 45ead72d-4988-4aa0-8941-acbeb70b1593
+
+[AUDIT: Dynamic Offload]
+Threshold 100KB -> Blob Count: 0
+Threshold 5KB   -> Blob Count: 1
+PASSED
+tests/test_p10_memory_router.py::test_p10_cognitive_load_trigger 
+[AUDIT: Cognitive Load]
+
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 86e5e054-fcf3-4aa5-9f3c-9da6dea68ea9
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 84b9c724-55e4-45d5-8f6d-3fa1550e7514
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: a5e21186-6ec6-40d9-99ee-17bf94797e04
+INFO     GATEWAY.MEMORY:router.py:62 [NC_DIST] Threshold Reached (3) -> Spawning Worker.
+PASSED
+tests/test_p11_integration.py::test_p11_full_chain_memory_echo_real 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: gemma4:e4b
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: ollama | Dialect: ollama
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_1_EXPERT | Action: PASS
+INFO     httpx:_client.py:1740 HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 02db4154-c0da-4f66-8e62-43eecd8a1cc4
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/chat "HTTP/1.1 200 OK"
+
+[REAL E2E AUDIT: Real Environment Echo - Round 2]
+================================================================================
+INPUT: Recall secret code
+--------------------------------------------------------------------------------
+EXPECTED RECALL                        | ACTUAL ENHANCEMENT
+APPLE-777                              | === SYSTEM MEMORY SUMMARY (NEOCORTEX) === No historical summary.  === RELEVANT HISTORICAL SNIPPETS (
+--------------------------------------------------------------------------------
+MEMORY ECHO MATCH: YES
+================================================================================
+PASSED
+tests/test_p12_lmstudio.py::test_lmstudio_real_routing 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: lmstudio/any-model
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: lmstudio | Dialect: openai
+INFO     httpx:_client.py:1740 HTTP Request: POST http://127.0.0.1:11434/api/show "HTTP/1.1 404 Not Found"
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_1_EXPERT | Action: PASS
+ERROR    GATEWAY:main.py:124 Forwarding error: All connection attempts failed
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/chat/completions "HTTP/1.1 502 Bad Gateway"
+
+[REAL-WORLD AUDIT: LM Studio Real Routing]
+------------------------------------------------------------
+INPUT: lmstudio/any-model
+------------------------------------------------------------
+EXPECTED PROVIDER           | ACTUAL STATUS
+--------------------------- | ---------------------------
+LM Studio (Local:1234)      | 502
+------------------------------------------------------------
+VERDICT: FAIL
+============================================================
+FAILED
+tests/test_p12_lmstudio.py::test_openai_routing_security 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: gpt-4
+WARNING  GATEWAY:main.py:61 [ROUTER] 501 Block: gpt-4
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/chat/completions "HTTP/1.1 501 Not Implemented"
+
+[REAL-WORLD AUDIT: OpenAI Routing Security]
+------------------------------------------------------------
+INPUT: gpt-4 (unauthorized)
+------------------------------------------------------------
+EXPECTED PROVIDER           | ACTUAL STATUS
+--------------------------- | ---------------------------
+501 Block                   | 501
+------------------------------------------------------------
+VERDICT: PASS
+============================================================
+PASSED
+tests/test_p12_universal_routing.py::test_universal_routing_lmstudio 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: lmstudio/llama-3
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: lmstudio | Dialect: openai
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_1_EXPERT | Action: PASS
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 3b8a6e4a-37eb-4661-a505-be99bd480b7f
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/chat/completions "HTTP/1.1 200 OK"
+
+[DIALECT AUDIT: Universal Routing -> LMStudio]
+------------------------------------------------------------
+INPUT: lmstudio/llama-3 via /v1
+------------------------------------------------------------
+TARGET PROVIDER             | ACTUAL STATUS
+--------------------------- | ---------------------------
+lmstudio (Dialect: openai)  | 200
+------------------------------------------------------------
+VERDICT: PASS
+============================================================
+PASSED
+tests/test_p12_universal_routing.py::test_universal_routing_ollama 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: ollama | Model: gemma4:e4b
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: ollama | Dialect: ollama
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_1_EXPERT | Action: PASS
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: fb146049-3975-4844-8032-f1811b0b13e7
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/chat "HTTP/1.1 200 OK"
+
+[DIALECT AUDIT: Universal Routing -> Ollama]
+------------------------------------------------------------
+INPUT: gemma4:e4b via /api
+------------------------------------------------------------
+TARGET PROVIDER             | ACTUAL STATUS
+--------------------------- | ---------------------------
+ollama (Dialect: ollama)    | 200
+------------------------------------------------------------
+VERDICT: PASS
+============================================================
+PASSED
+tests/test_p13_cloud_adapters.py::test_p13_anthropic_role_normalization 
+[AUDIT: Role Normalization]
+------------------------------------------------------------
+DESCRIPTION: Merge double User messages
+------------------------------------------------------------
+EXPECTED ATTRIBUTE                     | ACTUAL ATTRIBUTE
+-------------------------------------- | --------------------------------------
+msg_count: 1                           | msg_count: 1
+first_role: user                       | first_role: user
+------------------------------------------------------------
+VERDICT: PASS
+================================================================================
+PASSED
+tests/test_p13_cloud_adapters.py::test_p13_anthropic_mandatory_fields 
+[AUDIT: Mandatory Fields]
+------------------------------------------------------------
+DESCRIPTION: Auto-fill max_tokens
+------------------------------------------------------------
+EXPECTED ATTRIBUTE                     | ACTUAL ATTRIBUTE
+-------------------------------------- | --------------------------------------
+max_tokens: 4096                       | max_tokens: 4096
+------------------------------------------------------------
+VERDICT: PASS
+================================================================================
+PASSED
+tests/test_p13_cloud_adapters.py::test_p13_anthropic_system_mapping 
+[AUDIT: System Field Mapping]
+------------------------------------------------------------
+DESCRIPTION: System msg to Top-level
+------------------------------------------------------------
+EXPECTED ATTRIBUTE                     | ACTUAL ATTRIBUTE
+-------------------------------------- | --------------------------------------
+system: Admin Mode                     | system: Admin Mode
+------------------------------------------------------------
+VERDICT: PASS
+================================================================================
+PASSED
+tests/test_p13_universal_dialects.py::test_p13_google_gemini_translation 
+[DIALECT AUDIT: Google Gemini Dialect]
+================================================================================
+DESCRIPTION: Map Assistant -> Model, Extract System
+--------------------------------------------------------------------------------
+EXPECTED STRUCTURE                     | ACTUAL STRUCTURE
+-------------------------------------- | --------------------------------------
+{                                      | {
+  "contents": [                        |   "contents": [
+    {                                  |     {
+      "role": "user",                  |       "role": "user",
+      "parts": [                       |       "parts": [
+        {                              |         {
+          "text": "Hi"                 |           "text": "Hi"
+        }                              |         }
+      ]                                |       ]
+    },                                 |     },
+--------------------------------------------------------------------------------
+DIALECT MATCH: YES
+================================================================================
+PASSED
+tests/test_p13_universal_dialects.py::test_p13_anthropic_role_merge 
+[DIALECT AUDIT: Anthropic Role Normalization]
+================================================================================
+DESCRIPTION: Merge redundant User messages
+--------------------------------------------------------------------------------
+EXPECTED STRUCTURE                     | ACTUAL STRUCTURE
+-------------------------------------- | --------------------------------------
+{                                      | {
+  "count": 1                           |   "count": 1
+}                                      | }
+--------------------------------------------------------------------------------
+DIALECT MATCH: YES
+================================================================================
+PASSED
+tests/test_p13_universal_dialects.py::test_p13_openai_prefix_stripping 
+[DIALECT AUDIT: OpenAI Prefix Stripping]
+================================================================================
+DESCRIPTION: Strip 'deepseek/' from model name
+--------------------------------------------------------------------------------
+EXPECTED STRUCTURE                     | ACTUAL STRUCTURE
+-------------------------------------- | --------------------------------------
+"deepseek-chat"                        | "deepseek-chat"
+--------------------------------------------------------------------------------
+DIALECT MATCH: YES
+================================================================================
+PASSED
+tests/test_p1_models.py::test_standard_request_parsing 
+[AUDIT: Model Name Parsing]
+------------------------------------------------------------
+INPUT: {"model": "ollama/gemma4:e4b", "messages": [{"role": "user", "content": "Hi"}]}...
+------------------------------------------------------------
+EXPECTED RESULT             | ACTUAL RESULT
+--------------------------- | ---------------------------
+ollama/gemma4:e4b           | ollama/gemma4:e4b
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p1_models.py::test_tool_calling_parsing 
+[AUDIT: Tool Name Parsing]
+------------------------------------------------------------
+INPUT: {"model": "gemma4:31b", "messages": [{"role": "user", "content": "Read file"}], "tools": [{"type": "...
+------------------------------------------------------------
+EXPECTED RESULT             | ACTUAL RESULT
+--------------------------- | ---------------------------
+read_file                   | read_file
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p2_scout.py::test_tier_classification 
+[AUDIT: Qwen Static Lookup]
+------------------------------------------------------------
+INPUT (Metadata): "qwen2.5:latest"...
+------------------------------------------------------------
+EXPECTED TIER               | ACTUAL TIER
+--------------------------- | ---------------------------
+ModelTier.TIER_3            | ModelTier.TIER_3
+------------------------------------------------------------
+MATCH: YES
+============================================================
+
+[AUDIT: Gemma Static Lookup]
+------------------------------------------------------------
+INPUT (Metadata): "gemma4:e4b"...
+------------------------------------------------------------
+EXPECTED TIER               | ACTUAL TIER
+--------------------------- | ---------------------------
+ModelTier.TIER_1            | ModelTier.TIER_1
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p3_pipeline.py::test_full_pipeline_precision 
+[AUDIT: Pipeline Precision]
+------------------------------------------------------------
+INPUT: 'Task:    Run\n\n\nResult: OK'...
+------------------------------------------------------------
+EXPECTED: 'Task: Run\n\nResult: OK\n\n[SYSTEM ENFORCEMENT]: ...
+ACTUAL:   'Task: Run\n\nResult: OK\n\n[SYSTEM ENFORCEMENT]: ...
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p4_router.py::test_ollama_path_routing 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: gemma4:e4b
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: ollama | Dialect: ollama
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_1_EXPERT | Action: PASS
+INFO     httpx:_client.py:1740 HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: dbcb07ca-8648-494e-a4ec-f9d25c9c5a22
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/chat "HTTP/1.1 200 OK"
+
+[AUDIT: Ollama Routing]
+------------------------------------------------------------
+PATH: /api/chat
+------------------------------------------------------------
+EXPECTED STATUS             | ACTUAL STATUS
+--------------------------- | ---------------------------
+200                         | 200
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p4_router.py::test_openai_path_routing 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: gpt-4
+WARNING  GATEWAY:main.py:61 [ROUTER] 501 Block: gpt-4
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/chat/completions "HTTP/1.1 501 Not Implemented"
+
+[AUDIT: OpenAI Routing]
+------------------------------------------------------------
+PATH: /v1/chat/completions
+------------------------------------------------------------
+EXPECTED STATUS             | ACTUAL STATUS
+--------------------------- | ---------------------------
+501                         | 501
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p5_e2e.py::test_e2e_multi_round_marathon 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: gemma4:e4b
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: ollama | Dialect: ollama
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_1_EXPERT | Action: PASS
+INFO     httpx:_client.py:1740 HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: b2c83923-1469-42cd-afea-f372455eaf60
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/chat "HTTP/1.1 200 OK"
+
+[AUDIT: Marathon Knowledge Recall]
+------------------------------------------------------------
+INPUT: Round 21: Based on our talk about FastAPI (Round 2) and AWS ECS (Round 12), what is the single most critical step for production stability?
+------------------------------------------------------------
+EXPECTED KEYWORDS           | ACTUAL (SNIPPET)
+--------------------------- | ---------------------------
+['Health Check', 'Observability', 'Reliability'] | The single most critical st
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p5_e2e.py::test_e2e_ollama_chat_lifespan 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: gemma4:e4b
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: ollama | Dialect: ollama
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_1_EXPERT | Action: PASS
+INFO     httpx:_client.py:1740 HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: 984e2eda-dd68-4347-b7af-444193affece
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/chat "HTTP/1.1 200 OK"
+PASSED
+tests/test_p5_e2e.py::test_e2e_qualification_interception 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: qwen2.5:latest
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: ollama | Dialect: ollama
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_3_BASIC | Action: BLOCK
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/chat "HTTP/1.1 422 Unprocessable Entity"
+
+[AUDIT: E2E Qualification]
+------------------------------------------------------------
+INPUT: Qwen + Tools
+------------------------------------------------------------
+EXPECTED KEYWORDS           | ACTUAL (SNIPPET)
+--------------------------- | ---------------------------
+['422']                     | 422
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p6_memory_resilience.py::test_signal_fingerprinting 
+[AUDIT: Schema Fingerprint Constancy]
+------------------------------------------------------------
+INPUT: 'Payload structure'...
+------------------------------------------------------------
+EXPECTED                    | ACTUAL
+--------------------------- | ---------------------------
+0d33c8e8ca2bd9b4fa28697d79b | 0d33c8e8ca2bd9b4fa28697d79b
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p6_memory_resilience.py::test_core_intent_extraction 
+[AUDIT: Intent Extraction]
+------------------------------------------------------------
+INPUT: 'The Real Goal'...
+------------------------------------------------------------
+EXPECTED                    | ACTUAL
+--------------------------- | ---------------------------
+The Real Goal               | The Real Goal
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p6_memory_resilience.py::test_memory_router_ingest_resilience 
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY.MEMORY:router.py:54 [HP_STOR] Action: SQL | TraceID: e2bea129-aefa-477d-9c3d-f827585518e8
+
+[AUDIT: Working Memory Activity]
+------------------------------------------------------------
+INPUT: 'Ingest: Keep this alive'...
+------------------------------------------------------------
+EXPECTED                    | ACTUAL
+--------------------------- | ---------------------------
+True                        | True
+------------------------------------------------------------
+MATCH: YES
+============================================================
+
+[AUDIT: Hippocampus Storage]
+------------------------------------------------------------
+INPUT: 'Trace ID: e2bea129-aefa-477d-9c3d-f827585518e8'...
+------------------------------------------------------------
+EXPECTED                    | ACTUAL
+--------------------------- | ---------------------------
+True                        | True
+------------------------------------------------------------
+MATCH: YES
+============================================================
+PASSED
+tests/test_p7_hippocampus.py::test_p7_storage_integrity_audit 
+[HIGH-FIDELITY AUDIT: Storage Byte Integrity & SHA-256]
+================================================================================
+DESCRIPTION: 1MB Payload -> Blob Offloading + Hash Check
+--------------------------------------------------------------------------------
+EXPECTED EVIDENCE                      | ACTUAL EVIDENCE
+-------------------------------------- | --------------------------------------
+1eea027b45c52eb0de90f8cb38947d80da8bd4 | 1eea027b45c52eb0de90f8cb38947d80da8bd4
+--------------------------------------------------------------------------------
+INTEGRITY MATCH: YES
+================================================================================
+DEBUG EVIDENCE: SYSTEM=1eea027b... DB=1eea027b... DISK=1eea027b...
+PASSED
+tests/test_p7_hippocampus.py::test_p7_fts_recall_precision_audit 
+[HIGH-FIDELITY AUDIT: FTS Recall Precision]
+================================================================================
+DESCRIPTION: Search hyphenated word 'admin-root' in 6 logs
+--------------------------------------------------------------------------------
+EXPECTED EVIDENCE                      | ACTUAL EVIDENCE
+-------------------------------------- | --------------------------------------
+['target-99']                          | ['target-99']
+--------------------------------------------------------------------------------
+INTEGRITY MATCH: YES
+================================================================================
+PASSED
+tests/test_p8_working_memory.py::test_p8_full_math_transparency 
+[MATHEMATICAL AUDIT: Dual-Factor Derivation]
+================================================================================
+SCENARIO: 500s elapsed + 'database' keyword match
+--------------------------------------------------------------------------------
+EXPECTED LOGIC                         | ACTUAL DERIVATION TRAIL
+-------------------------------------- | --------------------------------------
+TimeScore = 0.7 * exp(-0.001 * 500)    | T_diff: 500s | Calc: 0.7 * exp(-0.001*
+RelScore = 0.3 * (Common / Total)      | Match: {'database'} | Rel_Score: 0.3 *
+Total = Time + Rel                     | Total: 0.5246
+--------------------------------------------------------------------------------
+VERDICT: PASS
+================================================================================
+PASSED
+tests/test_p8_working_memory.py::test_p8_capacity_and_threshold_enforcement PASSED
+tests/test_p9_neocortex.py::test_p9_neocortex_distillation_audit FAILED
+
+=================================== FAILURES ===================================
+__________________________ test_lmstudio_real_routing __________________________
+
+    @pytest.mark.asyncio
+    async def test_lmstudio_real_routing():
+        """验证 lmstudio/ 前缀通过网关真实转发到本地 1234 端口"""
+        # 注意：确保您的 LM Studio 已经加载了模型
+        payload = {
+            "model": "lmstudio/any-model",
+            "messages": [{"role": "user", "content": "Hello LM Studio, are you there?"}],
+            "stream": False
+        }
+    
+        with TestClient(app) as client:
+            # 1. 直接请求网关
+            response = client.post("/v1/chat/completions", json=payload)
+    
+            visual_audit("LM Studio Real Routing", "lmstudio/any-model", "LM Studio (Local:1234)", response.status_code)
+    
+            # 如果 LM Studio 在运行，应该返回 200 或由于模型未加载返回相应错误，
+            # 但绝不应该是 404 (Ollama 回退) 或 501 (路由未命中)
+>           assert response.status_code == 200
+E           assert 502 == 200
+E            +  where 502 = <Response [502 Bad Gateway]>.status_code
+
+tests/test_p12_lmstudio.py:36: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     GATEWAY:main.py:56 [DETECTOR] Proto: openai | Model: lmstudio/any-model
+INFO     GATEWAY:main.py:65 [ADAPTER] Target: lmstudio | Dialect: openai
+INFO     httpx:_client.py:1740 HTTP Request: POST http://127.0.0.1:11434/api/show "HTTP/1.1 404 Not Found"
+INFO     GATEWAY:main.py:73 [MODEL_QUAL] Tier: TIER_1_EXPERT | Action: PASS
+ERROR    GATEWAY:main.py:124 Forwarding error: All connection attempts failed
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/chat/completions "HTTP/1.1 502 Bad Gateway"
+_____________________ test_p9_neocortex_distillation_audit _____________________
+
+    @pytest.mark.asyncio
+    async def test_p9_neocortex_distillation_audit():
+        """Phase 9 深度审计：长上下文提取与金丝雀打点验证"""
+        if os.path.exists(TEST_DATA_DIR): shutil.rmtree(TEST_DATA_DIR)
+    
+>       nc = Neocortex(db_dir=TEST_DATA_DIR)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_p9_neocortex.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/memory/neocortex.py:13: in __init__
+    self._init_db()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <src.memory.neocortex.Neocortex object at 0x7a975af4c980>
+
+    def _init_db(self):
+>       with sqlite3.connect(self.db_path) as conn:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       sqlite3.OperationalError: unable to open database file
+
+src/memory/neocortex.py:16: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_p12_lmstudio.py::test_lmstudio_real_routing - assert 502 ==...
+FAILED tests/test_p9_neocortex.py::test_p9_neocortex_distillation_audit - sql...
+======================== 2 failed, 29 passed in 30.04s =========================

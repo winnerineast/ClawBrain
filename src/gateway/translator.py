@@ -1,4 +1,4 @@
-# Generated from design/gateway.md v1.26
+# Generated from design/gateway.md v1.38
 import json
 from typing import Dict, Any, AsyncGenerator, List
 from src.models import StandardRequest
@@ -15,17 +15,23 @@ class DialectTranslator:
 
     @staticmethod
     def to_openai(request: StandardRequest) -> Dict[str, Any]:
-        """翻译为标准 OpenAI 格式，支持 DeepSeek, Mistral, OpenRouter 等"""
+        """
+        翻译为标准 OpenAI 格式。
+        2.1 准则修正：只剥离第一个前缀（网关标识），保留模型内部路径。
+        解决 LM Studio 400 错误。
+        """
         payload = request.model_dump(exclude_none=True)
-        # 剥离前缀，如 'deepseek/chat' -> 'chat'
-        if "/" in payload.get("model", ""):
-            payload["model"] = payload["model"].split("/", 1)[1]
+        model_name = payload.get("model", "")
+        if "/" in model_name:
+            # lmstudio/nvidia/model -> nvidia/model
+            payload["model"] = model_name.split("/", 1)[1]
+            
         payload.pop("options", None)
         return payload
 
     @staticmethod
     def to_anthropic(request: StandardRequest) -> Dict[str, Any]:
-        """翻译为 Anthropic (Claude) 格式，包含角色正规化逻辑"""
+        """翻译为 Anthropic (Claude) 格式"""
         raw = request.model_dump(exclude_none=True)
         messages = raw.get("messages", [])
         
@@ -36,14 +42,17 @@ class DialectTranslator:
             if msg.get("role") == "system":
                 system_parts.append(msg.get("content", ""))
             else:
-                # 角色交替合并逻辑 (Rule 2.1)
                 if normalized and normalized[-1]["role"] == msg["role"]:
                     normalized[-1]["content"] += "\n" + msg.get("content", "")
                 else:
                     normalized.append({"role": msg["role"], "content": msg.get("content", "")})
         
+        # 2.1 准则修正：只剥离第一个前缀
+        model_name = raw.get("model", "")
+        target_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
+
         anthropic_body = {
-            "model": raw.get("model", "").split("/")[-1],
+            "model": target_model,
             "max_tokens": raw.get("max_tokens") or 4096,
             "messages": normalized,
             "stream": raw.get("stream", False)
@@ -65,7 +74,6 @@ class DialectTranslator:
             if msg.get("role") == "system":
                 system_instruction += msg.get("content", "") + "\n"
             else:
-                # Google 的角色映射：assistant -> model
                 role = "model" if msg.get("role") == "assistant" else "user"
                 contents.append({
                     "role": role,

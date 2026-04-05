@@ -1,4 +1,4 @@
-# design/memory_neocortex.md v1.1
+# design/memory_neocortex.md v1.2
 
 ## 1. 任务目标 (Objective)
 从零实现 **ClawBrain Neocortex (新皮层)** 引擎。该引擎负责将海马体中的冗长情节记忆异步整合为精炼的语义记忆（知识摘要），同时必须具备“可见的语义审计”能力。
@@ -19,9 +19,10 @@
 - **逻辑流转**：
   1. 遍历输入的 `traces` 列表，提取所有的 User 和 Assistant 对话内容，拼接成长文本。
   2. 构造指令 Prompt："请总结以下对话中的核心技术决策、用户偏好和已解决的问题。以精炼的 Bullet Points 形式输出，严禁废话。"
-  3. 使用 `httpx.AsyncClient` 调用 `ollama_url/api/generate`，指定 `gemma4:e4b`，传入合并后的 Prompt。
-  4. 将返回的 `response` 提取出来，存入/更新 `neocortex_summaries` 表。
-  5. 异常处理：如果请求失败，返回描述性的错误字符串，不抛出阻断异常。
+  3. **模型选择 (Fixed)**：从环境变量 `CLAWBRAIN_DISTILL_MODEL` 读取模型名（默认 `gemma4:e4b`）。
+  4. 使用 `httpx.AsyncClient` 调用 `ollama_url/api/generate`，传入合并后的 Prompt 和指定模型。
+  5. 将返回的 `response` 提取出来，存入/更新 `neocortex_summaries` 表。
+  6. 异常处理：如果请求失败，返回描述性的错误字符串，不抛出阻断异常。
 
 ### 2.3 记忆唤醒接口
 - **方法签名**：`def get_summary(context_id: str) -> Optional[str]`

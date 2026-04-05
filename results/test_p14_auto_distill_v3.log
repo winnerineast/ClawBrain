@@ -1,0 +1,69 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/nvidia/ClawBrain/venv/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-20-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'asyncio': '1.3.0', 'metadata': '3.1.1', 'json-report': '1.5.0', 'anyio': '4.13.0'}}
+rootdir: /home/nvidia/ClawBrain
+plugins: asyncio-1.3.0, metadata-3.1.1, json-report-1.5.0, anyio-4.13.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_p10_auto_trigger.py::test_p10_auto_distill_trigger_audit 
+[MARATHON TRIGGER TEST] Pumping 50 messages...
+
+-------------------------------- live log call ---------------------------------
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: fdabc9e0-3e2e-46b1-8aa6-421d4067fca1
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 50b889b7-f4d9-478f-af62-b05c12a2374d
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 19552ed7-470c-4be2-8da9-01dcf9dc342d
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 167050fe-78b3-481b-8a72-bdbf3a37b037
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 68990ef8-f77b-4d90-9702-1772b1cbfe8e
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 89b4ee94-bce7-4109-a2e2-a468b7513621
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: e388b25b-ab7a-4ab2-8479-dbd7c4f2999c
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 47c0df18-02a7-4a16-a729-17c6c94e5f9c
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 40fbd926-1907-4fc1-b476-a322f1e15a7d
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 8b99c931-30bb-4126-8aae-a606a993f688
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: c6177130-1409-4824-9dee-b6f654e77a3a
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 4d25d94c-2960-49eb-82b3-edac01c47772
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 5bc0341a-7113-4512-accd-462f72d6136b
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: a04102a0-8745-4a03-881d-242fefa92b51
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 2ea27492-c3e1-47fa-8a81-2be5a0361e5d
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: b244489d-2df8-431c-a859-9c21b74893c2
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 7c4d8c01-2919-4f12-bae0-31082c13c534
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 150b35d0-487b-478d-a1bb-9a0f0e216329
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 6be62fbd-f4ff-4fcf-89ae-4a8f078bb7cd
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 0068b44d-15e4-435e-8de0-db002e904990
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: f9466bfc-c87a-4425-ad77-2ce5db1c4a2a
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 50ca184d-6be0-4c25-aeb4-d5afc1f78393
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 6420b719-bdd8-4fe0-bf73-bc9d61f148a5
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 5bf30735-3d2c-4c1b-8458-6ee9786ea647
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 96ae3c51-cab8-461c-82f1-42f35f659174
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: a8d168c7-2738-40fe-8d93-0d503a6313d2
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: c5613736-4f7f-44b1-b592-bb3cce8d06b7
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: c821b542-f5dd-4b56-95d1-8176ea388339
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 998f3790-c006-4cb3-8ced-c3bb994a0314
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: e6e8fb9a-d8c5-40eb-835d-5086cdc28eab
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: b8ebd9e3-73e6-4c29-824d-bb8ffb8a6f66
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: b2e69fb2-ee2d-4e16-8620-0b7efdeb78fd
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 693506a0-5e05-4797-ba44-56a98ddb0127
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 7118410e-b62a-4999-8b2d-da734613185d
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 21310041-bcad-4ad8-8467-d708c0cc9fc0
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 23095229-e83e-4c3d-b4c8-8f1727a23055
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 761a3d74-837f-4055-b139-4da14c7ed76e
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 56fac0b5-ede9-4119-b5c9-8d8397906393
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 2721c967-af7e-448a-8b36-68cc287e5f91
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 9d1b654a-d87d-4b4b-aca9-7357ab129717
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 076da62e-27e9-40c5-9954-6fe7c82b4bb6
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 67c6159c-fbd4-4770-be6c-0057b4ddb57f
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 9e127d80-88a6-41fd-80c7-a0f91057a221
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: f729c5bf-cead-4bd7-b0e4-84767707f9ec
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 6073a3e1-e6da-40a0-b67a-35e171956da8
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: a4252ca6-689e-4ef7-b520-9f65e15d3570
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 37b0459d-92b3-47f9-8716-49fa30b6b36a
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: aabef9f3-9850-4306-a018-4b7b5c6bace5
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 0b69246f-6d2d-4091-be2b-4b6c17c28ab4
+INFO     GATEWAY.MEMORY:router.py:53 [HP_STOR] Action: SQL | TraceID: 11038105-a1f3-40de-a835-a1af3913713c
+INFO     GATEWAY.MEMORY:router.py:61 [NC_DIST] Threshold Reached (50) -> Spawning Worker.
+Pumping complete. Waiting for async worker...
+Test finished.
+PASSED
+
+============================== 1 passed in 3.53s ===============================

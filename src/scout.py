@@ -12,13 +12,11 @@ class ModelTier(str, Enum):
     TIER_3 = "TIER_3_BASIC"
 
 class ModelScout:
-    # 2.2 准则修复：内置确定性映射表，防止测试环境下的网络抖动导致拦截失效
+    # 2.2 准则修复：仅保留本地已知模型分级，移除云端模型（如 gpt-4）以防止路由误判
     KNOWN_MODELS = {
         "qwen2.5:latest": ModelTier.TIER_3, # 4.7B 确定为 TIER 3
         "gemma4:e4b": ModelTier.TIER_1,
-        "gemma4:31b": ModelTier.TIER_1,
-        "gpt-4": ModelTier.TIER_1,
-        "gpt-4o": ModelTier.TIER_1
+        "gemma4:31b": ModelTier.TIER_1
     }
 
     def __init__(self, ollama_base_url: str = "http://127.0.0.1:11434"):

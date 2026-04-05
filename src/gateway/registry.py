@@ -41,7 +41,7 @@ class ProviderRegistry:
     def resolve_provider(self, full_model_name: str) -> Tuple[Optional[str], Optional[ProviderConfig]]:
         """
         根据前缀或白名单解析。
-        2.2 准则修复：未命中前缀且不在白名单的模型（如 gpt-4）必须返回 None。
+        2.2 准则修复：如果前缀不匹配且不在白名单（如 gpt-4），必须返回 None, None 触发 501。
         """
         # 1. 检查显式前缀
         if "/" in full_model_name:
@@ -51,10 +51,10 @@ class ProviderRegistry:
             # 未知前缀，禁止回退
             return None, None
         
-        # 2. 检查无前缀白名单
+        # 2. 检查本地白名单（处理无前缀的合法本地模型）
         if full_model_name in self.known_no_prefix_models:
             p_name = self.known_no_prefix_models[full_model_name]
             return p_name, self.providers[p_name]
         
-        # 3. 2.2 准则：彻底移除默认的 ollama 返回逻辑
+        # 3. 2.2 准则：对于任何未命中的无前缀模型（如 gpt-4），严禁静默回退
         return None, None

@@ -1,9 +1,10 @@
-# Generated from design/memory_hippocampus.md v1.2
+# Generated from design/memory_hippocampus.md v1.5
 import pytest
 import os
 import shutil
 import hashlib
 import json
+import sqlite3
 from pathlib import Path
 from src.memory.storage import Hippocampus
 
@@ -37,7 +38,7 @@ def get_hash(data: str) -> str:
     return hashlib.sha256(data.encode('utf-8')).hexdigest()
 
 def test_p7_storage_integrity_audit():
-    """Phase 7 深度审计：大文件分流后的字节一致性校验"""
+    """Phase 7 深度审计：大文件分流后的字节一致性与 SHA-256 校验 (Fixed Bug 7)"""
     if os.path.exists(TEST_DATA_DIR): shutil.rmtree(TEST_DATA_DIR)
     hp = Hippocampus(db_dir=TEST_DATA_DIR)
     
@@ -45,32 +46,43 @@ def test_p7_storage_integrity_audit():
     raw_content = "CANARY_DATA_" + "A" * (1024 * 1024)
     input_payload = {"content": raw_content}
     
-    # 计算原始 JSON 字符串的 Hash
+    # 计算原始 JSON 字符串的 Hash (预期)
     original_json_str = json.dumps(input_payload)
-    original_hash = get_hash(original_json_str)
+    expected_hash = get_hash(original_json_str)
     
     # 存入海马体
     res = hp.save_trace("trace-deep-audit", input_payload)
     
-    # 验证返回契约
-    assert res["is_blob"] is True
-    assert os.path.exists(res["blob_path"])
+    # 1. 验证返回契约中的 checksum (Bug 7 修复验证)
+    system_hash = res.get("checksum")
     
-    # 从磁盘读取生成的 Blob 文件进行 Hash 校验
+    # 2. 从磁盘读取产生的内容并计算 Hash (物理确证)
+    assert res["is_blob"] is True
     with open(res["blob_path"], "r", encoding="utf-8") as f:
         on_disk_content = f.read()
         on_disk_hash = get_hash(on_disk_content)
     
-    # 高保真审计展示
+    # 3. 从数据库中读取存证 Hash (持久化确证)
+    db_path = os.path.join(TEST_DATA_DIR, "hippocampus.db")
+    conn = sqlite3.connect(db_path)
+    db_hash = conn.execute("SELECT checksum FROM traces WHERE trace_id='trace-deep-audit'").fetchone()[0]
+    conn.close()
+    
+    # 高保真审计展示 (Fixed Visual Bug: 确保比较的是哈希本身)
     visual_audit_high_fid(
-        "Storage Byte Integrity",
-        "1MB Payload -> Blob Offloading",
-        f"SHA256: {original_hash}",
-        f"SHA256: {on_disk_hash}"
+        "Storage Byte Integrity & SHA-256",
+        "1MB Payload -> Blob Offloading + Hash Check",
+        expected_hash, # 纯哈希用于比较
+        on_disk_hash   # 纯哈希用于比较
     )
     
-    # 硬核断言：字节必须 100% 一致
-    assert original_hash == on_disk_hash
+    # 额外打印多方证据用于肉眼复核
+    print(f"DEBUG EVIDENCE: SYSTEM={system_hash[:8]}... DB={db_hash[:8]}... DISK={on_disk_hash[:8]}...")
+    
+    # 硬核断言：四方 Hash 必须完全一致
+    assert system_hash == expected_hash, "Return metadata checksum mismatch"
+    assert db_hash == expected_hash, "Database persistent checksum mismatch"
+    assert on_disk_hash == expected_hash, "Physical file content checksum mismatch"
 
 def test_p7_fts_recall_precision_audit():
     """Phase 7 深度审计：全文检索的召回精度验证"""
