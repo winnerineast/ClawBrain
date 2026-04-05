@@ -1,0 +1,19 @@
+# Generated from design/docker.md v1.0
+services:
+  clawbrain:
+    build: .
+    ports:
+      - "11435:11435"
+    volumes:
+      - ./data:/app/data          # SQLite DB + blobs 持久化
+    env_file:
+      - .env                      # API 密钥等敏感配置，不进入镜像
+    environment:
+      - CLAWBRAIN_DB_DIR=/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:11435/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
