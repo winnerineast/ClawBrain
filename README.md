@@ -42,22 +42,20 @@ ClawBrain's Neocortex distillation runs automatically in the background. Every N
 
 ---
 
-## How It Works
+## Two Integration Modes
 
-ClawBrain is a **zero-config transparent proxy**. Point OpenClaw's model endpoint at `http://localhost:11435`. Nothing else changes.
+ClawBrain can plug into OpenClaw in two ways. Choose one or run both.
 
-```
-OpenClaw  →  ClawBrain (port 11435)  →  Ollama / OpenAI / Claude / Gemini
-                    │
-         ┌──────────┴──────────┐
-         │   On every request  │
-         │  1. Archive trace   │  ← captures stimulus + reaction automatically
-         │  2. Search memory   │  ← FTS5 recall scoped to this session
-         │  3. Inject context  │  ← greedy budget, highest-value facts first
-         └─────────────────────┘
-```
+| | Mode A — HTTP Relay | Mode B — Context Engine Plugin |
+|---|---|---|
+| **How** | Transparent proxy in front of the LLM | Native OpenClaw plugin via internal API |
+| **Setup** | Change one URL in OpenClaw config | Install plugin + two config lines |
+| **Memory injection** | Injected as a `[IMPORTANT]` system message on every relay request | Injected as `systemPromptAddition` before each model run |
+| **Session tracking** | Via `x-clawbrain-session` header | Via OpenClaw's native `sessionId` |
+| **Works with all LLM backends** | Yes | Yes |
+| **OpenClaw-native lifecycle hooks** | No | Yes (`ingest/assemble/compact/afterTurn`) |
 
-The model receives richer context. OpenClaw sees a normal model response. The full interaction is archived for future retrieval. Everything happens in the relay — invisible to both sides.
+Both modes use the same tri-layer memory backend. Mode B gives tighter integration with OpenClaw's session lifecycle.
 
 ---
 
@@ -71,7 +69,28 @@ docker compose up -d        # start on port 11435
 curl http://localhost:11435/health
 ```
 
-Point any LLM client at `http://127.0.0.1:11435` — no other configuration needed:
+---
+
+## 🔌 OpenClaw Integration
+
+### Mode A — HTTP Relay (zero-config)
+
+Point OpenClaw's model endpoint at ClawBrain instead of the LLM directly.
+ClawBrain intercepts every request, enriches it with memory, and forwards to
+the real backend.
+
+```
+OpenClaw  →  ClawBrain (port 11435)  →  Ollama / OpenAI / Claude / Gemini
+                    │
+         ┌──────────┴──────────┐
+         │   On every request  │
+         │  1. Archive trace   │  ← captures interaction automatically
+         │  2. Search memory   │  ← FTS5 recall scoped to this session
+         │  3. Inject context  │  ← greedy budget, highest-value facts first
+         └─────────────────────┘
+```
+
+In your OpenClaw provider config, change the `baseUrl` to ClawBrain:
 
 ```json
 "ollama": {
@@ -79,6 +98,106 @@ Point any LLM client at `http://127.0.0.1:11435` — no other configuration need
   "apiKey": "sk-xxx..."
 }
 ```
+
+Set a session header so memory is isolated per user/project:
+
+```
+x-clawbrain-session: my-project
+```
+
+That's it. No other changes required.
+
+---
+
+### Mode B — Context Engine Plugin (OpenClaw-native)
+
+ClawBrain implements OpenClaw's [Context Engine plugin interface](https://github.com/openclaw/openclaw).
+In this mode, OpenClaw calls ClawBrain's `ingest/assemble/compact/afterTurn`
+lifecycle hooks directly — giving ClawBrain precise control over what gets
+injected, and when.
+
+**Step 1 — Start ClawBrain**
+
+```bash
+docker compose up -d
+# or locally:
+PYTHONPATH=. uvicorn src.main:app --host 0.0.0.0 --port 11435
+```
+
+**Step 2 — Install the plugin**
+
+```bash
+# From a local clone:
+openclaw plugins install -l ./packages/openclaw
+
+# Or build first if dist/ is missing:
+cd packages/openclaw && npm install && npm run build
+cd ../..
+openclaw plugins install -l ./packages/openclaw
+```
+
+**Step 3 — Configure `~/.openclaw/openclaw.json`**
+
+```json5
+{
+  plugins: {
+    slots: {
+      contextEngine: "clawbrain"   // ClawBrain owns assembly + compaction
+    },
+    entries: {
+      clawbrain: {
+        enabled: true,
+        // Optional overrides:
+        // config: { url: "http://localhost:11435" }
+      }
+    },
+    load: {
+      paths: ["./packages/openclaw/dist/index.js"]
+    }
+  }
+}
+```
+
+**Step 4 — Restart the OpenClaw gateway**
+
+```bash
+openclaw restart
+# or kill and relaunch
+```
+
+**Verify the plugin is active:**
+
+```bash
+openclaw doctor
+# should show: contextEngine → clawbrain
+```
+
+#### What happens after activation
+
+| Hook | When OpenClaw calls it | What ClawBrain does |
+|------|------------------------|---------------------|
+| `ingest` | Every new message | Archives to Hippocampus, updates Working Memory |
+| `assemble` | Before each model run | Retrieves L3→L2→L1 context, injects as `systemPromptAddition` |
+| `compact` | Context window full / `/compact` | Distils traces into Neocortex, prunes Working Memory |
+| `afterTurn` | After model run completes | Persists WM snapshot, optionally triggers background distillation |
+
+ClawBrain sets `ownsCompaction: true` — OpenClaw's built-in auto-compaction is
+disabled in favour of ClawBrain's SQLite-backed distillation.
+
+#### Environment variables (plugin)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAWBRAIN_URL` | `http://localhost:11435` | ClawBrain server URL (read by the plugin) |
+| `CLAWBRAIN_TIMEOUT_MS` | `5000` | Per-request timeout in ms |
+
+---
+
+### Running both modes together
+
+Both modes are independent. You can run the HTTP relay for generic LLM traffic
+and enable the Context Engine plugin for OpenClaw sessions simultaneously —
+they share the same server and the same memory store.
 
 ---
 
@@ -267,4 +386,4 @@ Structured log tags emitted at runtime:
 
 ---
 
-<p align="right">Generated by Claude Sonnet 4.6 based on source v1.40 (P21)</p>
+<p align="right">Generated by Claude Sonnet 4.6 based on source v1.40 (P24)</p>
