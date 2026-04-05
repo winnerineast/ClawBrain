@@ -1,38 +1,37 @@
 # design/memory.md v1.8
 
-## 1. 系统愿景 (Objective)
-生成 **ClawBrain Neural Memory System**。该系统通过三层记忆架构实现交互的对称存储、异常容错、信号降噪以及大数据量冲击防御。
+## 1. Objective
+Generate the **ClawBrain Neural Memory System**. This system achieves symmetric storage of interactions, fault tolerance, signal denoising, and defence against high-volume data bursts through a three-layer memory architecture.
 
-## 2. 核心架构与逻辑 (Architecture & Logic)
+## 2. Architecture & Logic
 
-### 2.1 交互状态机 (Interaction State Machine)
-- **两阶段提交模型**：
-  - `PENDING` (STIMULUS_RECEIVED): 接收到 Input 时初始化。
-  - `COMMITTED` (REACTION_COMPLETED): 接收到 Output 时关联并固化。
-  - `ORPHAN` (INCOMPLETE_INTENT): 超过 300 秒无响应的输入。
-- **原子单位**：使用 `InteractionTrace` 对象，必须成对存储 `(Stimulus, Reaction)`。
+### 2.1 Interaction State Machine
+- **Two-phase commit model**:
+  - `PENDING` (STIMULUS_RECEIVED): Initialised when input is received.
+  - `COMMITTED` (REACTION_COMPLETED): Associated and solidified when output is received.
+  - `ORPHAN` (INCOMPLETE_INTENT): Any input with no response after 300 seconds.
+- **Atomic unit**: `InteractionTrace` object — stimulus and reaction must always be stored as a pair `(Stimulus, Reaction)`.
 
-### 2.2 信号分解器 (SignalDecomposer)
-- **指纹识别 (Schema Fingerprinting)**：通过对请求结构（排除消息内容）进行 MD5 Hash，识别重复的协议模板。
-- **意图提取 (Core Intent)**：从 `messages` 数组中精准剥离最后一条 `role: user` 的文本内容。
+### 2.2 Signal Decomposer
+- **Schema Fingerprinting**: Identifies repeated protocol templates by computing an MD5 hash of the request structure (excluding message content).
+- **Core Intent Extraction**: Precisely extracts the text content of the last `role: user` entry from the `messages` array.
 
-### 2.3 存储与生命周期 (Layers)
-- **工作记忆 (L1)**：内存 `OrderedDict`，支持基于时间常数的权重衰减。
-- **海马体 (L2)**：无损 SQLite FTS5 存储。单次 > 512KB 时流式写盘。
-- **新皮层 (L3)**：后台执行的语义摘要与规则泛化。
+### 2.3 Storage Layers & Lifecycle
+- **Working Memory (L1)**: In-memory `OrderedDict` with time-constant-based weight decay.
+- **Hippocampus (L2)**: Lossless SQLite FTS5 storage. Single payloads > 512 KB are streamed to disk.
+- **Neocortex (L3)**: Background semantic summarisation and rule generalisation.
 
-## 3. 测试与审计规范 (TDD & Audit)
+## 3. Test & Audit Specification (TDD)
 
-### 3.1 核心验证点 (Mandatory)
-- **状态流转**：验证从 `PENDING` 到 `COMMITTED` 的正确性。
-- **孤儿识别**：验证超时记录被标记为 `ORPHAN`。
-- **信号审计**：验证 `SignalDecomposer` 对相同结构的 Hash 一致性，以及对 User 意图提取的准确性。
+### 3.1 Mandatory Verification Points
+- **State transitions**: Verify correct progression from `PENDING` to `COMMITTED`.
+- **Orphan detection**: Verify timed-out records are marked as `ORPHAN`.
+- **Signal audit**: Verify `SignalDecomposer` produces consistent hashes for identical structures, and correctly extracts user intent.
 
-### 3.2 审计日志标准
-- 遵循 **Rule 3** 的 Side-by-Side 布局。
-- 日志必须展示：`Raw Payload -> Fingerprint -> Extracted Intent`。
+### 3.2 Audit Log Standard
+- Follow the **Rule 3** Side-by-Side layout.
+- Logs must display: `Raw Payload → Fingerprint → Extracted Intent`.
 
-## 4. 生成目标 (Output Targets)
-- `src/memory/core.py`: 状态机与引擎。
-- `src/memory/signals.py`: 信号解构与指纹识别。
-- `tests/test_p6_memory_resilience.py`: 覆盖状态机与信号审计的全量测试。
+## 4. Output Targets
+- `src/memory/signals.py`: Signal decomposition and fingerprinting.
+- `tests/test_p6_memory_resilience.py`: Full tests covering the state machine and signal audit.

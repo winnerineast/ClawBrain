@@ -1,59 +1,61 @@
 # design/memory_working.md v1.4
 
-## 1. 任务目标 (Objective)
-从零实现 **ClawBrain WorkingMemory (工作记忆)**。必须实现具备“双因子动力学”的消息驻留模型，并在审计日志中完整披露计算公式与分值来源，确保注意力的聚焦与衰减逻辑 100% 可审计。
+## 1. Objective
+Implement the **ClawBrain WorkingMemory** from scratch. This must implement a dual-factor dynamics model for message residency, and fully disclose the computation formula and score sources in audit logs — ensuring the focus and decay logic is 100% auditable.
 
-## 2. 核心架构逻辑 (Full Specifications)
+## 2. Specifications
 
-### 2.1 数据结构
-- **WorkingMemoryItem**: 包含 `trace_id`, `content`, `timestamp`, 以及实时 `activation`。
-- **管理器约束**:
-  - `MAX_CAPACITY`: 严格限制为 15 条记录。
-  - `THRESHOLD`: 淘汰分界线为 0.3。
-  - `DECAY_LAMBDA`: 时间衰减常数 0.001。
+### 2.1 Data Structures
+- **WorkingMemoryItem**: Contains `trace_id`, `content`, `timestamp`, and real-time `activation`.
+- **Manager constraints**:
+  - `MAX_CAPACITY`: Hard limit of 15 items.
+  - `THRESHOLD`: Eviction cutoff at activation 0.3.
+  - `DECAY_LAMBDA`: Time decay constant 0.001.
 
-### 2.2 双因子数学模型 (The Mathematical Engine)
-每一条消息的活跃度 $A$ 计算如下：
+### 2.2 Dual-Factor Mathematical Model
+Each item's activation $A$ is computed as:
+
 $$A = \text{TimeScore} + \text{RelevanceScore}$$
-1. **TimeScore** (Max 0.7): $0.7 \times \exp(-0.001 \times \Delta t)$。
-2. **RelevanceScore** (Max 0.3): $0.3 \times (\text{Common\_Words\_Count} / \text{Current\_Input\_Words\_Count})$。
 
-### 2.3 动态清理逻辑
-每次添加新消息后，必须执行：
-1. **刷新**：重新计算内存中所有 Item 的激活值。
-2. **阈值清理**：移除 $A < 0.3$ 的 Item。
-3. **容量挤出**：若记录数 > 15，按 $A$ 从高到低排序，保留前 15 名。
+1. **TimeScore** (max 0.7): $0.7 \times \exp(-0.001 \times \Delta t)$
+2. **RelevanceScore** (max 0.3): $0.3 \times (\text{Common\_Words} / \text{Current\_Input\_Words})$
 
-## 3. 高保真审计与数学透明度规范 (High-Fidelity TDD)
+### 2.3 Dynamic Cleanup Logic
+After every `add_item` call:
+1. **Refresh**: Recompute activation for every item in memory.
+2. **Threshold eviction**: Remove items where $A < 0.3$.
+3. **Capacity eviction**: If count > 15, sort by $A$ descending and keep the top 15.
 
-测试脚本必须输出 **“带计算推导过程”** 的 Side-by-Side 日志。
-
-### 3.1 时间衰减全记录 (Time Decay Trace)
-- **要求**：打印 $\Delta t$ 及其带入公式后的中间值。
-- **日志示例**：`T_diff: 1000s | Calc: 0.7 * exp(-0.001*1000) = 0.2575`。
-
-### 3.2 话题唤醒明细 (Relevance Breakdown)
-- **要求**：展示关键词匹配的详细证据。
-- **日志示例**：`Match: {'database'} | Count: 1 | Focus_Len: 5 | Rel_Score: 0.3 * (1/5) = 0.06`。
-
-### 3.3 状态对比展示 (Rule 8)
-- 必须展示每一轮请求后，工作记忆中残留消息的 ID 列表及其对应的激活值。
-
-### 2.4 持久化机制 (P22 新增)
-- **背景**：WorkingMemory 纯粹在内存中，服务重启后 `_hydrate` 只能从 Hippocampus 最近记录重建，丢失了精确的 `activation` 值和原始 `timestamp`，导致重启后注意力状态与重启前不一致。
-- **方案**：在 `hippocampus.db` 中新增 `wm_state` 表，每次 `ingest` 后将当前活跃 WM 快照写入 DB。
-- **Schema**：`wm_state(session_id TEXT, trace_id TEXT, content TEXT, activation REAL, timestamp REAL, PRIMARY KEY (session_id, trace_id))`
-- **写入时机**：`MemoryRouter.ingest()` 在 `_get_wm(ctx).add_item()` 之后，调用 `hippo.save_wm_state(context_id, wm.items)` 覆盖写入该 session 的全量快照（先 DELETE 再 INSERT REPLACE）。
-- **读取时机**：`_hydrate()` 优先从 `wm_state` 加载（精确恢复 activation + timestamp）；若该 session 无快照记录，则降级为旧的从 `traces` 重建逻辑。
-- **清理联动**：`DELETE /v1/memory/{session_id}` 同步清除对应 `wm_state` 行；TTL 清理同步清除过期 session 的 `wm_state`。
-- **`Hippocampus` 新增方法**：
+### 2.4 Persistence (P22)
+- **Background**: WorkingMemory is purely in-memory. `_hydrate` reconstructed WM from Hippocampus traces, losing exact `activation` values and original `timestamps` — attention state reset on every restart.
+- **Solution**: Add a `wm_state` table to `hippocampus.db`; persist a snapshot after every `ingest`.
+- **Schema**: `wm_state(session_id TEXT, trace_id TEXT, content TEXT, activation REAL, timestamp REAL, PRIMARY KEY (session_id, trace_id))`
+- **Write timing**: After `_get_wm(ctx).add_item(...)` in `MemoryRouter.ingest()`, call `hippo.save_wm_state(context_id, wm.items)` — overwrites the full snapshot for that session (DELETE then INSERT).
+- **Read timing**: `_hydrate()` first calls `hippo.load_wm_state(session)` for an exact restore (preserves `activation` + `timestamp`); falls back to the old traces-rebuild path only if no snapshot exists.
+- **Cleanup coupling**: `DELETE /v1/memory/{session_id}` also clears the corresponding `wm_state` rows; TTL cleanup clears expired sessions' `wm_state` as well.
+- **New `Hippocampus` methods**:
   - `save_wm_state(session_id, items: List[WorkingMemoryItem])`
-  - `load_wm_state(session_id) -> List[dict]`（返回字段：trace_id, content, activation, timestamp）
+  - `load_wm_state(session_id) -> List[dict]` (fields: trace_id, content, activation, timestamp)
   - `clear_wm_state(session_id)`
 
-## 4. 生成目标 (Output Targets)
-1. `src/memory/working.py`: 支持计算过程返回的工作记忆逻辑。
-2. `src/memory/storage.py`: 新增 `wm_state` 表及 save/load/clear 方法。
-3. `src/memory/router.py`: `ingest()` 写入快照，`_hydrate()` 优先从快照恢复。
-4. `src/main.py`: `DELETE /v1/memory/{session_id}` 同步调用 `clear_wm_state`。
-5. `tests/test_p22_wm_persistence.py`: 验证精确恢复 activation、跨重启一致性。
+## 3. Test Specification (High-Fidelity TDD)
+
+Test scripts must output **"with full derivation trace"** Side-by-Side logs.
+
+### 3.1 Time Decay Full Record
+- **Requirement**: Print $\Delta t$ and its intermediate value after substitution.
+- **Log example**: `T_diff: 1000s | Calc: 0.7 * exp(-0.001*1000) = 0.2575`
+
+### 3.2 Topic Activation Breakdown
+- **Requirement**: Show detailed keyword-match evidence.
+- **Log example**: `Match: {'database'} | Count: 1 | Focus_Len: 5 | Rel_Score: 0.3 * (1/5) = 0.06`
+
+### 3.3 State Comparison Display (Rule 8)
+- After every request round, display the list of remaining item IDs in Working Memory and their corresponding activation values.
+
+## 4. Output Targets
+1. `src/memory/working.py`: Working memory logic with derivation-trace support.
+2. `src/memory/storage.py`: `wm_state` table and save/load/clear methods.
+3. `src/memory/router.py`: `ingest()` writes snapshot; `_hydrate()` restores from snapshot first.
+4. `src/main.py`: `DELETE /v1/memory/{session_id}` calls `clear_wm_state`.
+5. `tests/test_p22_wm_persistence.py`: Verify exact activation restore and cross-restart consistency.

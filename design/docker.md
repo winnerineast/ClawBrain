@@ -1,44 +1,43 @@
 # design/docker.md v1.0
 
-## 1. 任务目标 (Objective)
-为 ClawBrain 提供生产级 Docker 部署方案。目标：单命令启动（`docker compose up -d`），数据持久化，所有运行时参数通过 env var 注入，不硬编码任何路径或密钥。
+## 1. Objective
+Provide a production-grade Docker deployment for ClawBrain. Goal: single-command startup (`docker compose up -d`), data persistence, all runtime parameters injected via env vars, zero hard-coded paths or secrets.
 
-## 2. 核心架构决策 (Architecture Decisions)
+## 2. Architecture Decisions
 
 ### 2.1 Dockerfile
-- **基础镜像**：`python:3.12-slim`（最小化攻击面，与本机 Python 3.12.3 对齐）
-- **工作目录**：`/app`
-- **依赖安装**：仅复制 `requirements.txt` 先安装，利用 Docker 层缓存（源码变动不触发重装）
-- **运行用户**：创建非 root 用户 `clawbrain`（uid=1000），以最小权限运行
-- **启动命令**：`uvicorn src.main:app --host 0.0.0.0 --port 11435 --workers 1`
-  - `workers=1`：保证单进程内 in-memory WorkingMemory 会话状态一致（多进程会导致各进程 WM 不共享）
-  - 如需水平扩展，须先将 WorkingMemory 迁移至 Redis；现阶段单进程即可
+- **Base image**: `python:3.12-slim` — minimal attack surface, aligned with host Python 3.12.3.
+- **Working directory**: `/app`.
+- **Dependency installation**: Copy `requirements.txt` first, install before copying source — exploits Docker layer caching (source changes do not re-trigger installs).
+- **Non-root user**: Create user `clawbrain` (uid=1000); run with least privilege.
+- **Start command**: `uvicorn src.main:app --host 0.0.0.0 --port 11435 --workers 1`
+  - `workers=1`: Ensures the in-process WorkingMemory session state is consistent (multiple workers would not share WM). Horizontal scaling requires migrating L1 to Redis first.
 
 ### 2.2 docker-compose.yml
-- **服务**：单一 `clawbrain` 服务
-- **端口映射**：`11435:11435`（与 README 承诺对齐）
-- **数据卷**：`./data:/app/data`（SQLite DB + blobs 持久化到宿主机，容器重启不丢数据）
-- **env_file**：`.env`（用户在此配置 API 密钥等敏感信息，不进入镜像）
-- **restart policy**：`unless-stopped`（宿主重启自动拉起）
-- **healthcheck**：`curl -f http://localhost:11435/health`，30s 间隔，3 次重试
+- **Service**: Single `clawbrain` service.
+- **Port mapping**: `11435:11435` (aligned with README promise).
+- **Volume**: `./data:/app/data` — SQLite DB and blobs persisted to the host; container restarts do not lose data.
+- **env_file**: `.env` — user configures API keys and sensitive settings here; never baked into the image.
+- **Restart policy**: `unless-stopped` — auto-restart on host reboot.
+- **Healthcheck**: `python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:11435/health')"` (no curl in slim image), 30 s interval, 3 retries.
 
-### 2.3 环境变量清单（全量）
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `CLAWBRAIN_DB_DIR` | `/app/data` | SQLite DB 与 blobs 目录（容器内路径）|
-| `CLAWBRAIN_MAX_CONTEXT_CHARS` | `2000` | 上下文预算字符数上限 |
-| `CLAWBRAIN_TRACE_TTL_DAYS` | `30` | trace 记录 TTL（0=禁用）|
-| `CLAWBRAIN_EXTRA_PROVIDERS` | _(空)_ | JSON 字符串，注入额外 Provider |
-| `CLAWBRAIN_LOCAL_MODELS` | _(空)_ | JSON 字符串，注入本地模型白名单 |
+### 2.3 Environment Variable Reference (Full)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAWBRAIN_DB_DIR` | `/app/data` | SQLite DB and blobs directory (in-container path) |
+| `CLAWBRAIN_MAX_CONTEXT_CHARS` | `2000` | Total context budget (chars) injected per request |
+| `CLAWBRAIN_TRACE_TTL_DAYS` | `30` | Trace expiry in days (`0` = disabled) |
+| `CLAWBRAIN_EXTRA_PROVIDERS` | _(empty)_ | JSON string to inject additional providers |
+| `CLAWBRAIN_LOCAL_MODELS` | _(empty)_ | JSON string to whitelist additional local model IDs |
 
 ### 2.4 .env.example
-提供 `.env.example` 模板，列出所有可配变量，敏感值用占位符。`.env` 加入 `.gitignore`（已存在）。
+Provide a `.env.example` template listing all configurable variables with placeholder values. `.env` is already in `.gitignore`.
 
 ### 2.5 .dockerignore
-排除：`venv/`, `__pycache__/`, `tests/`, `data/`, `.env`, `*.pyc`, `.git/`
-目的：最小化构建上下文，data 目录通过 volume 挂载而非打包进镜像。
+Exclude: `venv/`, `__pycache__/`, `tests/`, `data/`, `.env`, `*.pyc`, `.git/`.
+Purpose: Minimise build context. The `data/` directory is mounted as a volume at runtime — it must not be baked into the image.
 
-## 3. 生成目标 (Output Targets)
+## 3. Output Targets
 - `Dockerfile`
 - `docker-compose.yml`
 - `.env.example`

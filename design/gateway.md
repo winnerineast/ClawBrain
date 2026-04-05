@@ -1,64 +1,67 @@
 # design/gateway.md v1.40
 
-## 1. 任务目标 (Objective)
-全量实现 ClawBrain Gateway 对主流 LLM 提供商（Google Gemini, Mistral, xAI, OpenRouter 等）的协议适配。构建一个真正的“万能神经翻译器”，确保所有在 README 中承诺的平台都能通过 ClawBrain 进行记忆增强。同时，全量补齐结构化日志系统，确保每一项神经活动均具备透明度。
+## 1. Objective
+Fully implement ClawBrain Gateway protocol adaptation for major LLM providers (Google Gemini, Mistral, xAI, OpenRouter, etc.). Build a true "universal neural translator" ensuring every platform promised in the README can receive memory-augmented requests through ClawBrain. Simultaneously, complete the structured logging system so every neural activity is fully transparent.
 
-## 2. 核心架构逻辑 (Architecture)
+## 2. Architecture
 
-### 2.1 协议方言扩展 (Extended Dialects)
-- **Google (Gemini)**：
-  - **翻译器 (`to_google`)**：将 `messages` 转换为 `contents` 数组，将 `role: assistant` 映射为 `model`，将 `system` 消息映射为顶层 `system_instruction`。
-- **Anthropic (Claude)**：
-  - **翻译器 (`to_anthropic`)**：剥离 `role: system` 到顶层 `system` 字段；执行角色交替正规化（合并连续重复角色）；强制补全 `max_tokens` (默认 4096)。
-- **OpenAI 兼容簇 (DeepSeek, Mistral, Grok, vLLM, OpenRouter)**：
-  - **翻译器 (`to_openai`)**：统一处理模型前缀剥离。针对 OpenRouter，自动注入必要的 Web 标识 Header（如 `HTTP-Referer`）。
-- **终极模型名对齐准则 (Fixed Bug 11)**：
-  - 所有的翻译器（`to_google`, `to_anthropic`, `to_openai`）以及网关入口逻辑，必须遵循**非破坏性前缀剥离**规则。
-  - **核心逻辑**：仅通过 `model_name.split("/", 1)[1]` 剥离最前面的网关 Provider 标识符（如 `lmstudio/`）。严禁使用 `split("/")[-1]`，以确保模型本身可能包含的组织路径（如 `nvidia/nemotron`）被完整保留并传递给后端。
+### 2.1 Extended Protocol Dialects
+- **Google (Gemini)**:
+  - **Translator (`to_google`)**: Convert `messages` to a `contents` array; map `role: assistant` to `model`; map `system` messages to the top-level `system_instruction` field.
+- **Anthropic (Claude)**:
+  - **Translator (`to_anthropic`)**: Strip `role: system` messages to the top-level `system` field; normalize role alternation (merge consecutive duplicate roles); force-inject `max_tokens` (default 4096).
+- **OpenAI-compatible cluster (DeepSeek, Mistral, Grok, vLLM, OpenRouter)**:
+  - **Translator (`to_openai`)**: Unified model-prefix stripping. For OpenRouter, auto-inject required web identity headers (e.g., `HTTP-Referer`).
+- **Non-destructive prefix stripping rule (Bug 11 fix)**:
+  - All translators (`to_google`, `to_anthropic`, `to_openai`) and the gateway entry point must follow the **non-destructive prefix stripping** rule.
+  - **Core logic**: Strip only the leading gateway provider identifier via `model_name.split("/", 1)[1]`. Never use `split("/")[-1]` — doing so would truncate organization paths embedded in the model ID (e.g., `nvidia/nemotron`).
 
-### 2.2 提供商注册表扩展 (Registry & Routing Security)
-- `ProviderRegistry` 必须包含内置映射：google, mistral, xai, openrouter, together, ollama, lmstudio, openai, deepseek。
-- **路由安全性 (Fixed)**：如果请求的模型无法被 `resolve_provider` 识别（即不包含有效前缀且不是原生 ollama 格式），系统**必须严禁任何形式的静默回退**。`resolve_provider` 必须返回 `(None, None)`，由上层抛出 **HTTP 501 Not Implemented**。禁止将此类请求发往任何后端适配器以防止协议错配导致的 404 错误。
+### 2.2 Provider Registry & Routing Security
+- `ProviderRegistry` must include built-in mappings for: google, mistral, xai, openrouter, together, ollama, lmstudio, openai, deepseek.
+- **Routing security**: If the requested model cannot be resolved by `resolve_provider` (no valid prefix and not a native Ollama model ID), the system must **strictly prohibit any silent fallback**. `resolve_provider` must return `(None, None)`; the caller raises **HTTP 501 Not Implemented**. Forwarding such requests to any backend adapter is forbidden to prevent 404 errors from protocol mismatch.
 
-### 2.3 动态协议探测与标准化 (Fixed)
-- **ProtocolDetector**：必须能够拦截所有 HTTP 请求，通过分析 Payload 结构自动推断输入协议类型（Ollama/OpenAI）。
-- **标准化逻辑补强**：必须显式地从原始 Payload 的顶层、`options` 或 `extra_body` 中提取 `tools`、`tool_choice`、`stream` 及 `options` 字段并填入 `StandardRequest`。严禁在转换过程中丢失关键元数据，以支持后续的准入拦截逻辑。
+### 2.3 Dynamic Protocol Detection & Standardization
+- **ProtocolDetector**: Must intercept every HTTP request and automatically infer the input protocol (Ollama / OpenAI) by analysing the payload structure.
+- **Standardization hardening**: Explicitly extract `tools`, `tool_choice`, `stream`, and `options` from the raw payload's top level, `options`, or `extra_body`, and populate them in `StandardRequest`. Losing these fields during conversion is forbidden, as they are required by the downstream gating logic.
 
-### 2.4 结构化日志系统 (Logging System)
-- **全局配置**：系统必须使用统一的 `logging` 模块，格式为：`[TIMESTAMP] [MODULE] [LEVEL] MESSAGE | {METADATA}`。
-- **强制埋点**：[DETECTOR], [PIPELINE], [MODEL_QUAL], [HP_STOR] (子 Logger), [ADAPTER]。
+### 2.4 Structured Logging System
+- **Global config**: Use a unified `logging` module with format: `[TIMESTAMP] [MODULE] [LEVEL] MESSAGE | {METADATA}`.
+- **Mandatory log points**: `[DETECTOR]`, `[PIPELINE]`, `[MODEL_QUAL]`, `[HP_STOR]` (sub-logger), `[ADAPTER]`.
 
-## 3. 高保真审计与测试规范 (TDD & High-Fidelity Audit)
+## 3. Test Specification (TDD & High-Fidelity Audit)
 
-### 3.1 跨平台翻译对齐审计
-- **场景 A: Google Gemini 转换**；**场景 B: OpenRouter 透传**；**场景 C: 角色交替合并 (Anthropic)**；**场景 D: LM Studio 真实环境 E2E 验证**。
+### 3.1 Cross-provider Translation Alignment Audit
+- **Scenario A**: Google Gemini conversion.
+- **Scenario B**: OpenRouter pass-through.
+- **Scenario C**: Role alternation merging (Anthropic).
+- **Scenario D**: LM Studio real-environment E2E validation.
 
-### 3.2 审计展示与日志验收
-- **对比展示**：日志必须 Side-by-Side 展示 `Internal Standard` -> `Provider Specific Dialect`。
-- **异步确证**：针对异步存储或流式请求，测试代码必须具备 **1.5s (存储) 或 15s (提纯)** 的显式等待机制。
-- **语义召回断言**：在马拉松长对话测试中，系统必须执行硬断言，验证金丝雀关键词（如 `Health Check` 或 `Observability`）。
-- **自适应实战验证**：针对 LM Studio 等本地服务，测试脚本必须自动探测 `/v1/models` 获取实际加载的模型 ID。
+### 3.2 Audit Display & Log Acceptance
+- **Side-by-Side display**: Logs must show `Internal Standard` → `Provider Specific Dialect`.
+- **Async confirmation**: Tests covering async storage or streaming must include explicit waits — **1.5 s** (storage) or **15 s** (distillation).
+- **Semantic recall assertion**: In marathon long-conversation tests, the system must perform hard assertions to verify canary keywords (e.g., `Health Check` or `Observability`).
+- **Adaptive real-world validation**: For local services like LM Studio, the test script must auto-discover the active model ID via `/v1/models`.
 
-### 2.5 流式响应记忆捕获 (P15 新增)
-- **背景**：流式请求的 reaction 被写死为 `[Streamed]`，记忆系统对所有流式会话完全失明。
-- **修复逻辑（`stream_generator` 内）**：在 `yield chunk` 的同时，尝试从 chunk 中实时提取 assistant 内容，追加到 `collected_content` 列表：
-  - 先将 bytes 解码为 UTF-8 字符串，去除首尾空白。
-  - 若以 `data:` 开头（SSE 格式），剥离前缀；若内容为 `[DONE]`，跳过。
-  - 尝试 JSON 解析：Ollama 格式取 `message.content`；OpenAI SSE 格式取 `choices[0].delta.content`。
-  - 任何解析失败均静默跳过，不影响正常流式输出。
-- **流结束后**：将 `collected_content` 拼接为完整字符串，作为真实 reaction 调用 `memory_router.ingest`。若收集为空则回退为 `[Streamed]`。
+### 2.5 Streaming Response Memory Capture (P15)
+- **Background**: Streaming reactions were hard-coded as `[Streamed]`, leaving the memory system blind to all streamed sessions.
+- **Fix logic (inside `stream_generator`)**:
+  - Decode each chunk to UTF-8 and strip whitespace.
+  - Strip the `data:` SSE prefix if present; skip `[DONE]` tokens.
+  - Attempt JSON parsing: Ollama format reads `message.content`; OpenAI SSE format reads `choices[0].delta.content`.
+  - Any parse failure is silently ignored — it must not affect the live stream output.
+- **After stream ends**: Join `collected_content` into a full string and call `memory_router.ingest` with the real reaction. Fall back to `[Streamed]` if the list is empty.
 
-### 2.6 context_id 全链路透传 (P18 新增)
-- **背景**：`main.py` 已从 Header 提取 `context_id`，但调用 `memory_router.ingest()` 时未传入，导致所有记录写入 `"default"` session。
-- **修复**：在非流式和流式两处 `ingest` 调用中，均显式传入 `context_id` 参数：`await memory_router.ingest(raw_body, resp_json, context_id=context_id)`。
+### 2.6 context_id Full-path Propagation (P18)
+- **Background**: `main.py` extracted `context_id` from the header but did not pass it to `memory_router.ingest()`, causing all records to be written to the `"default"` session.
+- **Fix**: Pass `context_id=context_id` explicitly in both the non-streaming and streaming `ingest` call sites.
 
-## 5. P19 死代码清除 (Dead Code Removal)
-`src/adapters/` 目录（`base.py`, `lmstudio.py`, `ollama.py`, `openai.py`, `__init__.py`）已被 `src/gateway/translator.py` 和 `src/gateway/registry.py` 完全取代。无任何 import 引用。P19 阶段予以全量删除，不保留兼容层。
+## 5. P19 Dead Code Removal
+The `src/adapters/` directory (`base.py`, `lmstudio.py`, `ollama.py`, `openai.py`, `__init__.py`) has been fully superseded by `src/gateway/translator.py` and `src/gateway/registry.py`. No import references remain. Deleted in full during P19 — no compatibility shim retained.
 
-## 4. 生成目标
-- `src/main.py`: 修复 Google 终点构造的模型名截断逻辑。
-- `src/gateway/translator.py`: 补齐所有方言的非破坏性剥离。
-- `src/gateway/registry.py`: 保持严谨路由。
-- `src/gateway/detector.py`: 保持元数据深度提取。
-- `src/memory/router.py`: 保持存证逻辑。
-- `tests/test_p12_lmstudio.py`: 最终回归确证。
+## 4. Output Targets
+- `src/main.py`: Fix model-name truncation in Google endpoint construction.
+- `src/gateway/translator.py`: Complete non-destructive prefix stripping for all dialects.
+- `src/gateway/registry.py`: Maintain strict routing.
+- `src/gateway/detector.py`: Maintain deep metadata extraction.
+- `src/memory/router.py`: Maintain archival logic.
+- `tests/test_p12_lmstudio.py`: Final regression confirmation.
