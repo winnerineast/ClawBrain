@@ -1,0 +1,8 @@
+{
+  "id": "clawbrain",
+  "name": "ClawBrain Neural Memory",
+  "version": "1.0.0",
+  "description": "Context Engine plugin for ClawBrain memory relay.",
+  "kind": "context-engine",
+  "configSchema": {}
+}

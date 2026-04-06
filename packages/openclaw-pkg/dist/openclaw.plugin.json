@@ -1,0 +1,18 @@
+{
+  "id": "clawbrain",
+  "enabledByDefault": false,
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "ClawBrain server base URL (default: http://localhost:11435)"
+      },
+      "timeoutMs": {
+        "type": "number",
+        "description": "Per-request timeout in milliseconds (default: 5000)"
+      }
+    }
+  }
+}

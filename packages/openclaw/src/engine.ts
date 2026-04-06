@@ -1,4 +1,4 @@
-// Generated from design/openclaw_plugin.md v1.0
+// Generated from design/openclaw_plugin.md v1.0 / design/context_engine_api.md v1.1
 // ClawBrainContextEngine: implements the OpenClaw ContextEngine interface.
 // Delegates all memory operations to ClawBrain via localhost HTTP.
 
@@ -10,16 +10,11 @@ import {
 } from "./client.js";
 
 // ── Minimal local type definitions ────────────────────────────────────────────
-// We reproduce the required subset of OpenClaw's ContextEngine interface types
-// here so the package can be compiled without openclaw as a dependency.
-// At runtime, OpenClaw injects its own interface — structural compatibility is
-// all that is required (TypeScript duck typing).
-
 type TextContent = { type: "text"; text: string };
 type AnyContent = { type: string; [key: string]: unknown };
 
 type UserMessage   = { role: "user";        content: string | AnyContent[]; timestamp: number };
-type AssistantMsg  = { role: "assistant";    content: AnyContent[];          timestamp: number };
+type AssistantMsg  = { role: "assistant";    content: string | AnyContent[]; timestamp: number };
 type ToolResultMsg = { role: "toolResult";   [key: string]: unknown };
 type AgentMessage  = UserMessage | AssistantMsg | ToolResultMsg | { role: string; [key: string]: unknown };
 
@@ -53,44 +48,21 @@ type IngestResult = { ingested: boolean };
 
 // ── Text extraction helpers ───────────────────────────────────────────────────
 
-function debug(msg: string): void {
-  process.stderr.write(`[clawbrain-debug] ${msg}\n`);
-}
-
 function extractText(message: AgentMessage): string {
-  const role = message.role;
-  debug(`Extracting text for role: ${role}. Content type: ${typeof message.content}`);
-
-  if (role === "user") {
-    const m = message as UserMessage;
-    if (typeof m.content === "string") return m.content;
-    if (Array.isArray(m.content)) {
-      debug(`Content is array of length ${m.content.length}`);
-      return (m.content as AnyContent[])
-        .map(c => {
-          debug(`Chunk type: ${c.type}`);
-          return c.type === "text" ? (c as any).text : "";
-        })
-        .filter(t => t)
-        .join(" ");
-    }
+  const content = message.content;
+  if (!content) return "";
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return (content as any[])
+      .map((part) => {
+        if (typeof part === "string") return part;
+        return part?.text || part?.content || "";
+      })
+      .filter((t) => t)
+      .join(" ");
   }
-
-  if (role === "assistant") {
-    const m = message as AssistantMsg;
-    if (typeof m.content === "string") return m.content;
-    if (Array.isArray(m.content)) {
-      return (m.content as AnyContent[])
-        .map(c => c.type === "text" ? (c as any).text : "")
-        .filter(t => t)
-        .join(" ");
-    }
-  }
-
   return "";
 }
-
-// ── Log helper ────────────────────────────────────────────────────────────────
 
 function warn(msg: string): void {
   process.stderr.write(`[clawbrain-warn] ${msg}\n`);
@@ -110,17 +82,11 @@ export class ClawBrainContextEngine {
 
   async ingest(params: {
     sessionId: string;
+    sessionKey?: string;
     message: AgentMessage;
     isHeartbeat?: boolean;
   }): Promise<IngestResult> {
     const { sessionId, message, isHeartbeat } = params;
-    
-    // 🕵️ DESTRUCTIVE DIAGNOSIS: Force an error to see the data in OpenClaw logs
-    if (!isHeartbeat && message.role !== 'toolResult') {
-        throw new Error(`[CLAWBRAIN_DIAG] role=${message.role} content=${JSON.stringify(message.content)}`);
-    }
-
-    debug(`ingest hook called for session: ${sessionId}, role: ${message.role}`);
 
     if (isHeartbeat) {
       try {
@@ -130,37 +96,25 @@ export class ClawBrainContextEngine {
           content: "",
           is_heartbeat: true,
         });
-      } catch {
-        // heartbeat errors are always silently swallowed
-      }
+      } catch { /* ignore */ }
       return { ingested: false };
     }
 
-    // Skip non-text roles
-    if (message.role === "toolResult") {
-      debug(`Skipping toolResult role`);
-      return { ingested: false };
-    }
+    if (message.role === "toolResult") return { ingested: false };
 
     const text = extractText(message);
-    debug(`Extracted text: "${text}"`);
-    if (!text.trim()) {
-      debug(`Text is empty, skipping ingest`);
-      return { ingested: false };
-    }
+    if (!text.trim()) return { ingested: false };
 
     try {
-      debug(`Calling callIngest...`);
       const resp = await callIngest({
         session_id: sessionId,
         role: message.role,
         content: text,
         is_heartbeat: false,
       });
-      debug(`callIngest response success: ${resp.ingested}`);
       return { ingested: resp.ingested };
     } catch (err) {
-      warn(`ingest failed for session=${sessionId}: ${err}`);
+      warn(`ingest failed: ${err}`);
       return { ingested: false };
     }
   }
@@ -169,8 +123,10 @@ export class ClawBrainContextEngine {
 
   async assemble(params: {
     sessionId: string;
+    sessionKey?: string;
     messages: AgentMessage[];
     tokenBudget?: number;
+    model?: string;
     prompt?: string;
   }): Promise<AssembleResult> {
     const { sessionId, messages, tokenBudget = 4096, prompt = "" } = params;
@@ -186,13 +142,10 @@ export class ClawBrainContextEngine {
         ? resp.system_prompt_addition
         : undefined;
 
-      // Rough token estimate: ClawBrain chars + original message payload
-      const estimatedTokens =
-        Math.ceil(resp.chars_used / 4) + messages.length * 100;
-
+      const estimatedTokens = Math.ceil(resp.chars_used / 4) + messages.length * 100;
       return { messages, estimatedTokens, systemPromptAddition };
     } catch (err) {
-      warn(`assemble failed for session=${sessionId}: ${err}`);
+      warn(`assemble failed: ${err}`);
       return { messages, estimatedTokens: 0 };
     }
   }
@@ -201,32 +154,52 @@ export class ClawBrainContextEngine {
 
   async compact(params: {
     sessionId: string;
+    sessionKey?: string;
+    sessionFile?: string;
+    tokenBudget?: number;
     force?: boolean;
   }): Promise<CompactResult> {
     const { sessionId, force = false } = params;
-
     try {
       const resp = await callCompact({ session_id: sessionId, force });
       return { ok: resp.ok, compacted: resp.compacted };
     } catch (err) {
-      warn(`compact failed for session=${sessionId}: ${err}`);
-      return { ok: false, compacted: false, reason: String(err) };
+      warn(`compact failed: ${err}`);
+      return { ok: false, compacted: false };
     }
   }
 
-  // ── afterTurn ───────────────────────────────────────────────────────────────
+  // ── afterTurn (Fixed v1.1) ──────────────────────────────────────────────────
 
-  async afterTurn(params: { sessionId: string }): Promise<void> {
+  async afterTurn(params: any): Promise<void> {
     try {
-      await callAfterTurn({ session_id: params.sessionId });
-    } catch {
-      // best-effort; errors are silently swallowed
+      const { sessionId, messages, prePromptMessageCount } = params;
+      
+      // 1. 提取该轮次产生的新消息
+      const new_messages: any[] = [];
+      if (messages && messages.length > (prePromptMessageCount || 0)) {
+          const rawNew = messages.slice(prePromptMessageCount || 0);
+          for (const m of rawNew) {
+              if (m.role === "toolResult") continue;
+              const text = extractText(m);
+              if (text.trim()) {
+                  new_messages.push({ role: m.role, content: text });
+              }
+          }
+      }
+
+      // 2. 原子化发送给后端结算中心
+      await callAfterTurn({
+          session_id: sessionId,
+          new_messages: new_messages
+      } as any);
+
+    } catch (err) {
+      warn(`afterTurn failed: ${err}`);
     }
   }
 
   // ── dispose ─────────────────────────────────────────────────────────────────
 
-  async dispose(): Promise<void> {
-    // No persistent resources to release (stateless HTTP client)
-  }
+  async dispose(): Promise<void> { /* nothing to cleanup */ }
 }

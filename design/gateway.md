@@ -1,7 +1,7 @@
-# design/gateway.md v1.40
+# design/gateway.md v1.42
 
 ## 1. Objective
-Fully implement ClawBrain Gateway protocol adaptation for major LLM providers (Google Gemini, Mistral, xAI, OpenRouter, etc.). Build a true "universal neural translator" ensuring every platform promised in the README can receive memory-augmented requests through ClawBrain. Simultaneously, complete the structured logging system so every neural activity is fully transparent.
+Fully implement ClawBrain Gateway protocol adaptation for major LLM providers. Build a true "universal neural translator" ensuring every platform promised in the README can receive memory-augmented requests through ClawBrain. Simultaneously, complete the structured logging system so every neural activity is fully transparent. **P27 Update: Implement Secure Header Forwarding to prevent credential leakage (Issue #1).**
 
 ## 2. Architecture
 
@@ -28,40 +28,36 @@ Fully implement ClawBrain Gateway protocol adaptation for major LLM providers (G
 - **Global config**: Use a unified `logging` module with format: `[TIMESTAMP] [MODULE] [LEVEL] MESSAGE | {METADATA}`.
 - **Mandatory log points**: `[DETECTOR]`, `[PIPELINE]`, `[MODEL_QUAL]`, `[HP_STOR]` (sub-logger), `[ADAPTER]`.
 
-## 3. Test Specification (TDD & High-Fidelity Audit)
-
-### 3.1 Cross-provider Translation Alignment Audit
-- **Scenario A**: Google Gemini conversion.
-- **Scenario B**: OpenRouter pass-through.
-- **Scenario C**: Role alternation merging (Anthropic).
-- **Scenario D**: LM Studio real-environment E2E validation.
-
-### 3.2 Audit Display & Log Acceptance
-- **Side-by-Side display**: Logs must show `Internal Standard` → `Provider Specific Dialect`.
-- **Async confirmation**: Tests covering async storage or streaming must include explicit waits — **1.5 s** (storage) or **15 s** (distillation).
-- **Semantic recall assertion**: In marathon long-conversation tests, the system must perform hard assertions to verify canary keywords (e.g., `Health Check` or `Observability`).
-- **Adaptive real-world validation**: For local services like LM Studio, the test script must auto-discover the active model ID via `/v1/models`.
-
 ### 2.5 Streaming Response Memory Capture (P15)
 - **Background**: Streaming reactions were hard-coded as `[Streamed]`, leaving the memory system blind to all streamed sessions.
 - **Fix logic (inside `stream_generator`)**:
   - Decode each chunk to UTF-8 and strip whitespace.
   - Strip the `data:` SSE prefix if present; skip `[DONE]` tokens.
   - Attempt JSON parsing: Ollama format reads `message.content`; OpenAI SSE format reads `choices[0].delta.content`.
-  - Any parse failure is silently ignored — it must not affect the live stream output.
 - **After stream ends**: Join `collected_content` into a full string and call `memory_router.ingest` with the real reaction. Fall back to `[Streamed]` if the list is empty.
 
 ### 2.6 context_id Full-path Propagation (P18)
 - **Background**: `main.py` extracted `context_id` from the header but did not pass it to `memory_router.ingest()`, causing all records to be written to the `"default"` session.
 - **Fix**: Pass `context_id=context_id` explicitly in both the non-streaming and streaming `ingest` call sites.
 
-## 5. P19 Dead Code Removal
-The `src/adapters/` directory (`base.py`, `lmstudio.py`, `ollama.py`, `openai.py`, `__init__.py`) has been fully superseded by `src/gateway/translator.py` and `src/gateway/registry.py`. No import references remain. Deleted in full during P19 — no compatibility shim retained.
+### 2.7 Secure Header Forwarding (P27 - Issue #1)
+- **Goal**: Prevent leakage of internal session metadata and inappropriate authentication credentials to upstream LLM providers.
+- **Mandatory Header Stripping**:
+  - **Internal Headers**: Automatically strip all headers starting with `x-clawbrain-` (case-insensitive).
+  - **Generic Sensitive Headers**: Strip `Cookie`, `Set-Cookie`, `X-Custom-Sensitive`, and any non-standard headers that could leak client state.
+- **Controlled Auth Forwarding**:
+  - **Priority 1 (Static Override)**: If `ProviderConfig.api_key` is set in the registry, use it to populate the appropriate auth header (`Authorization` or `x-api-key`) and **discard** any incoming auth headers from the client.
+  - **Priority 2 (Transparent Relay)**: If no static key is set, forward the client's `Authorization` or `x-api-key` header **only if it matches the target provider's protocol**.
+    - `openai`, `google`, `mistral`, `together`: Forward `Authorization`.
+    - `anthropic`: Forward `x-api-key`; remove `Authorization`.
+    - `ollama`: Remove all auth headers by default.
+
+## 3. Test Specification (TDD & High-Fidelity Audit)
+
+### 3.3 Secure Header Leak Audit (New)
+- **Audit Case**: Send a request with `x-clawbrain-session` and `Authorization`.
+- **Verification**: Mock the upstream client and assert that `x-clawbrain-session` is absent and `Authorization` is only present if appropriate for the protocol.
 
 ## 4. Output Targets
-- `src/main.py`: Fix model-name truncation in Google endpoint construction.
-- `src/gateway/translator.py`: Complete non-destructive prefix stripping for all dialects.
-- `src/gateway/registry.py`: Maintain strict routing.
-- `src/gateway/detector.py`: Maintain deep metadata extraction.
-- `src/memory/router.py`: Maintain archival logic.
-- `tests/test_p12_lmstudio.py`: Final regression confirmation.
+- `src/main.py`: Implement the secure header filtering and auth override logic.
+- `tests/reproduce_issue_1.py`: Acceptance test for the fix.

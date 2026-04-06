@@ -2,7 +2,7 @@
 // HTTP client for ClawBrain's /internal/* endpoints.
 // All methods degrade gracefully on network or server errors.
 
-const DEFAULT_URL = "http://localhost:11435";
+const DEFAULT_URL = "http://127.0.0.1:11435";
 const DEFAULT_TIMEOUT_MS = 5000;
 
 function baseUrl(): string {
@@ -10,15 +10,16 @@ function baseUrl(): string {
 }
 
 function timeoutMs(): number {
-  const raw = process.env["CLAWBRAIN_TIMEOUT_MS"];
-  return raw ? parseInt(raw, 10) : DEFAULT_TIMEOUT_MS;
+  const env = process.env["CLAWBRAIN_TIMEOUT_MS"];
+  return env ? parseInt(env, 10) : DEFAULT_TIMEOUT_MS;
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs());
   try {
-    const resp = await fetch(`${baseUrl()}${path}`, {
+    const url = baseUrl();
+    const resp = await fetch(`${url}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -91,10 +92,12 @@ export async function callCompact(payload: CompactPayload): Promise<CompactRespo
 
 export type AfterTurnPayload = {
   session_id: string;
+  new_messages: any[];
 };
 
 export type AfterTurnResponse = {
   ok: boolean;
+  ingested_count: number;
 };
 
 export async function callAfterTurn(payload: AfterTurnPayload): Promise<AfterTurnResponse> {
