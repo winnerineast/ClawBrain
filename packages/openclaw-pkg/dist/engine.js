@@ -24,6 +24,9 @@ function extractText(message) {
 function warn(msg) {
     process.stderr.write(`[clawbrain-warn] ${msg}\n`);
 }
+function debug(msg) {
+    process.stderr.write(`[clawbrain-debug] ${msg}\n`);
+}
 // ── ClawBrainContextEngine ────────────────────────────────────────────────────
 export class ClawBrainContextEngine {
     info = {
@@ -62,7 +65,7 @@ export class ClawBrainContextEngine {
             return { ingested: resp.ingested };
         }
         catch (err) {
-            warn(`ingest failed: ${err}`);
+            warn(`ingest failed for session=${sessionId}: ${err}`);
             return { ingested: false };
         }
     }
@@ -82,7 +85,7 @@ export class ClawBrainContextEngine {
             return { messages, estimatedTokens, systemPromptAddition };
         }
         catch (err) {
-            warn(`assemble failed: ${err}`);
+            warn(`assemble failed for session=${sessionId}: ${err}`);
             return { messages, estimatedTokens: 0 };
         }
     }
@@ -94,7 +97,7 @@ export class ClawBrainContextEngine {
             return { ok: resp.ok, compacted: resp.compacted };
         }
         catch (err) {
-            warn(`compact failed: ${err}`);
+            warn(`compact failed for session=${sessionId}: ${err}`);
             return { ok: false, compacted: false };
         }
     }
@@ -102,10 +105,11 @@ export class ClawBrainContextEngine {
     async afterTurn(params) {
         try {
             const { sessionId, messages, prePromptMessageCount } = params;
-            // 1. 提取该轮次产生的新消息
+            // 1. Extract new messages generated in this turn
             const new_messages = [];
-            if (messages && messages.length > (prePromptMessageCount || 0)) {
-                const rawNew = messages.slice(prePromptMessageCount || 0);
+            const preCount = prePromptMessageCount || 0;
+            if (messages && messages.length > preCount) {
+                const rawNew = messages.slice(preCount);
                 for (const m of rawNew) {
                     if (m.role === "toolResult")
                         continue;
@@ -115,14 +119,15 @@ export class ClawBrainContextEngine {
                     }
                 }
             }
-            // 2. 原子化发送给后端结算中心
-            await callAfterTurn({
+            // 2. Transmit batched messages to the Settlement Center
+            const resp = await callAfterTurn({
                 session_id: sessionId,
                 new_messages: new_messages
             });
+            debug(`afterTurn synced | ingested_count=${resp.ingested_count}`);
         }
         catch (err) {
-            warn(`afterTurn failed: ${err}`);
+            warn(`afterTurn failed for session=${params.sessionId}: ${err}`);
         }
     }
     // ── dispose ─────────────────────────────────────────────────────────────────
