@@ -20,19 +20,21 @@ from typing import Any
 from evaluate import CaseResult, CaseScore, score_case
 
 OPENCLAW_BIN = os.getenv("OPENCLAW_BIN", "openclaw")
-OPENCLAW_TIMEOUT = int(os.getenv("OPENCLAW_TURN_TIMEOUT", "120"))  # seconds per turn
+OPENCLAW_TIMEOUT = int(os.getenv("OPENCLAW_TURN_TIMEOUT", "1200"))  # 10x timeout: 1200 seconds
 
 
 def _run_turn(
     profile: str,
     session_id: str,
     message: str,
+    turn_num: int = 0
 ) -> tuple[str, float]:
     """
     Send one message via openclaw agent --local --json.
     Returns (response_text, latency_ms).
     Raises on non-zero exit or JSON parse failure.
     """
+    print(f"    [Turn {turn_num}] Sending message... ", end="", flush=True)
     cmd = [
         OPENCLAW_BIN,
         "--profile", profile,
@@ -50,6 +52,7 @@ def _run_turn(
         timeout=OPENCLAW_TIMEOUT,
     )
     latency_ms = (time.monotonic() - t0) * 1000
+    print(f"Done ({latency_ms/1000:.1f}s)")
 
     # openclaw writes JSON output to stderr; stdout is always empty
     output = proc.stderr
@@ -62,11 +65,28 @@ def _run_turn(
     # Strip ANSI colour codes before parsing JSON
     ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
     clean = ansi_escape.sub('', output)
-    match = re.search(r'(\{.*)', clean, re.DOTALL)
-    if not match:
+    
+    # openclaw might output multiple JSON objects or logs before the final response.
+    # We look for the LAST JSON object in the output which contains "payloads".
+    matches = list(re.finditer(r'\{.*\}', clean, re.DOTALL))
+    if not matches:
         raise ValueError(f"No JSON found in stderr: {clean[:300]}")
+    
+    # Try parsing from the last match and work backwards if needed
+    data = None
+    for m in reversed(matches):
+        try:
+            potential_json = m.group(0)
+            data = json.loads(potential_json)
+            if "payloads" in data:
+                break
+            data = None
+        except json.JSONDecodeError:
+            continue
+            
+    if data is None:
+        raise ValueError(f"No valid response JSON with 'payloads' found in stderr")
 
-    data = json.loads(match.group(1))
     payloads = data.get("payloads", [])
     text = " ".join(p.get("text", "") for p in payloads if p.get("text"))
     return text, latency_ms
@@ -85,10 +105,9 @@ def _run_conversation(
     recall_text = ""
     recall_latency = 0.0
 
-    for turn in conversation:
-        if turn["role"] != "user":
-            continue
-        text, lat = _run_turn(profile, session_id, turn["content"])
+    user_turns = [t for t in conversation if t["role"] == "user"]
+    for i, turn in enumerate(user_turns):
+        text, lat = _run_turn(profile, session_id, turn["content"], turn_num=i+1)
         if turn.get("is_recall_query"):
             recall_text = text
             recall_latency = lat
@@ -113,14 +132,16 @@ def run_case(case: dict) -> CaseResult:
     )
 
     try:
-        # ── ClawBrain ON ──────────────────────────���───────────────────────
+        # ── ClawBrain ON ───────────────────────────────────────────────────
         # Setup session (if isolation test)
         if "session_id_setup" in case and "conversation_setup" in case:
             setup_session_on = case["session_id_setup"] + "-t2-on"
-            for turn in case["conversation_setup"]:
-                if turn["role"] == "user":
-                    _run_turn("benchmark-on", setup_session_on, turn["content"])
+            setup_user_turns = [t for t in case["conversation_setup"] if t["role"] == "user"]
+            print(f"\n    [Setup ON] session={setup_session_on}")
+            for i, turn in enumerate(setup_user_turns):
+                _run_turn("benchmark-on", setup_session_on, turn["content"], turn_num=i+1)
 
+        print(f"\n    [Run ON] profile=benchmark-on session={session_on}")
         resp_on, lat_on = _run_conversation(
             "benchmark-on", session_on, case["conversation"]
         )
@@ -128,6 +149,7 @@ def run_case(case: dict) -> CaseResult:
         result.latency_ms_t2 = lat_on
 
         # ── ClawBrain OFF (legacy engine) ─────────────────────────────────
+        print(f"\n    [Run OFF] profile=benchmark-off session={session_off}")
         resp_off, _ = _run_conversation(
             "benchmark-off", session_off, case["conversation"]
         )

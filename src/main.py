@@ -229,25 +229,30 @@ async def internal_ingest(body: IngestRequest, request: Request):
     return {"trace_id": trace_id, "ingested": True}
 
 @app.post("/internal/assemble")
-async def internal_assemble(body: AssembleRequest, request: Request):
+async def internal_assemble(request: Request):
     """3.2: Context Assembly (Pre-model run)."""
+    raw = await request.json()
+    session_id = raw.get("session_id")
+    focus = raw.get("current_focus") or ""
     mr: MemoryRouter = request.app.state.memory_router
-    context = await mr.get_combined_context(body.session_id, body.current_focus)
+    context = await mr.get_combined_context(session_id, focus)
     addition = f"[CLAWBRAIN MEMORY]\n{context}\n[END CLAWBRAIN MEMORY]" if context.strip() else ""
     return {"system_prompt_addition": addition, "chars_used": len(addition)}
 
 @app.post("/internal/compact")
-async def internal_compact(body: CompactRequest, request: Request):
+async def internal_compact(request: Request):
     """3.3: Manual Compaction / Distillation."""
+    raw = await request.json()
+    session_id = raw.get("session_id")
     mr: MemoryRouter = request.app.state.memory_router
-    rows = mr.hippo.get_recent_traces(limit=mr.distill_threshold, context_id=body.session_id)
+    rows = mr.hippo.get_recent_traces(limit=mr.distill_threshold, context_id=session_id)
     traces = []
     for row in rows:
         raw_c = row.get("raw_content") or mr.hippo.get_content(row["trace_id"])
         if raw_c:
             try: traces.append(json.loads(raw_c))
             except: pass
-    if traces: await mr.neo.distill(body.session_id, traces)
+    if traces: await mr.neo.distill(session_id, traces)
     return {"ok": True, "compacted": True}
 
 @app.post("/internal/after-turn")
