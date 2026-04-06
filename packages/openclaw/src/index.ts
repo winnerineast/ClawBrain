@@ -26,5 +26,5 @@ type OpenClawPluginApi = {
  * ```
  */
 export default function register(api: OpenClawPluginApi): void {
-  api.registerContextEngine("clawbrain", () => new ClawBrainContextEngine());
+  process.stderr.write("[clawbrain-plugin] REGISTERING CONTEXT ENGINE\n"); api.registerContextEngine("clawbrain", () => new ClawBrainContextEngine());
 }

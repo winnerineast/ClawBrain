@@ -53,34 +53,47 @@ type IngestResult = { ingested: boolean };
 
 // ── Text extraction helpers ───────────────────────────────────────────────────
 
+function debug(msg: string): void {
+  process.stderr.write(`[clawbrain-debug] ${msg}\n`);
+}
+
 function extractText(message: AgentMessage): string {
   const role = message.role;
+  debug(`Extracting text for role: ${role}. Content type: ${typeof message.content}`);
 
   if (role === "user") {
     const m = message as UserMessage;
     if (typeof m.content === "string") return m.content;
-    return (m.content as AnyContent[])
-      .filter((c): c is TextContent => c.type === "text")
-      .map((c) => c.text)
-      .join(" ");
+    if (Array.isArray(m.content)) {
+      debug(`Content is array of length ${m.content.length}`);
+      return (m.content as AnyContent[])
+        .map(c => {
+          debug(`Chunk type: ${c.type}`);
+          return c.type === "text" ? (c as any).text : "";
+        })
+        .filter(t => t)
+        .join(" ");
+    }
   }
 
   if (role === "assistant") {
     const m = message as AssistantMsg;
-    return m.content
-      .filter((c): c is TextContent => c.type === "text")
-      .map((c) => c.text)
-      .join(" ");
+    if (typeof m.content === "string") return m.content;
+    if (Array.isArray(m.content)) {
+      return (m.content as AnyContent[])
+        .map(c => c.type === "text" ? (c as any).text : "")
+        .filter(t => t)
+        .join(" ");
+    }
   }
 
-  // toolResult and custom roles: no extractable text
   return "";
 }
 
 // ── Log helper ────────────────────────────────────────────────────────────────
 
 function warn(msg: string): void {
-  console.warn(`[clawbrain] ${msg}`);
+  process.stderr.write(`[clawbrain-warn] ${msg}\n`);
 }
 
 // ── ClawBrainContextEngine ────────────────────────────────────────────────────
@@ -101,6 +114,13 @@ export class ClawBrainContextEngine {
     isHeartbeat?: boolean;
   }): Promise<IngestResult> {
     const { sessionId, message, isHeartbeat } = params;
+    
+    // 🕵️ DESTRUCTIVE DIAGNOSIS: Force an error to see the data in OpenClaw logs
+    if (!isHeartbeat && message.role !== 'toolResult') {
+        throw new Error(`[CLAWBRAIN_DIAG] role=${message.role} content=${JSON.stringify(message.content)}`);
+    }
+
+    debug(`ingest hook called for session: ${sessionId}, role: ${message.role}`);
 
     if (isHeartbeat) {
       try {
@@ -118,21 +138,26 @@ export class ClawBrainContextEngine {
 
     // Skip non-text roles
     if (message.role === "toolResult") {
+      debug(`Skipping toolResult role`);
       return { ingested: false };
     }
 
     const text = extractText(message);
+    debug(`Extracted text: "${text}"`);
     if (!text.trim()) {
+      debug(`Text is empty, skipping ingest`);
       return { ingested: false };
     }
 
     try {
+      debug(`Calling callIngest...`);
       const resp = await callIngest({
         session_id: sessionId,
         role: message.role,
         content: text,
         is_heartbeat: false,
       });
+      debug(`callIngest response success: ${resp.ingested}`);
       return { ingested: resp.ingested };
     } catch (err) {
       warn(`ingest failed for session=${sessionId}: ${err}`);
