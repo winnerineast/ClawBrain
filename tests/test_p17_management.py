@@ -102,10 +102,10 @@ def test_p17_manual_distill_trigger():
         assert data["session_id"] == "distill_session"
 
 def test_p17_health_check_version():
-    """健康检查版本号已更新至 1.39"""
+    """健康检查版本号已更新至 1.42"""
     with TestClient(app) as client:
         resp = client.get("/health")
         data = resp.json()
-        visual_audit("Health Check Version", "version should be 1.39", "1.39", data.get("version"))
+        visual_audit("Health Check Version", "version should be 1.42", "1.42", data.get("version"))
         assert resp.status_code == 200
-        assert data["version"] == "1.39"
+        assert data["version"] == "1.42"

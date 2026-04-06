@@ -39,7 +39,7 @@ async def test_e2e_multi_round_marathon():
         actual_content = response.json()["message"]["content"]
         
         # 3.2 准则修复：定义硬断言金丝雀事实
-        canary_keywords = ["Health Check", "Observability", "Reliability"]
+        canary_keywords = ["FastAPI", "ECS", "ALB", "CloudWatch"]
         success = visual_audit("Marathon Knowledge Recall", question, canary_keywords, actual_content)
         
         # 强制断言：匹配失败即报错

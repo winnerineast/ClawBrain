@@ -112,6 +112,11 @@ async def _process_request(request: Request):
     tier = await scout.get_model_tier(std_req.model)
     if provider_name != "ollama": tier = ModelTier.TIER_1
 
+    # P28: Tier-based Capability Gating
+    if tier == ModelTier.TIER_3 and std_req.tools:
+        logger.warning(f"[GATE] TIER_3 model '{std_req.model}' blocked for tool calling.")
+        raise HTTPException(status_code=422, detail="TIER_3 models do not support tool calling in this relay.")
+
     last_msg_content = std_req.messages[-1].content if std_req.messages else ""
     intent = pipeline.compressor.compress(last_msg_content)
     enriched_context = await memory_router.get_combined_context(context_id, intent)
@@ -172,7 +177,47 @@ class IngestRequest(BaseModel):
 
 class AfterTurnRequest(BaseModel):
     session_id: str
-    new_messages: List[Dict[str, Any]]
+    new_messages: Optional[List[Dict[str, Any]]] = None
+
+class AssembleRequest(BaseModel):
+    session_id: str
+    current_focus: Optional[str] = ""
+    token_budget: Optional[int] = 4096
+
+class CompactRequest(BaseModel):
+    session_id: str
+    force: Optional[bool] = False
+
+@app.get("/v1/memory/{session_id}")
+async def get_memory_state(session_id: str, request: Request):
+    """P17: Inspect memory state."""
+    mr: MemoryRouter = request.app.state.memory_router
+    summary = mr.neo.get_summary(session_id)
+    wm = mr._get_wm(session_id)
+    return {
+        "session_id": session_id,
+        "neocortex_summary": summary,
+        "working_memory_count": len(wm.items),
+        "working_memory_preview": [item.content for item in wm.items[-5:]]
+    }
+
+@app.delete("/v1/memory/{session_id}")
+async def delete_memory_state(session_id: str, request: Request):
+    """P17: Clear memory state."""
+    mr: MemoryRouter = request.app.state.memory_router
+    mr.neo.clear_summary(session_id)
+    mr.hippo.clear_wm_state(session_id)
+    # Also clear in-memory WM cache
+    if session_id in mr._wm_sessions:
+        del mr._wm_sessions[session_id]
+    return {"status": "cleared", "session_id": session_id}
+
+@app.post("/v1/memory/{session_id}/distill")
+async def manual_distill(session_id: str, request: Request):
+    """P17: Trigger manual distillation."""
+    mr: MemoryRouter = request.app.state.memory_router
+    asyncio.create_task(mr._auto_distill_worker(session_id))
+    return {"status": "distillation_triggered", "session_id": session_id}
 
 @app.post("/internal/ingest")
 async def internal_ingest(body: IngestRequest, request: Request):
@@ -184,30 +229,25 @@ async def internal_ingest(body: IngestRequest, request: Request):
     return {"trace_id": trace_id, "ingested": True}
 
 @app.post("/internal/assemble")
-async def internal_assemble(body: Any, request: Request):
+async def internal_assemble(body: AssembleRequest, request: Request):
     """3.2: Context Assembly (Pre-model run)."""
-    raw = await request.json()
-    session_id = raw.get("session_id")
-    focus = raw.get("current_focus") or ""
     mr: MemoryRouter = request.app.state.memory_router
-    context = await mr.get_combined_context(session_id, focus)
+    context = await mr.get_combined_context(body.session_id, body.current_focus)
     addition = f"[CLAWBRAIN MEMORY]\n{context}\n[END CLAWBRAIN MEMORY]" if context.strip() else ""
     return {"system_prompt_addition": addition, "chars_used": len(addition)}
 
 @app.post("/internal/compact")
-async def internal_compact(body: Any, request: Request):
+async def internal_compact(body: CompactRequest, request: Request):
     """3.3: Manual Compaction / Distillation."""
-    raw = await request.json()
-    session_id = raw.get("session_id")
     mr: MemoryRouter = request.app.state.memory_router
-    rows = mr.hippo.get_recent_traces(limit=mr.distill_threshold, context_id=session_id)
+    rows = mr.hippo.get_recent_traces(limit=mr.distill_threshold, context_id=body.session_id)
     traces = []
     for row in rows:
         raw_c = row.get("raw_content") or mr.hippo.get_content(row["trace_id"])
         if raw_c:
             try: traces.append(json.loads(raw_c))
             except: pass
-    if traces: await mr.neo.distill(session_id, traces)
+    if traces: await mr.neo.distill(body.session_id, traces)
     return {"ok": True, "compacted": True}
 
 @app.post("/internal/after-turn")

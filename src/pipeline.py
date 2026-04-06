@@ -38,7 +38,7 @@ class SafetyEnforcer:
 
     @classmethod
     def apply(cls, request: StandardRequest, tier: ModelTier):
-        if tier == ModelTier.TIER_2 and request.messages:
+        if tier in [ModelTier.TIER_2, ModelTier.TIER_3] and request.messages:
             # 遵循 2.2 准则：幂等性检查
             if cls.TIER2_PATCH not in request.messages[0].content:
                 request.messages[0].content += cls.TIER2_PATCH

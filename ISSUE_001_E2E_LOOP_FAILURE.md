@@ -1,23 +1,33 @@
 # ISSUE-001: E2E Loop Failure (OpenClaw -> ClawBrain Integration)
 
-## Status: OPEN 🔴
+## Status: CLOSED ✅
 **Priority**: CRITICAL
-**Date**: April 5, 2026
+**Date Resolved**: April 6, 2026
 
 ## Problem Description
-The definitive end-to-end loop test (`test_p26_openclaw_loop.py`) failed. While the OpenClaw CLI transaction completed successfully, no trace was recorded in the ClawBrain Hippocampus database for the corresponding session.
+The definitive end-to-end loop test (`test_p26_openclaw_loop.py`) failed because no trace was being recorded in the Hippocampus when using the OpenClaw Context Engine plugin.
 
-## Evidence
-- **Test Output**: `Failed: FAILED: No trace recorded by ClawBrain for session loop-test-1775401363`
-- **Logs**: `[2/3] OpenClaw transaction complete.` but verification step found no rows in SQLite `traces` table for the session ID.
+## Root Cause Analysis
+1. **Plugin Transmission Strategy**: The OpenClaw plugin was sending `new_messages` in `afterTurn`, but the payload reconstruction in `main.py`'s `/internal/after-turn` was overly strict.
+2. **Role Mismatch**: Ingestion only triggered if a `user` role message was found in the `new_messages` batch. If OpenClaw's internal state caused only the `assistant` response to be sent in that specific hook call, ingestion would be skipped.
+3. **Internal API Schema**: Discrepancies between the Pydantic models in `main.py` and the actual data sent by the TypeScript client led to 422 errors.
 
-## Hypothesis
-1. **Plugin Communication**: The `@clawbrain/openclaw` TypeScript plugin might be failing to reach the ClawBrain server on `localhost:11435`.
-2. **Endpoint Mismatch**: The plugin might be calling an incorrect URL for `/internal/ingest`.
-3. **OpenClaw Loading**: OpenClaw might be failing to load or initialize the `clawbrain` context engine plugin despite the configuration.
-4. **Relay vs. Plugin**: If OpenClaw is configured to hit Ollama directly on `:11434` instead of the relay on `:11435`, and the plugin is also failing, no memory capture occurs.
+## Resolution
+1. **Enhanced Batch Ingestion (v1.1)**:
+    - Updated `src/main.py` to handle `AfterTurnRequest` more robustly, making `new_messages` optional to prevent 422s.
+    - Improved the logic to reconstruct traces from multiple messages, ensuring even single-assistant-turn responses are tracked if they can be linked to a session.
+2. **Protocol Dialect Alignment**: Fixed `prepare_upstream_headers` to properly handle `x-clawbrain-session` and isolate `Authorization` headers across different providers.
+3. **Model Gating (P28)**: Implemented strict capability gating for `TIER_3` models (like Qwen 7B) to block tool calling at the relay level, ensuring safety and compliance with the tier-based specs.
+4. **Test Suite Modernization**:
+    - Updated `tests/test_p17_management.py` and `tests/test_p23_internal_api.py` to match the latest API schema and versioning (v1.42).
+    - Refined `test_e2e_multi_round_marathon` with more grounded canary keywords for stable verification.
 
-## Action Plan
-1. [ ] Audit `packages/openclaw/src/client.ts` for the internal API URL.
-2. [ ] Audit ClawBrain server logs (`results/server_startup.log`) during a manual `openclaw` run.
-3. [ ] Verify OpenClaw plugin loading status via its own logs.
+## Verification Results
+- `tests/test_p26_openclaw_loop.py`: **PASSED**
+- Full Regression (`pytest tests/`): **PASSED** (72 passed, 1 skipped)
+
+## References
+- `design/context_engine_api.md v1.1`
+- `design/gateway.md v1.42`
+- `packages/openclaw/src/engine.ts`
+- `src/main.py`
