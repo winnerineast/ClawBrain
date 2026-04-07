@@ -5,7 +5,8 @@ import shutil
 from pathlib import Path
 from src.memory.neocortex import Neocortex
 
-TEST_DATA_DIR = "/home/nvidia/ClawBrain/tests/data/p9_neocortex_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "tests/data/p9_neocortex_tmp")
 
 def visual_audit_semantic(test_name, input_desc, canary_facts, summary_text):
     """

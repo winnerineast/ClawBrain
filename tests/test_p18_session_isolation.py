@@ -6,7 +6,8 @@ import asyncio
 from src.memory.storage import Hippocampus
 from src.memory.router import MemoryRouter
 
-TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p18_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p18_tmp")
 
 def setup_function():
     if os.path.exists(TEST_DIR):
@@ -25,10 +26,10 @@ def visual_audit(test_name, description, expected, actual):
     print(f"MATCH: {match}")
     print("=" * 70)
 
-# ── P18-A: 海马体存储层 session 隔离 ──────────────────────────────────────
+# ── P18-A: Hippocampus storage layer session isolation ──────────────────
 
 def test_p18_hippo_search_session_isolation():
-    """跨 session 的内容不应互相召回"""
+    """Content across sessions should not be recalled from each other"""
     hp = Hippocampus(db_dir=TEST_DIR)
 
     hp.save_trace("alice-1", {"x": 1}, search_text="project ALPHA secret key",    context_id="alice")
@@ -50,7 +51,7 @@ def test_p18_hippo_search_session_isolation():
     assert len(bob_results) == 0
 
 def test_p18_hippo_save_context_id_persisted():
-    """context_id 正确写入 traces 表"""
+    """context_id is correctly written to the traces table"""
     hp = Hippocampus(db_dir=TEST_DIR)
     hp.save_trace("trace-x", {"msg": "hello"}, search_text="hello world", context_id="session-99")
 
@@ -66,7 +67,7 @@ def test_p18_hippo_save_context_id_persisted():
     assert row[0] == "session-99"
 
 def test_p18_hippo_get_recent_traces_filtered():
-    """get_recent_traces 按 session 过滤"""
+    """get_recent_traces filters by session"""
     hp = Hippocampus(db_dir=TEST_DIR)
     hp.save_trace("s1-t1", {"x": 1}, context_id="session-A")
     hp.save_trace("s1-t2", {"x": 2}, context_id="session-A")
@@ -84,11 +85,11 @@ def test_p18_hippo_get_recent_traces_filtered():
     assert len(b_traces) == 1
     assert len(all_traces) == 3
 
-# ── P18-B: MemoryRouter 工作记忆 session 隔离 ─────────────────────────────
+# ── P18-B: MemoryRouter working memory session isolation ──────────────────
 
 @pytest.mark.asyncio
 async def test_p18_wm_session_isolation():
-    """不同 session 的工作记忆互不干扰"""
+    """Working memories of different sessions do not interfere with each other"""
     router = MemoryRouter(db_dir=TEST_DIR)
 
     await router.ingest(
@@ -120,7 +121,7 @@ async def test_p18_wm_session_isolation():
 
 @pytest.mark.asyncio
 async def test_p18_get_combined_context_isolated():
-    """get_combined_context 按 session 隔离，A 的上下文不含 B 的内容"""
+    """get_combined_context is isolated by session; A's context does not contain B's content"""
     router = MemoryRouter(db_dir=TEST_DIR)
 
     await router.ingest(
@@ -145,12 +146,12 @@ async def test_p18_get_combined_context_isolated():
     assert "BETA-TOKEN" in bob_ctx
     assert "ALPHA-TOKEN" not in bob_ctx
 
-# ── P18-C: Hydrate 按 session 恢复 ────────────────────────────────────────
+# ── P18-C: Hydrate by session recovery ──────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_p18_hydrate_per_session():
-    """重启后 _hydrate 按 session 分别恢复 WM"""
-    # 第一个 router 写入数据
+    """After restart, _hydrate recovers WM by session separately"""
+    # First router writes data
     router1 = MemoryRouter(db_dir=TEST_DIR)
     await router1.ingest(
         {"messages": [{"role": "user", "content": "Hydrate ALICE persist test"}]},
@@ -161,7 +162,7 @@ async def test_p18_hydrate_per_session():
         context_id="hydrate-bob"
     )
 
-    # 第二个 router 模拟重启，触发 _hydrate
+    # Second router simulates restart, triggering _hydrate
     router2 = MemoryRouter(db_dir=TEST_DIR)
 
     alice_wm = router2._get_wm("hydrate-alice").get_active_contents()

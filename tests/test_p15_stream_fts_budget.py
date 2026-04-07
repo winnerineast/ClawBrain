@@ -6,7 +6,8 @@ import asyncio
 from src.memory.storage import Hippocampus
 from src.memory.router import MemoryRouter
 
-TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p15_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p15_tmp")
 
 def visual_audit(test_name, description, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"

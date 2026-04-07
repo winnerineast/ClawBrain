@@ -8,7 +8,8 @@ from src.memory.router import MemoryRouter
 from src.memory.storage import Hippocampus
 from src.memory.neocortex import Neocortex
 
-TEST_DIR = "/Users/nvidia/ClawBrain/tests/data/issue_002_remediation"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/issue_002_remediation")
 
 @pytest.fixture
 def clean_env():

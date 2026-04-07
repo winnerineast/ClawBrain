@@ -17,7 +17,12 @@ class MemoryRouter:
     ClawBrain Memory Central Router.
     P18: Working Memory and Hippocampus search paths are isolated by context_id.
     """
-    def __init__(self, db_dir: str = "/home/nvidia/ClawBrain/data", distill_threshold: int = 50):
+    def __init__(self, db_dir: str = None, distill_threshold: int = 50):
+        if db_dir is None:
+            # Dynamic default path for portability (Issue-003)
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            db_dir = os.path.join(base_dir, "data")
+            
         self.db_dir = db_dir
         self.distill_threshold = distill_threshold
         self.hippo = Hippocampus(db_dir=db_dir)

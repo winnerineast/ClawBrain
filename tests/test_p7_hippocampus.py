@@ -8,7 +8,8 @@ import sqlite3
 from pathlib import Path
 from src.memory.storage import Hippocampus
 
-TEST_DATA_DIR = "/home/nvidia/ClawBrain/tests/data/p7_hippocampus_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "tests/data/p7_hippocampus_tmp")
 
 def visual_audit_high_fid(test_name, input_desc, expected_evidence, actual_evidence):
     """

@@ -6,7 +6,8 @@ import sqlite3
 from fastapi.testclient import TestClient
 from src.main import app
 
-TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p23_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p23_tmp")
 
 
 @pytest.fixture(autouse=True)

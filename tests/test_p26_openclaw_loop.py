@@ -9,7 +9,8 @@ import httpx
 from pathlib import Path
 
 # Paths
-DB_PATH = "/home/nvidia/ClawBrain/data/hippocampus.db"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, "data/hippocampus.db")
 OPENCLAW_BIN = "openclaw" 
 
 def visual_audit(test_name, step, expected, actual):

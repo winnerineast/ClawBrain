@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 class Neocortex:
-    def __init__(self, db_dir: str = "/home/nvidia/ClawBrain/data", ollama_url: str = "http://127.0.0.1:11434"):
+    def __init__(self, db_dir: str = None, ollama_url: str = "http://127.0.0.1:11434"):
+        if db_dir is None:
+            # Dynamic default path for portability (Issue-003)
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            db_dir = os.path.join(base_dir, "data")
+            
         # §2.1: Ensure storage directory exists to prevent sqlite3 failures
         self.db_dir = Path(db_dir)
         self.db_dir.mkdir(parents=True, exist_ok=True)

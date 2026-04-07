@@ -8,7 +8,8 @@ import time
 from src.memory.storage import Hippocampus
 from src.memory.router import MemoryRouter
 
-TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p22_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p22_tmp")
 
 def setup_function():
     if os.path.exists(TEST_DIR):
@@ -27,11 +28,11 @@ def visual_audit(test_name, description, expected, actual):
     print(f"MATCH: {match}")
     print("=" * 70)
 
-# ── P22-A: wm_state 表写入验证 ───────────────────────────────────────────────
+# ── P22-A: wm_state table write verification ─────────────────────────────
 
 @pytest.mark.asyncio
 async def test_p22_wm_state_written_after_ingest():
-    """ingest 后 wm_state 表中应有对应记录"""
+    """There should be corresponding records in the wm_state table after ingest"""
     router = MemoryRouter(db_dir=TEST_DIR)
     await router.ingest(
         {"messages": [{"role": "user", "content": "hello persistence test"}]},
@@ -50,11 +51,11 @@ async def test_p22_wm_state_written_after_ingest():
     assert len(rows) > 0
     assert all(0.0 <= r[2] <= 1.0 for r in rows)
 
-# ── P22-B: 精确 activation 跨重启恢复 ────────────────────────────────────────
+# ── P22-B: Exact activation restoration across restarts ───────────────────
 
 @pytest.mark.asyncio
 async def test_p22_exact_activation_restored_after_restart():
-    """重启后 WM 的 activation 值应与重启前完全一致"""
+    """The activation value of WM after restart should be exactly the same as before restart"""
     router1 = MemoryRouter(db_dir=TEST_DIR)
     await router1.ingest(
         {"messages": [{"role": "user", "content": "topic ALPHA project detail"}]},
@@ -65,7 +66,7 @@ async def test_p22_exact_activation_restored_after_restart():
         context_id="persist-session"
     )
 
-    # 取重启前的 WM 状态（activation + trace_ids）
+    # Get WM state (activation + trace_ids) before restart
     wm_before = router1._get_wm("persist-session").items
     before_state = {it.trace_id: round(it.activation, 4) for it in wm_before}
 
@@ -73,7 +74,7 @@ async def test_p22_exact_activation_restored_after_restart():
                  "should have 2 items", 2, len(wm_before))
     print(f"  Before activations: {before_state}")
 
-    # 模拟重启
+    # Simulate restart
     router2 = MemoryRouter(db_dir=TEST_DIR)
     wm_after = router2._get_wm("persist-session").items
     after_state = {it.trace_id: round(it.activation, 4) for it in wm_after}
@@ -89,11 +90,11 @@ async def test_p22_exact_activation_restored_after_restart():
     assert len(after_state) == len(before_state)
     assert after_state == before_state
 
-# ── P22-C: 多 session 快照互不干扰 ───────────────────────────────────────────
+# ── P22-C: Multi-session snapshots are isolated ──────────────────────────
 
 @pytest.mark.asyncio
 async def test_p22_multi_session_snapshots_isolated():
-    """不同 session 的 wm_state 行互不污染"""
+    """wm_state rows of different sessions do not pollute each other"""
     router = MemoryRouter(db_dir=TEST_DIR)
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice working on PROJECT-A"}]},
@@ -123,45 +124,45 @@ async def test_p22_multi_session_snapshots_isolated():
     assert not alice_has_bob
     assert not bob_has_alice
 
-# ── P22-D: clear_wm_state 清除快照 ───────────────────────────────────────────
+# ── P22-D: clear_wm_state clears snapshots ──────────────────────────────
 
 @pytest.mark.asyncio
 async def test_p22_clear_wm_state():
-    """clear_wm_state 应删除指定 session 的所有 wm_state 行"""
+    """clear_wm_state should delete all wm_state rows for the specified session"""
     router = MemoryRouter(db_dir=TEST_DIR)
     await router.ingest(
         {"messages": [{"role": "user", "content": "content to be cleared"}]},
         context_id="clear-session"
     )
 
-    # 确认写入
+    # Confirm write
     before = router.hippo.load_wm_state("clear-session")
     visual_audit("Before clear: has rows", "wm_state should have rows", True, len(before) > 0)
     assert len(before) > 0
 
-    # 清除
+    # Clear
     router.hippo.clear_wm_state("clear-session")
     after = router.hippo.load_wm_state("clear-session")
 
     visual_audit("After clear: no rows", "wm_state should be empty", 0, len(after))
     assert len(after) == 0
 
-# ── P22-E: 快照优先于 traces 重建 ─────────────────────────────────────────────
+# ── P22-E: Snapshot takes priority over traces rebuild ──────────────────
 
 @pytest.mark.asyncio
 async def test_p22_snapshot_takes_priority_over_traces_rebuild():
-    """_hydrate 有快照时不走 traces 重建路径；无快照时降级到 traces 重建"""
+    """_hydrate does not take the traces rebuild path when a snapshot exists; fall back to traces rebuild when no snapshot exists"""
     router1 = MemoryRouter(db_dir=TEST_DIR)
     await router1.ingest(
         {"messages": [{"role": "user", "content": "snapshot priority test CANARY"}]},
         context_id="snap-test"
     )
 
-    # 验证快照存在
+    # Verify snapshot exists
     snap = router1.hippo.load_wm_state("snap-test")
     assert len(snap) > 0, "Snapshot must exist before restart"
 
-    # 重启 — 应走快照路径
+    # Restart — should take snapshot path
     router2 = MemoryRouter(db_dir=TEST_DIR)
     wm_contents = router2._get_wm("snap-test").get_active_contents()
     has_canary = any("CANARY" in c for c in wm_contents)
@@ -171,7 +172,7 @@ async def test_p22_snapshot_takes_priority_over_traces_rebuild():
                  True, has_canary)
     assert has_canary
 
-    # 手动删除快照后重启 — 降级到 traces 重建
+    # Manually delete snapshot and restart — fallback to traces rebuild
     router2.hippo.clear_wm_state("snap-test")
     router3 = MemoryRouter(db_dir=TEST_DIR)
     wm_fallback = router3._get_wm("snap-test").get_active_contents()

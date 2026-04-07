@@ -7,7 +7,8 @@ import time
 from fastapi.testclient import TestClient
 from src.main import app
 
-TEST_DB_DIR = "/home/nvidia/ClawBrain/tests/data/p11_real_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DB_DIR = os.path.join(PROJECT_ROOT, "tests/data/p11_real_tmp")
 
 def visual_audit_memory(test_name, round_num, input_data, expected_recall, actual_payload):
     print(f"\n[REAL E2E AUDIT: {test_name} - Round {round_num}]")

@@ -5,7 +5,8 @@ import shutil
 from src.memory.router import MemoryRouter
 from src.memory.signals import SignalDecomposer
 
-TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p6_resilience_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p6_resilience_tmp")
 
 def visual_audit(test_name, input_val, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
@@ -22,7 +23,7 @@ def visual_audit(test_name, input_val, expected, actual):
 
 @pytest.mark.asyncio
 async def test_signal_fingerprinting():
-    """验证协议指纹的一致性 (Core Resilience)"""
+    """Verify consistency of protocol fingerprints (Core Resilience)"""
     payload1 = {"model": "gemma", "tools": ["read"], "messages": [{"content": "hi"}]}
     payload2 = {"model": "gemma", "tools": ["read"], "messages": [{"content": "different"}]}
     
@@ -34,7 +35,7 @@ async def test_signal_fingerprinting():
 
 @pytest.mark.asyncio
 async def test_core_intent_extraction():
-    """验证最后一条 User 意图提取"""
+    """Verify extraction of the last User intent"""
     payload = {
         "messages": [
             {"role": "user", "content": "The Real Goal"}
@@ -46,20 +47,20 @@ async def test_core_intent_extraction():
 
 @pytest.mark.asyncio
 async def test_memory_router_ingest_resilience():
-    """验证 MemoryRouter 摄入后的 L1/L2 双重活性"""
+    """Verify L1/L2 dual activity after MemoryRouter ingestion"""
     if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
     router = MemoryRouter(db_dir=TEST_DIR)
     
     payload = {"context_id": "resilience", "messages": [{"role": "user", "content": "Keep this alive"}]}
     
-    # 1. 摄入
+    # 1. Ingest
     tid = await router.ingest(payload)
     
-    # 2. 验证 L1 (Working Memory) 活性
+    # 2. Verify L1 (Working Memory) activity
     active_items = router._get_wm("default").get_active_contents()
     visual_audit("Working Memory Activity", "Ingest: Keep this alive", "True", "Keep this alive" in str(active_items))
     
-    # 3. 验证 L2 (Hippocampus) 存储
+    # 3. Verify L2 (Hippocampus) storage
     content = router.hippo.get_content(tid)
     visual_audit("Hippocampus Storage", "Trace ID: " + tid, "True", "Keep this alive" in str(content))
     

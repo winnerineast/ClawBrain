@@ -33,7 +33,11 @@ INTERNAL_SENSITIVE_HEADERS = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db_dir = os.getenv("CLAWBRAIN_DB_DIR", "/home/nvidia/ClawBrain/data")
+    # Dynamic default path for portability (Issue-003)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    default_db_dir = os.path.join(base_dir, "data")
+    db_dir = os.getenv("CLAWBRAIN_DB_DIR", default_db_dir)
+    
     app.state.scout = ModelScout()
     app.state.memory_router = MemoryRouter(db_dir=db_dir)
     app.state.registry = ProviderRegistry()

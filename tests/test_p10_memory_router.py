@@ -4,7 +4,8 @@ import os
 import shutil
 from src.memory.router import MemoryRouter
 
-TEST_DIR = "/home/nvidia/ClawBrain/tests/data/p10_load_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p10_load_tmp")
 
 @pytest.mark.asyncio
 async def test_p10_dynamic_offload_audit():

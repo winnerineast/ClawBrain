@@ -6,7 +6,7 @@ Implement the **ClawBrain MemoryRouter** — the central memory hub that orchest
 ## 2. Architecture & Logic
 
 ### 2.1 Initialisation & Sub-module Mounting
-- **Constructor parameters**: `db_dir` (default `/home/nvidia/ClawBrain/data`), `distill_threshold` (default 50).
+- **Constructor parameters**: `db_dir` (default: dynamic resolution relative to the application root or environment variable `CLAWBRAIN_DB_DIR`), `distill_threshold` (default 50).
 - **Sub-modules**: `Hippocampus(db_dir)`, `Neocortex(db_dir)`, `SignalDecomposer()`.
 - **Per-session WM registry**: `self._wm_sessions: Dict[str, WorkingMemory] = {}` — see §2.7.
 

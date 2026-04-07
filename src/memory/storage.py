@@ -13,7 +13,12 @@ logger = logging.getLogger("GATEWAY.MEMORY")
 class Hippocampus:
     DEFAULT_THRESHOLD = 512 * 1024
 
-    def __init__(self, db_dir: str = "/home/nvidia/ClawBrain/data"):
+    def __init__(self, db_dir: str = None):
+        if db_dir is None:
+            # Dynamic default path for portability (Issue-003)
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            db_dir = os.path.join(base_dir, "data")
+            
         self.db_dir = Path(db_dir)
         self.blob_dir = self.db_dir / "blobs"
         self.db_dir.mkdir(parents=True, exist_ok=True)

@@ -6,7 +6,8 @@ import asyncio
 from fastapi.testclient import TestClient
 from src.main import app
 
-TEST_DB_DIR = "/home/nvidia/ClawBrain/tests/data/p17_tmp"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_DB_DIR = os.path.join(PROJECT_ROOT, "tests/data/p17_tmp")
 
 def visual_audit(test_name, description, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
@@ -21,7 +22,7 @@ def visual_audit(test_name, description, expected, actual):
     print("=" * 70)
 
 def test_p17_get_memory_state_structure():
-    """GET /v1/memory/{session_id} 返回结构完整"""
+    """GET /v1/memory/{session_id} returns a complete structure"""
     if os.path.exists(TEST_DB_DIR): shutil.rmtree(TEST_DB_DIR)
     os.environ["CLAWBRAIN_DB_DIR"] = TEST_DB_DIR
 
@@ -53,32 +54,32 @@ def test_p17_get_memory_state_structure():
         assert isinstance(data["working_memory_preview"], list)
 
 def test_p17_delete_clears_summary():
-    """DELETE /v1/memory/{session_id} 清除新皮层摘要"""
+    """DELETE /v1/memory/{session_id} clears Neocortex summary"""
     if os.path.exists(TEST_DB_DIR): shutil.rmtree(TEST_DB_DIR)
     os.environ["CLAWBRAIN_DB_DIR"] = TEST_DB_DIR
 
     with TestClient(app) as client:
-        # 先写入摘要
+        # Save summary first
         mr = client.app.state.memory_router
         mr.neo._save_summary("del_session", "This summary should be deleted")
 
-        # 确认摘要存在
+        # Confirm summary exists
         before = client.get("/v1/memory/del_session").json()
         visual_audit("DELETE: Before", "Summary exists before delete", True, before["neocortex_summary"] is not None)
 
-        # 执行删除
+        # Execute delete
         del_resp = client.delete("/v1/memory/del_session")
         visual_audit("DELETE: Status", "Should return 200", 200, del_resp.status_code)
         assert del_resp.status_code == 200
         assert del_resp.json()["status"] == "cleared"
 
-        # 确认摘要已清除
+        # Confirm summary is cleared
         after = client.get("/v1/memory/del_session").json()
         visual_audit("DELETE: After", "Summary should be null after delete", None, after["neocortex_summary"])
         assert after["neocortex_summary"] is None
 
 def test_p17_manual_distill_trigger():
-    """POST /v1/memory/{session_id}/distill 立即返回 triggered 状态"""
+    """POST /v1/memory/{session_id}/distill immediately returns triggered status"""
     if os.path.exists(TEST_DB_DIR): shutil.rmtree(TEST_DB_DIR)
     os.environ["CLAWBRAIN_DB_DIR"] = TEST_DB_DIR
 
@@ -102,7 +103,7 @@ def test_p17_manual_distill_trigger():
         assert data["session_id"] == "distill_session"
 
 def test_p17_health_check_version():
-    """健康检查版本号已更新至 1.42"""
+    """Health check version number has been updated to 1.42"""
     with TestClient(app) as client:
         resp = client.get("/health")
         data = resp.json()
