@@ -38,17 +38,35 @@ We don't just test "memory"; we stress-test specific cognitive failure points th
 
 ```bash
 # 1. Generate test cases from seed libraries
-python benchmark/run_benchmark.py generate
+python3 benchmark/run_benchmark.py generate
 
-# 2. Run Tier 1 (Fast, requires ClawBrain server running)
-python benchmark/run_benchmark.py run --tier 1
+# 2. Setup OpenClaw profiles (Creates ~/.openclaw-benchmark-on/off)
+# This command configures contextEngine to 'clawbrain' for 'on' and 'legacy' for 'off'
+python3 benchmark/run_benchmark.py setup-profiles
 
-# 3. Run Tier 2 (Slower, requires OpenClaw + local model)
-python benchmark/run_benchmark.py run --tier 2
+# 3. Run Tier 1 (Fast, requires ClawBrain server running)
+PYTHONPATH=. ./venv/bin/python3 benchmark/run_benchmark.py run --tier 1
 
-# 4. View the latest comprehensive report
-python benchmark/run_benchmark.py report
+# 4. Run Tier 2 (Slower, requires OpenClaw + local model gemma4:e4b)
+# Uses profiles in ~/.openclaw-benchmark-on and ~/.openclaw-benchmark-off
+PYTHONPATH=. ./venv/bin/python3 benchmark/run_benchmark.py run --tier 2
+
+# 5. View the latest comprehensive report
+python3 benchmark/run_benchmark.py report
 ```
+
+## Tier 2 Environment Details
+
+To ensure a clean testing environment, Tier 2 uses dedicated OpenClaw profiles and workspaces:
+
+- **Profiles**:
+  - `benchmark-on`: Located at `~/.openclaw-benchmark-on/`, uses ClawBrain as the `contextEngine`.
+  - `benchmark-off`: Located at `~/.openclaw-benchmark-off/`, uses the legacy `contextEngine`.
+- **Workspaces**:
+  - `benchmark-on` uses `~/.openclaw/workspace-benchmark-on`.
+  - `benchmark-off` uses `~/.openclaw/workspace-benchmark-off`.
+- **Default Model**: The benchmark defaults to `ollama/gemma4:e4b`. Ensure this model is pulled in Ollama before running.
+
 
 ---
 *This benchmark is a living system. As ClawBrain evolves (e.g., adding Vector Embeddings), these metrics provide the guardrails to ensure every "improvement" is a genuine cognitive gain.*

@@ -67,25 +67,38 @@ def _run_turn(
     clean = ansi_escape.sub('', output)
     
     # openclaw might output multiple JSON objects or logs before the final response.
-    # We look for the LAST JSON object in the output which contains "payloads".
-    matches = list(re.finditer(r'\{.*\}', clean, re.DOTALL))
-    if not matches:
-        raise ValueError(f"No JSON found in stderr: {clean[:300]}")
-    
-    # Try parsing from the last match and work backwards if needed
+    # The JSON can be multi-line. We look for a balanced JSON object containing "payloads".
     data = None
-    for m in reversed(matches):
+    
+    def extract_json_objects(text):
+        """Find all potential JSON objects in a string by balancing braces."""
+        objs = []
+        stack = []
+        start = -1
+        for i, char in enumerate(text):
+            if char == '{':
+                if not stack:
+                    start = i
+                stack.append(char)
+            elif char == '}':
+                if stack:
+                    stack.pop()
+                    if not stack:
+                        objs.append(text[start:i+1])
+        return objs
+
+    potential_objs = extract_json_objects(clean)
+    for obj_str in reversed(potential_objs):
         try:
-            potential_json = m.group(0)
-            data = json.loads(potential_json)
-            if "payloads" in data:
+            candidate = json.loads(obj_str)
+            if isinstance(candidate, dict) and "payloads" in candidate:
+                data = candidate
                 break
-            data = None
         except json.JSONDecodeError:
             continue
             
     if data is None:
-        raise ValueError(f"No valid response JSON with 'payloads' found in stderr")
+        raise ValueError(f"No valid response JSON with 'payloads' found in stderr. Clean output tail: {clean[-1000:]}")
 
     payloads = data.get("payloads", [])
     text = " ".join(p.get("text", "") for p in payloads if p.get("text"))

@@ -341,12 +341,13 @@ docker compose down           # 停止（数据持久化在 ./data）
 ## 🖥️ 本地开发
 
 ```bash
-python -m venv venv && source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-PYTHONPATH=. uvicorn src.main:app --host 0.0.0.0 --port 11435 --reload
+# 使用 PYTHONPATH=. 启动以确保能找到本地模块
+PYTHONPATH=. ./venv/bin/python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435 --reload
 
-# 执行全量测试
-PYTHONPATH=. pytest tests/ --ignore=tests/test_p10_auto_trigger.py -v
+# 运行完整测试套件
+PYTHONPATH=. ./venv/bin/pytest tests/ --ignore=tests/test_p10_auto_trigger.py -v
 ```
 
 > `test_p10_auto_trigger.py` 需要本地 Ollama 运行以执行提纯——在无本地模型的 CI 环境中可跳过。

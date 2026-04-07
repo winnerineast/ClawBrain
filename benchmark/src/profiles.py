@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PLUGIN_DIST = Path(__file__).parent.parent.parent / "packages" / "openclaw" / "dist" / "index.js"
+PLUGIN_DIST = Path(__file__).parent.parent.parent / "packages" / "openclaw" / "clawbrain"
 HOME = Path.home()
 MAIN_CONFIG = HOME / ".openclaw" / "openclaw.json"
 

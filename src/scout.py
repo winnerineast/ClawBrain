@@ -12,9 +12,9 @@ class ModelTier(str, Enum):
     TIER_3 = "TIER_3_BASIC"
 
 class ModelScout:
-    # 2.2 准则修复：仅保留本地已知模型分级，移除云端模型（如 gpt-4）以防止路由误判
+    # Rule 2.2 Fix: Only keep local known model tiers, remove cloud models (e.g., gpt-4) to prevent routing misjudgment
     KNOWN_MODELS = {
-        "qwen2.5:latest": ModelTier.TIER_3, # 4.7B 确定为 TIER 3
+        "qwen2.5:latest": ModelTier.TIER_3, # 4.7B confirmed as TIER 3
         "gemma4:e4b": ModelTier.TIER_1,
         "gemma4:31b": ModelTier.TIER_1
     }
@@ -25,18 +25,18 @@ class ModelScout:
         self.cache_ttl = 600
 
     async def get_model_tier(self, model_name: str) -> ModelTier:
-        # 1. 静态规则优先
+        # 1. Static rules priority
         if model_name in self.KNOWN_MODELS:
             return self.KNOWN_MODELS[model_name]
 
-        # 2. 缓存检查
+        # 2. Cache check
         now = time.time()
         if model_name in self.cache:
             entry = self.cache[model_name]
             if now - entry["timestamp"] < self.cache_ttl:
                 return entry["tier"]
 
-        # 3. 动态探测 (带异常收口)
+        # 3. Dynamic probing (with exception handling)
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.post(f"{self.base_url}/api/show", json={"name": model_name})

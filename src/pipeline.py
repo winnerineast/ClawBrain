@@ -5,29 +5,29 @@ from src.scout import ModelTier
 
 class WhitespaceCompressor:
     """
-    基于 design/gateway.md v1.8 实现的高精度压缩引擎。
-    先切分代码块，再对非代码块区域执行底噪去除。
+    High-precision compression engine based on design/gateway.md v1.8.
+    Splits code blocks first, then performs noise reduction on non-code regions.
     """
     @staticmethod
     def compress(text: str) -> str:
         if not text:
             return text
         
-        # 遵循 2.1 准则：先捕获代码块，保持缩进无损
+        # Follow Rule 2.1: Capture code blocks first to preserve indentation lossless
         pattern = r'(```[\s\S]*?```)'
-        # 使用括号捕获组，split 会保留分隔符
+        # Using capturing group in re.split will keep delimiters
         parts = re.split(pattern, text)
         processed_parts = []
         
         for part in parts:
             if part.startswith('```') and part.endswith('```'):
-                # 命中保护逻辑
+                # Protection logic hit
                 processed_parts.append(part)
             else:
-                # 2.1 准则：仅处理非代码块区域
-                # 将 2+ 空格变为 1
+                # Rule 2.1: Only process non-code block regions
+                # Convert 2+ spaces to 1
                 temp = re.sub(r' {2,}', ' ', part)
-                # 将 3+ 换行变为 2
+                # Convert 3+ newlines to 2
                 temp = re.sub(r'\n{3,}', '\n\n', temp)
                 processed_parts.append(temp)
         
@@ -39,7 +39,7 @@ class SafetyEnforcer:
     @classmethod
     def apply(cls, request: StandardRequest, tier: ModelTier):
         if tier in [ModelTier.TIER_2, ModelTier.TIER_3] and request.messages:
-            # 遵循 2.2 准则：幂等性检查
+            # Rule 2.2: Idempotency check
             if cls.TIER2_PATCH not in request.messages[0].content:
                 request.messages[0].content += cls.TIER2_PATCH
         return request

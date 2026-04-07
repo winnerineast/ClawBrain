@@ -140,8 +140,8 @@ def gen_fact_evolution(
         })
         raw_turns.append({"role": "assistant", "content": "Understood."})
 
-        # Noise block
-        raw_turns.extend(make_noise_block(noise_pool, 8, rng))
+        # Noise block (Increased to 20 pairs for stress testing)
+        raw_turns.extend(make_noise_block(noise_pool, 20, rng))
 
         # Plant update
         raw_turns.append({
@@ -153,8 +153,8 @@ def gen_fact_evolution(
         })
         raw_turns.append({"role": "assistant", "content": "Got it, updated."})
 
-        # More noise
-        raw_turns.extend(make_noise_block(noise_pool, 6, rng))
+        # More noise (Increased to 15 pairs)
+        raw_turns.extend(make_noise_block(noise_pool, 15, rng))
 
         # Recall query — should return update_message content
         raw_turns.append({
@@ -214,7 +214,7 @@ def gen_session_isolation(
             "session_id": session_a,
         })
         raw_a.append({"role": "assistant", "content": "Recorded."})
-        raw_a.extend(make_noise_block(noise_pool, 5, rng))
+        raw_a.extend(make_noise_block(noise_pool, 15, rng))
 
         # Session B conversation
         session_b = f"bm-iso-{i:02d}-b"
@@ -227,7 +227,7 @@ def gen_session_isolation(
             "session_id": session_b,
         })
         raw_b.append({"role": "assistant", "content": "Got it."})
-        raw_b.extend(make_noise_block(noise_pool, 5, rng))
+        raw_b.extend(make_noise_block(noise_pool, 15, rng))
         raw_b.append({
             "role": "user",
             "content": query_b,
@@ -464,7 +464,7 @@ def generate_all(seed: int = 42) -> dict[str, int]:
 
     write("recall_dist", gen_recall_distance(
         facts, noise,
-        distances=[5, 10, 20, 50, 100, 200],
+        distances=[10, 50, 100, 200, 300, 500],
         per_distance=8,
         rng=rng,
     ))
@@ -479,7 +479,7 @@ def generate_all(seed: int = 42) -> dict[str, int]:
 
     write("noise_robust", gen_noise_robustness(
         facts, noise,
-        noise_sizes=[20, 50, 100, 200],
+        noise_sizes=[50, 100, 200, 400],
         per_size=6,
         rng=rng,
     ))

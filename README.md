@@ -346,12 +346,13 @@ The `./data` directory is mounted as a volume — SQLite DB and blob files survi
 ## 🖥️ Local Development
 
 ```bash
-python -m venv venv && source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-PYTHONPATH=. uvicorn src.main:app --host 0.0.0.0 --port 11435 --reload
+# Start with PYTHONPATH=. to ensure local modules are found
+PYTHONPATH=. ./venv/bin/python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435 --reload
 
 # Run full test suite
-PYTHONPATH=. pytest tests/ --ignore=tests/test_p10_auto_trigger.py -v
+PYTHONPATH=. ./venv/bin/pytest tests/ --ignore=tests/test_p10_auto_trigger.py -v
 ```
 
 > `test_p10_auto_trigger.py` requires a live LLM (Ollama) for distillation — skip it in CI without a local model.
