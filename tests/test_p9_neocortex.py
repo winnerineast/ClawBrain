@@ -2,6 +2,8 @@
 import pytest
 import os
 import shutil
+import respx
+from httpx import Response
 from pathlib import Path
 from src.memory.neocortex import Neocortex
 
@@ -10,21 +12,20 @@ TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "tests/data/p9_neocortex_tmp")
 
 def visual_audit_semantic(test_name, input_desc, canary_facts, summary_text):
     """
-    语义提纯打点审计输出：展示事实留存清单
+    Semantic Distillation Audit Output: Display fact preservation checklist.
     """
     print(f"\n[SEMANTIC DELTA AUDIT: {test_name}]")
     print("=" * 80)
     print(f"DESCRIPTION: {input_desc}")
     print("-" * 80)
     
-    # 分析摘要长度
+    # Preview summary output
     print(f"SUMMARY OUTPUT PREVIEW:\n{summary_text[:150]}...\n")
     print(f"{'EXPECTED FACT (CANARY)':<38} | {'ACTUAL PRESERVATION'}")
     print(f"{'-'*38} | {'-'*38}")
     
     all_passed = True
     for fact in canary_facts:
-        # 不区分大小写进行判断
         passed = fact.lower() in summary_text.lower()
         if not passed: all_passed = False
         
@@ -36,13 +37,18 @@ def visual_audit_semantic(test_name, input_desc, canary_facts, summary_text):
     print("=" * 80)
 
 @pytest.mark.asyncio
+@respx.mock
 async def test_p9_neocortex_distillation_audit():
-    """Phase 9 深度审计：长上下文提取与金丝雀打点验证"""
+    """Phase 9 Depth Audit: Long context extraction and canary fact verification."""
     if os.path.exists(TEST_DATA_DIR): shutil.rmtree(TEST_DATA_DIR)
     
     nc = Neocortex(db_dir=TEST_DATA_DIR)
     
-    # 构造：3条废话 + 1条关键技术决策 (金丝雀)
+    # Mock Ollama Response containing the canary facts
+    mock_summary = "Technical decisions: Use PostgreSQL 15.2 and Tortoise ORM."
+    respx.post(f"{nc.distill_url}/api/generate").mock(return_value=Response(200, json={"response": mock_summary}))
+    
+    # Construct: 3 noise turns + 1 core tech decision (Canary)
     traces = [
         {"stimulus": {"messages": [{"role": "user", "content": "Hi, are you there?"}]}, 
          "reaction": {"message": {"content": "Yes, I am here."}}},
@@ -50,7 +56,7 @@ async def test_p9_neocortex_distillation_audit():
         {"stimulus": {"messages": [{"role": "user", "content": "We need to set up the database."}]}, 
          "reaction": {"message": {"content": "Okay, which one?"}}},
         
-        # --- 核心金丝雀事实 ---
+        # --- Core Canary Fact ---
         {"stimulus": {"messages": [{"role": "user", "content": "Let's use PostgreSQL version 15.2 with Tortoise ORM."}]}, 
          "reaction": {"message": {"content": "Understood. I will configure PostgreSQL 15.2 and Tortoise ORM."}}},
          
@@ -60,13 +66,13 @@ async def test_p9_neocortex_distillation_audit():
     
     canary_facts = ["PostgreSQL", "15.2", "Tortoise"]
     
-    # 执行提纯
+    # Execute distillation
     summary = await nc.distill("session-audit-01", traces)
     
-    # 验证是否提纯成功（未报错）
+    # Verify success (no error prefix)
     assert not summary.startswith("[Error]")
     
-    # 执行语义打点审计
+    # Perform semantic audit
     visual_audit_semantic(
         "Knowledge Distillation Pipeline",
         "Distilling 4 rounds of chat to extract core tech decisions",
@@ -74,10 +80,10 @@ async def test_p9_neocortex_distillation_audit():
         summary
     )
     
-    # 硬核断言：金丝雀事实必须全部存在于摘要中
+    # Hard assertion: Canary facts must be present in the summary
     for fact in canary_facts:
         assert fact.lower() in summary.lower()
         
-    # 验证持久化
+    # Verify persistence
     saved_summary = nc.get_summary("session-audit-01")
     assert saved_summary == summary

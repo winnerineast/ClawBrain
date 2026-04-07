@@ -6,23 +6,32 @@ Implement the **ClawBrain Neocortex** engine from scratch. This engine is respon
 ## 2. Architecture
 
 ### 2.1 Data & Storage Model
-- **Dependencies**: `db_dir` (to locate `hippocampus.db`), `ollama_url` (default `http://127.0.0.1:11434`).
+- **Dependencies**: 
+  - `db_dir`: Directory for SQLite storage.
+  - `distill_url`: Base URL for the distillation provider (default: `http://127.0.0.1:11434` for Ollama or `http://127.0.0.1:8080/v1` for OpenAI-compatible local servers).
+  - `distill_model`: Model name for distillation.
+  - `distill_provider`: Protocol type (`ollama` or `openai-compatible`).
 - **Storage table (`neocortex_summaries`)**:
   - `context_id` (TEXT PRIMARY KEY)
   - `summary_text` (TEXT)
   - `last_updated` (REAL)
   - `hebbian_weight` (REAL DEFAULT 1.0)
-- **Initialisation**: The SQLite table must be created automatically at instantiation time.
 
 ### 2.2 Semantic Distillation Engine
 - **Method signature**: `async def distill(context_id: str, traces: List[Dict[str, Any]]) -> str`
+- **Config priority**:
+  1. URL: Env `CLAWBRAIN_DISTILL_URL` -> Constructor `distill_url`.
+  2. Model: Env `CLAWBRAIN_DISTILL_MODEL` -> Constructor `distill_model`.
+  3. API Key: Env `CLAWBRAIN_DISTILL_API_KEY` (optional).
+  4. Provider: Env `CLAWBRAIN_DISTILL_PROVIDER` (default: `openai-compatible`).
+- **Protocol Dispatch**:
+  - **Ollama**: Call `distill_url/api/generate` with `prompt`. Extract `response`.
+  - **OpenAI-compatible**: Call `distill_url/chat/completions` with `messages`. Extract `choices[0].message.content`.
 - **Logic flow**:
-  1. Iterate the `traces` list, extract all user and assistant dialogue content, and concatenate into a long text.
-  2. Construct an instruction prompt: "Summarise the core technical decisions, user preferences, and resolved issues from the following conversation. Output as concise bullet points only."
-  3. **Model selection**: Read the model name from env var `CLAWBRAIN_DISTILL_MODEL` (default `gemma4:e4b`).
-  4. Call `ollama_url/api/generate` via `httpx.AsyncClient` with the merged prompt and selected model.
-  5. Extract the `response` field and upsert it into the `neocortex_summaries` table.
-  6. **Error handling**: On request failure, return a descriptive error string — do not raise a blocking exception.
+  1. Iterate `traces` to build a conversation corpus.
+  2. Construct the summarization prompt.
+  3. Dispatch to the selected provider.
+  4. Upsert result into `neocortex_summaries`.
 
 ### 2.3 Memory Recall Interface
 - **Method signature**: `def get_summary(context_id: str) -> Optional[str]`

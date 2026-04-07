@@ -17,7 +17,8 @@ class MemoryRouter:
     ClawBrain Memory Central Router.
     P18: Working Memory and Hippocampus search paths are isolated by context_id.
     """
-    def __init__(self, db_dir: str = None, distill_threshold: int = 50):
+    def __init__(self, db_dir: str = None, distill_threshold: int = 50, 
+                 distill_url: str = None, distill_model: str = None, distill_provider: str = None):
         if db_dir is None:
             # Dynamic default path for portability (Issue-003)
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,7 +27,8 @@ class MemoryRouter:
         self.db_dir = db_dir
         self.distill_threshold = distill_threshold
         self.hippo = Hippocampus(db_dir=db_dir)
-        self.neo = Neocortex(db_dir=db_dir)
+        self.neo = Neocortex(db_dir=db_dir, distill_url=distill_url, 
+                             distill_model=distill_model, distill_provider=distill_provider)
         self._wm_sessions: Dict[str, WorkingMemory] = {}   # P18: Isolated by session
         self.decomposer = SignalDecomposer()
 

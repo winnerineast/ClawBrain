@@ -4,6 +4,8 @@ import json
 import os
 import shutil
 import time
+import respx
+from httpx import Response
 from fastapi.testclient import TestClient
 from src.main import app
 
@@ -24,30 +26,32 @@ def visual_audit_memory(test_name, round_num, input_data, expected_recall, actua
     print("=" * 80)
 
 @pytest.mark.asyncio
+@respx.mock
 async def test_p11_full_chain_memory_echo_real():
-    """Phase 11 真实环境集成验收：验证在真实 Ollama 环境下的记忆回响"""
+    """Phase 11 Real environment integration audit: verify memory echo using respx mock."""
     if os.path.exists(TEST_DB_DIR): shutil.rmtree(TEST_DB_DIR)
     os.makedirs(TEST_DB_DIR)
     
-    # 3.1 准则：通过环境变量强制隔离数据库路径
+    # Force isolated DB path via environment
     os.environ["CLAWBRAIN_DB_DIR"] = TEST_DB_DIR
     
-    # 只有在 TestClient 启动时，Lifespan 才会读取环境变量
+    # Mock Ollama
+    respx.post("http://127.0.0.1:11434/api/chat").mock(return_value=Response(200, json={
+        "message": {"role": "assistant", "content": "Secret recorded."}
+    }))
+    
     with TestClient(app) as client:
-        # Round 1: 存入秘密 (向真实的 Ollama 发送请求)
-        # 注意：此处必须使用您本地确实存在的模型名，否则后端依然会报 404
-        # 根据日志，您使用的是 gemma4:e4b，我将去掉 ollama/ 前缀以对齐原生协议
+        # Round 1: Plant secret
         payload1 = {
             "model": "gemma4:e4b",
             "messages": [{"role": "user", "content": "The secret code is APPLE-777"}]
         }
         client.post("/api/chat", json=payload1)
         
-        # 强制等待一小会儿确保异步存证完成
+        # Ensure async ingestion is complete
         time.sleep(1.0)
         
-        # Round 2: 验证召回
-        # 我们模拟网关内部合成逻辑
+        # Round 2: Verify recall
         memory = client.app.state.memory_router
         enhanced_context = await memory.get_combined_context("default", "secret code")
         

@@ -39,7 +39,21 @@ async def lifespan(app: FastAPI):
     db_dir = os.getenv("CLAWBRAIN_DB_DIR", default_db_dir)
     
     app.state.scout = ModelScout()
-    app.state.memory_router = MemoryRouter(db_dir=db_dir)
+    
+    # ISSUE-004: Pass distillation config from env
+    distill_url = os.getenv("CLAWBRAIN_DISTILL_URL")
+    distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL")
+    distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER")
+    
+    app.state.memory_router = MemoryRouter(
+        db_dir=db_dir,
+        distill_url=distill_url,
+        distill_model=distill_model,
+        distill_provider=distill_provider
+    )
+    
+    logger.info(f"[INIT] Distillation Backend: {app.state.memory_router.neo.distill_provider} | URL: {app.state.memory_router.neo.distill_url}")
+    
     app.state.registry = ProviderRegistry()
     app.state.pipeline = Pipeline()
     app.state.http_client = httpx.AsyncClient(timeout=300.0, limits=httpx.Limits(max_connections=100))
