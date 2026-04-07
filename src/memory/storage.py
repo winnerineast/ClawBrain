@@ -23,7 +23,7 @@ class Hippocampus:
 
     def _init_db(self):
         with sqlite3.connect(self.db_path) as conn:
-            # traces 表
+            # traces table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS traces (
                     trace_id TEXT PRIMARY KEY,
@@ -35,18 +35,18 @@ class Hippocampus:
                     checksum TEXT
                 )
             """)
-            # P15: checksum 列兼容迁移
+            # P15: checksum column compatibility migration
             try:
                 conn.execute("ALTER TABLE traces ADD COLUMN checksum TEXT")
             except sqlite3.OperationalError:
                 pass
-            # P18: context_id 列兼容迁移
+            # P18: context_id column compatibility migration
             try:
                 conn.execute("ALTER TABLE traces ADD COLUMN context_id TEXT DEFAULT 'default'")
             except sqlite3.OperationalError:
                 pass
 
-            # P18: search_idx 需要含 context_id 列，检测旧 schema 并按需重建
+            # P18: search_idx needs context_id column, detect old schema and rebuild as needed
             needs_rebuild = False
             try:
                 conn.execute("SELECT context_id FROM search_idx LIMIT 1")
@@ -61,7 +61,7 @@ class Hippocampus:
                 USING fts5(trace_id UNINDEXED, context_id UNINDEXED, content)
             """)
 
-            # P22: WM 精确持久化快照表
+            # P22: WM exact persistence snapshot table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS wm_state (
                     session_id TEXT,
@@ -73,11 +73,11 @@ class Hippocampus:
                 )
             """)
 
-        # P20: 启动时自动清理脏数据与过期记录
+        # P20: Auto-cleanup dirty data and expired records on startup
         self._startup_cleanup()
 
     def _startup_cleanup(self):
-        """P20: 清除 timestamp=0.0 脏数据、TTL 过期记录、孤儿 blob 文件。"""
+        """P20: Purge timestamp=0.0 dirty data, TTL expired records, and orphan blob files."""
         dirty_count = 0
         expired_count = 0
         orphan_count = 0
@@ -86,7 +86,7 @@ class Hippocampus:
         cutoff = time.time() - ttl_days * 86400 if ttl_days > 0 else None
 
         with sqlite3.connect(self.db_path) as conn:
-            # 1. 脏数据（timestamp = 0.0）
+            # 1. Dirty data (timestamp = 0.0)
             dirty_ids = [r[0] for r in conn.execute(
                 "SELECT trace_id FROM traces WHERE timestamp = 0.0"
             ).fetchall()]
@@ -96,7 +96,7 @@ class Hippocampus:
                 conn.execute(f"DELETE FROM search_idx WHERE trace_id IN ({placeholders})", dirty_ids)
                 dirty_count = len(dirty_ids)
 
-            # 2. TTL 过期记录（timestamp > 0 且早于截止时间）
+            # 2. TTL expired records (timestamp > 0 and before cutoff)
             if cutoff:
                 expired_rows = conn.execute(
                     "SELECT trace_id, is_blob, blob_path FROM traces WHERE timestamp > 0 AND timestamp < ?",
@@ -107,7 +107,7 @@ class Hippocampus:
                     placeholders = ",".join("?" * len(exp_ids))
                     conn.execute(f"DELETE FROM traces WHERE trace_id IN ({placeholders})", exp_ids)
                     conn.execute(f"DELETE FROM search_idx WHERE trace_id IN ({placeholders})", exp_ids)
-                    # 清理 blob 文件
+                    # Cleanup blob files
                     for _, is_blob, blob_path in expired_rows:
                         if is_blob and blob_path:
                             try:
@@ -116,7 +116,7 @@ class Hippocampus:
                                 pass
                     expired_count = len(exp_ids)
 
-            # 3. 孤儿 blob 清理
+            # 3. Orphan blob cleanup
             valid_paths = set(
                 r[0] for r in conn.execute(
                     "SELECT blob_path FROM traces WHERE is_blob = 1 AND blob_path != ''"

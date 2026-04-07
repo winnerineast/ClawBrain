@@ -33,14 +33,18 @@ Implement the **ClawBrain MemoryRouter** — the central memory hub that orchest
 - The `ingest` method accepts `offload_threshold` (bytes); if provided it overrides the Hippocampus default.
 - **Verification**: Pass 1 MB data with `offload_threshold=500 KB`; verify offload triggers 100% of the time.
 
-### 2.6 Greedy Context Budget (P15)
-- **Background**: `get_combined_context` had no upper bound; after long-running sessions it could overflow the model context window.
-- **Env var `CLAWBRAIN_MAX_CONTEXT_CHARS`**: Default `2000`; controls the total character limit of memory injected per request.
-- **Priority greedy allocation** (highest value density first, no fixed ratios):
-  1. **L3 Neocortex summary first**: Inject the full summary; truncate with `...` if it exceeds the remaining budget.
-  2. **L2 Hippocampus next**: Use remaining budget to append recalled snippets in retrieval order; stop when the next snippet would exceed what remains.
-  3. **L1 Working Memory last**: Use remaining budget to inject active messages; truncate if needed.
-- **Log point**: `[CTX_BUDGET] Budget: N | Used(L3): N | Used(L2): N | Used(L1): N | Session: ctx`.
+### 2.6 Greedy Context Budget (P15 + Phase 29/30/31)
+- **Background**: `get_combined_context` injected noisy strings and had sub-optimal layer priority.
+- **Env var `CLAWBRAIN_MAX_CONTEXT_CHARS`**: Default `2000`.
+- **Phase 29/30**: Neocortex silence and Plain-Text Hippocampus.
+- **Phase 31 (Context Budgeting v2)**: Re-prioritise layers to L3 -> L1 -> L2. Working Memory (L1) contains active attractor-driven context and is more critical for current turn focus than historical L2 snippets.
+- **Header Safety**: Before injecting a layer's content, the budget must be checked against the **header length plus a 20-character safety margin**. This prevents "hanging headers" where a section title appears without content.
+- **Priority greedy allocation** (highest value density first):
+  1. **L3 Neocortex summary first**: If exists, inject header `=== SYSTEM MEMORY SUMMARY (NEOCORTEX) ===` followed by the summary.
+  2. **L1 Working Memory next**: Check if `remaining > 60` (header + safety). If so, inject header `=== ACTIVE CONVERSATION (WORKING MEMORY) ===` and then as much of the active messages as possible.
+  3. **L2 Hippocampus last**: Check if `remaining > 70` (header + safety). If so, inject header `=== RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS) ===` and then append plain-text bullet points until budget exhausted.
+- **Output Format**: Separate sections with a single newline. If no layers have content, return an empty string.
+- **Log point**: `[CTX_BUDGET] Budget: N | Used(L3): N | Used(L1): N | Used(L2): N | Session: ctx`.
 
 ### 2.7 Per-session Working Memory Isolation (P18)
 - **Background**: A global `WorkingMemory` singleton shared across all sessions caused cross-session context contamination.

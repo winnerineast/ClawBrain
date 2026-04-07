@@ -15,6 +15,14 @@ Drives ClawBrain's `/internal/*` endpoints directly. Measures whether
 `system_prompt_addition` contains the expected facts. No language model is
 involved; results are deterministic and reproducible.
 
+**Phase 29 (Blocking Compact)**: The benchmark runner calls `/internal/compact`
+to trigger Neocortex distillation. This call is **blocking** to ensure the L3
+summary is fully generated and available for recall before the evaluation step.
+
+**Phase 30 (Plain-Text Recall)**: Evaluators must look for facts formatted as
+**human-readable plain-text bullet points** (e.g., `- ROLE: content | ROLE: content`)
+rather than raw JSON objects.
+
 ```
 Test Conversation
       │
@@ -22,6 +30,8 @@ Test Conversation
       ▼
 ClawBrain Python server
       │
+      │  POST /internal/compact (blocking Phase 29)
+      ▼
       │  POST /internal/assemble  (at recall query turn)
       ▼
 system_prompt_addition

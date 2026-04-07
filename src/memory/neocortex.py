@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 
 class Neocortex:
     def __init__(self, db_dir: str = "/home/nvidia/ClawBrain/data", ollama_url: str = "http://127.0.0.1:11434"):
-        # 2.1 准则修正：确保存储目录物理存在，防止 sqlite3 加载失败
+        # §2.1: Ensure storage directory exists to prevent sqlite3 failures
         self.db_dir = Path(db_dir)
         self.db_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.db_dir / "hippocampus.db"
@@ -27,8 +27,8 @@ class Neocortex:
             """)
 
     async def distill(self, context_id: str, traces: List[Dict[str, Any]]) -> str:
-        """2.2 准则：异步提纯逻辑，支持可配置模型"""
-        # 1. 拼接素材
+        """§2.2: Async distillation logic with configurable model support."""
+        # 1. Prepare corpus
         corpus = []
         for t in traces:
             stimulus = t.get("stimulus", {})
@@ -37,12 +37,12 @@ class Neocortex:
                 corpus.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
         
         full_text = "\n".join(corpus)
-        prompt = f"请总结以下对话中的核心技术决策、用户偏好和已解决的问题。以精炼的 Bullet Points 形式输出，严禁废话。\n\n对话内容：\n{full_text}"
+        prompt = f"Please summarize the core technical decisions, user preferences, and resolved issues in the following dialogue. Output in concise Bullet Points format. No filler text.\n\nDialogue:\n{full_text}"
         
-        # 2.2 准则修正：从环境变量获取模型名
+        # §2.2: Get model name from environment variable
         distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
 
-        # 2. 调用 Ollama
+        # 2. Call Ollama
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 resp = await client.post(f"{self.ollama_url}/api/generate", json={
@@ -60,7 +60,7 @@ class Neocortex:
             return f"[Error] Distillation error: {str(e)}"
 
     def _save_summary(self, context_id: str, summary: str):
-        """内部写入摘要（供测试与 distill 共用）"""
+        """Internal summary persistence (shared by tests and distill)."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO neocortex_summaries (context_id, summary_text, last_updated) VALUES (?, ?, ?)",
@@ -74,6 +74,6 @@ class Neocortex:
             return row[0] if row else None
 
     def clear_summary(self, context_id: str):
-        """P17 管理 API：清除指定 session 的新皮层摘要"""
+        """P17 Management API: Clear Neocortex summary for a specific session."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DELETE FROM neocortex_summaries WHERE context_id = ?", (context_id,))

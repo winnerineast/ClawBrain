@@ -74,8 +74,9 @@ OpenClaw calls the following four hooks on every registered context engine:
 ```
 
 **Behaviour**:
+- **Phase 29 (Blocking Compact)**: This endpoint must **await** `neo.distill` before returning to ensure distillation is complete for benchmarking.
 - Fetch recent traces: `hippo.get_recent_traces(limit=distill_threshold, context_id=session_id)`.
-- Call `neo.distill(session_id, traces)` to consolidate episodic fragments.
+- **Await** `neo.distill(session_id, traces)` to consolidate episodic fragments.
 - Evict Working Memory items older than `CLAWBRAIN_WM_COMPACT_KEEP_RECENT` (default: 5).
 - Persist pruned snapshot via `hippo.save_wm_state`.
 

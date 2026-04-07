@@ -241,10 +241,12 @@ async def internal_assemble(request: Request):
 
 @app.post("/internal/compact")
 async def internal_compact(request: Request):
-    """3.3: Manual Compaction / Distillation."""
+    """3.3: Manual Compaction / Distillation (Blocking)."""
     raw = await request.json()
     session_id = raw.get("session_id")
     mr: MemoryRouter = request.app.state.memory_router
+    
+    # 1. Distillation (L3)
     rows = mr.hippo.get_recent_traces(limit=mr.distill_threshold, context_id=session_id)
     traces = []
     for row in rows:
@@ -252,7 +254,19 @@ async def internal_compact(request: Request):
         if raw_c:
             try: traces.append(json.loads(raw_c))
             except: pass
-    if traces: await mr.neo.distill(session_id, traces)
+    if traces:
+        # Phase 29: Await distillation to ensure completion for benchmarks
+        await mr.neo.distill(session_id, traces)
+        logger.info(f"[INT_COMPACT] Distillation complete for session={session_id}")
+
+    # 2. Working Memory Pruning (L1)
+    keep_recent = int(os.getenv("CLAWBRAIN_WM_COMPACT_KEEP_RECENT", "5"))
+    wm = mr._get_wm(session_id)
+    if len(wm.items) > keep_recent:
+        wm.items = wm.items[-keep_recent:]
+        mr.hippo.save_wm_state(session_id, wm.items)
+        logger.info(f"[INT_COMPACT] WM pruned to {keep_recent} items for session={session_id}")
+
     return {"ok": True, "compacted": True}
 
 @app.post("/internal/after-turn")
