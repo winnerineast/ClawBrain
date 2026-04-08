@@ -49,8 +49,26 @@ class Neocortex:
                 corpus.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
         
         full_text = "\n".join(corpus)
-        instruction = "Please summarize the core technical decisions, user preferences, and resolved issues in the following dialogue. Output in concise Bullet Points format. No filler text."
-        prompt = f"{instruction}\n\nDialogue:\n{full_text}"
+        # Phase 32 (ISSUE-007): Structured template-based distillation instruction
+        instruction = (
+            "You are a professional Memory Distiller for an AI Agent. "
+            "Your goal is to extract and preserve critical information from the following dialogue into a concise summary.\n\n"
+            "STRICT GUIDELINES:\n"
+            "1. PRESERVE TECHNICAL IDENTIFIERS: Always keep exact FQDNs, IP addresses, Port numbers, and Database names.\n"
+            "2. REQUIRED TEMPLATE: You MUST output the summary strictly using the following Markdown template. "
+            "Do not output categories that have no facts.\n\n"
+            "   ### Technical Decisions\n"
+            "   - [Technical details, URLs, IPs, architecture]\n"
+            "   ### User Preferences\n"
+            "   - [User preferences, workflow habits, styling]\n"
+            "   ### Project Context\n"
+            "   - [General context, names, goals]\n"
+            "   ### Relationships\n"
+            "   - [People, roles, teams]\n\n"
+            "3. BE CONCISE: Use Bullet Points. No conversational filler or introductory text.\n"
+            "4. EVOLUTION: If a fact is updated in the dialogue, only preserve the NEWEST value."
+        )
+        prompt = f"{instruction}\n\nDialogue to Distill:\n{full_text}"
         
         # 2. Dispatch by provider
         try:

@@ -29,7 +29,7 @@ Implement the **ClawBrain Neocortex** engine from scratch. This engine is respon
   - **OpenAI-compatible**: Call `distill_url/chat/completions` with `messages`. Extract `choices[0].message.content`.
 - **Logic flow**:
   1. Iterate `traces` to build a conversation corpus.
-  2. Construct the summarization prompt.
+  2. Construct the summarization prompt. The prompt MUST be template-based and strictly categorize extracted facts into 'Technical Decisions', 'User Preferences', and 'Project Context' to optimize for specific test dimensions (ISSUE-007).
   3. Dispatch to the selected provider.
   4. Upsert result into `neocortex_summaries`.
 
