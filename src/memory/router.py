@@ -32,7 +32,7 @@ class MemoryRouter:
         self._wm_sessions: Dict[str, WorkingMemory] = {}   # P18: Isolated by session
         self.decomposer = SignalDecomposer()
 
-        self._trace_counter = 0
+        self._trace_counters: Dict[str, int] = {}
         self._session_locks: Dict[str, asyncio.Lock] = {} # Phase 32: Per-session serialization
         self._hydrate()
 
@@ -109,14 +109,16 @@ class MemoryRouter:
             self.hippo.save_wm_state(context_id, wm.items)
 
             # Sequential Distillation logic
-            self._trace_counter += 1
-            if self._trace_counter >= self.distill_threshold:
-                logger.info(f"[NC_DIST] Threshold Reached ({self.distill_threshold}) -> Sequentially Awaiting Distillation.")
+            if context_id not in self._trace_counters:
+                self._trace_counters[context_id] = 0
+            self._trace_counters[context_id] += 1
+            if self._trace_counters[context_id] >= self.distill_threshold or sync_distill:
+                logger.info(f"[NC_DIST] Threshold Reached ({self.distill_threshold}) or Sync Forced -> Sequentially Awaiting Distillation.")
                 try:
                     await self._auto_distill_worker(context_id)
                 except Exception as e:
                     logger.error(f"Sequential distillation failed: {e}")
-                self._trace_counter = 0
+                self._trace_counters[context_id] = 0
 
             return trace_id
 

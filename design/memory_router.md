@@ -13,7 +13,7 @@ Implement the **ClawBrain MemoryRouter** — the central memory hub that orchest
   - `self._session_locks: Dict[str, asyncio.Lock] = {}` — **Phase 32: Per-session concurrency control**.
 
 ### 2.2 Asynchronous Sequential Gate (ingest)
-- **Method signature**: `async def ingest(payload, reaction=None, offload_threshold=None, context_id="default") -> str`
+- **Method signature**: `async def ingest(payload, reaction=None, offload_threshold=None, context_id="default", sync_distill=False) -> str`
 - **Logic (Phase 32)**:
   1. Acquire the lock for `context_id`: `async with self._get_session_lock(context_id):`.
   2. Generate `trace_id = uuid4()`.
@@ -22,10 +22,10 @@ Implement the **ClawBrain MemoryRouter** — the central memory hub that orchest
   5. Call `_get_wm(context_id).add_item(...)`.
   6. **P22**: Persist WM snapshot.
   7. **Auto-distillation (awaited sequence)**:
-     - Increment `_trace_counter`.
-     - If `_trace_counter >= distill_threshold`:
+     - Increment `_trace_counters[context_id]`.
+     - If `_trace_counters[context_id] >= distill_threshold` OR `sync_distill` is True:
        - `await self._auto_distill_worker(context_id)` — **Crucial: Direct await ensures sequence completion before lock release.**
-       - Reset `_trace_counter = 0`.
+       - Reset `_trace_counters[context_id] = 0`.
   8. Return `trace_id`.
 
 ### 2.3 Automatic Distillation Worker
