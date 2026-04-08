@@ -1,33 +1,44 @@
-# design/memory_router.md v1.11
+# design/memory_router.md v1.13 (Phase 32)
 
 ## 1. Objective
-Implement the **ClawBrain MemoryRouter** — the central memory hub that orchestrates the three-layer memory system. It must correctly connect Working Memory (L1), Hippocampus (L2), and Neocortex (L3), and provide a unified `ingest / get_combined_context` interface to the gateway.
+Implement the **ClawBrain MemoryRouter** — the central memory hub that orchestrates the three-layer memory system. It must provide an **Asynchronous Sequential Gate** to ensure that memory ingestion, distillation, and assembly for any given session occur in a consistent logical order without race conditions.
 
 ## 2. Architecture & Logic
 
 ### 2.1 Initialisation & Sub-module Mounting
-- **Constructor parameters**: `db_dir` (default: dynamic resolution relative to the application root or environment variable `CLAWBRAIN_DB_DIR`), `distill_threshold` (default 50).
-- **Sub-modules**: `Hippocampus(db_dir)`, `Neocortex(db_dir)`, `SignalDecomposer()`.
-- **Per-session WM registry**: `self._wm_sessions: Dict[str, WorkingMemory] = {}` — see §2.7.
+- **Constructor parameters**: `db_dir` (default: dynamic), `distill_threshold` (default 50).
+- **Sub-modules**: `Hippocampus`, `Neocortex`, `SignalDecomposer`.
+- **Per-session Registry**:
+  - `self._wm_sessions: Dict[str, WorkingMemory] = {}`
+  - `self._session_locks: Dict[str, asyncio.Lock] = {}` — **Phase 32: Per-session concurrency control**.
 
-### 2.2 Signal Ingestion (ingest)
+### 2.2 Asynchronous Sequential Gate (ingest)
 - **Method signature**: `async def ingest(payload, reaction=None, offload_threshold=None, context_id="default") -> str`
-- Logic:
-  1. Generate `trace_id = uuid4()`.
-  2. Extract `intent = decomposer.extract_core_intent(payload)`.
-  3. Call `hippo.save_trace(trace_id, {"stimulus": payload, "reaction": reaction}, search_text=intent, threshold=offload_threshold, context_id=context_id)`.
-  4. Call `_get_wm(context_id).add_item(trace_id, intent)`.
-  5. **P22**: Persist WM snapshot via `hippo.save_wm_state(context_id, wm.items)`.
-  6. Increment `_trace_counter`; if it reaches `distill_threshold`, spawn `_auto_distill_worker(context_id)` as an async task and reset counter.
+- **Logic (Phase 32)**:
+  1. Acquire the lock for `context_id`: `async with self._get_session_lock(context_id):`.
+  2. Generate `trace_id = uuid4()`.
+  3. Extract `intent`.
+  4. Call `hippo.save_trace(...)`.
+  5. Call `_get_wm(context_id).add_item(...)`.
+  6. **P22**: Persist WM snapshot.
+  7. **Auto-distillation (awaited sequence)**:
+     - Increment `_trace_counter`.
+     - If `_trace_counter >= distill_threshold`:
+       - `await self._auto_distill_worker(context_id)` — **Crucial: Direct await ensures sequence completion before lock release.**
+       - Reset `_trace_counter = 0`.
+  8. Return `trace_id`.
 
 ### 2.3 Automatic Distillation Worker
 - **Method**: `async def _auto_distill_worker(context_id: str)`
-- Uses `asyncio.Lock` to prevent concurrent distillations.
-- Fetches the most recent `distill_threshold` traces for `context_id`; deserialises and passes them to `neo.distill(context_id, traces)`.
+- Internal method, now always called under a session lock.
+- Fetches the most recent `distill_threshold` traces for `context_id`; passes them to `neo.distill(context_id, traces)`.
 
 ### 2.4 Combined Context Retrieval (get_combined_context)
 - **Method signature**: `async def get_combined_context(context_id: str, current_focus: str) -> str`
-- Reads `CLAWBRAIN_MAX_CONTEXT_CHARS` (default 2000) as total budget.
+- **Logic (Phase 32)**:
+  1. Acquire the lock for `context_id`: `async with self._get_session_lock(context_id):`. This ensures we don't read a summary or WM state while it is being updated by a parallel `ingest` or `distill` operation.
+  2. Read `CLAWBRAIN_MAX_CONTEXT_CHARS` (default 2000).
+  3. Perform L3 -> L1 -> L2 greedy allocation (as defined in §2.6).
 
 ### 2.5 Dynamic Offload Threshold
 - The `ingest` method accepts `offload_threshold` (bytes); if provided it overrides the Hippocampus default.
@@ -38,7 +49,7 @@ Implement the **ClawBrain MemoryRouter** — the central memory hub that orchest
 - **Env var `CLAWBRAIN_MAX_CONTEXT_CHARS`**: Default `2000`.
 - **Phase 29/30**: Neocortex silence and Plain-Text Hippocampus.
 - **Phase 31 (Context Budgeting v2)**: Re-prioritise layers to L3 -> L1 -> L2. Working Memory (L1) contains active attractor-driven context and is more critical for current turn focus than historical L2 snippets.
-- **Header Safety**: Before injecting a layer's content, the budget must be checked against the **header length plus a 20-character safety margin**. This prevents "hanging headers" where a section title appears without content.
+- **Header Safety**: Before injecting a layer's content, the budget must be checked against the **header length plus a 20-character safety margin**. When appending content, the exact lengths of headers, newlines, and truncation ellipses (`...`) MUST be precisely deducted from the remaining character budget to prevent budget efficiency overruns (ISSUE-006).
 - **Priority greedy allocation** (highest value density first):
   1. **L3 Neocortex summary first**: If exists, inject header `=== SYSTEM MEMORY SUMMARY (NEOCORTEX) ===` followed by the summary.
   2. **L1 Working Memory next**: Check if `remaining > 60` (header + safety). If so, inject header `=== ACTIVE CONVERSATION (WORKING MEMORY) ===` and then as much of the active messages as possible.
