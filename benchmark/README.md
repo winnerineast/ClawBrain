@@ -68,5 +68,14 @@ To ensure a clean testing environment, Tier 2 uses dedicated OpenClaw profiles a
 - **Default Model**: The benchmark defaults to `ollama/gemma4:e4b`. Ensure this model is pulled in Ollama before running.
 
 
+## Work Daily (Phase 32 Status)
+
+The core infrastructure and Tier 1 integrity tests are now fully verified. The next immediate focus is executing **Tier 2 (Cognitive Effectiveness)** benchmarks. This will quantify the end-to-end recall rate of the `gemma4:e4b` model when enhanced by ClawBrain's tri-layer memory system.
+
+**Next Tasks:**
+1.  Verify `gemma4:e4b` is locally active in Ollama.
+2.  Execute full Tier 2 run: `python3 benchmark/run_benchmark.py run --tier 2`.
+3.  Analyze the "Cognitive Delta" between `benchmark-on` and `benchmark-off` profiles.
+
 ---
 *This benchmark is a living system. As ClawBrain evolves (e.g., adding Vector Embeddings), these metrics provide the guardrails to ensure every "improvement" is a genuine cognitive gain.*
