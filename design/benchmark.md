@@ -98,7 +98,7 @@ OpenClaw profiles:
 }
 ```
 
-`update_message`: if non-null, planted after an initial noise block to test fact evolution.
+`update_message`: if non-null, planted after an initial noise block to test fact evolution. When generating fact evolution tests, the `must_contain` token extracted from `update_message` MUST prioritize technical identifiers (IPs, ports, FQDNs, URLs, tokens with `. : -` or digits) over generic vocabulary to avoid false negatives.
 
 ### Noise turn pair (`data/noise/*.jsonl`, one record per line)
 

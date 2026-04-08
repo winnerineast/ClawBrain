@@ -164,9 +164,20 @@ def gen_fact_evolution(
             "expected_facts": [fact["fact_id"]],
         })
 
-        # Extract a token from update_message for must_contain
-        update_token = fact["update_message"].split()[-3]  # last few words as rough signal
+        # Phase 32 (ISSUE-005): Robust token extraction for must_contain
+        # Prefer technical identifiers (contains . : - or digits) over common words
+        stop_words = {"the", "and", "with", "for", "that", "this", "from", "have", "has", "had", "will", "would", "what", "when", "where", "which", "your", "their", "they", "them", "then", "than", "there", "were", "been", "much", "some", "very", "many", "just", "like", "into", "onto", "upon", "about", "above", "below", "under", "over"}
+        tokens = [t.strip(",.!?\"'") for t in fact["update_message"].split()]
 
+        tech_tokens = [t for t in tokens if (any(c in t for c in ".:-/\\") or any(c.isdigit() for c in t)) and len(t) > 1 and t.lower() not in stop_words]
+
+        if tech_tokens:
+            # Take the most specific one (longest technical identifier)
+            update_token = max(tech_tokens, key=len)
+        else:
+            # Fallback to longest non-common word
+            valid_tokens = [t for t in tokens if t.lower() not in stop_words and len(t) >= 3]
+            update_token = max(valid_tokens, key=len) if valid_tokens else (tokens[-1] if tokens else "update")
         test_id = f"fact_evol_{fact['fact_id']}_{i:02d}"
         cases.append({
             "test_id": test_id,
@@ -179,7 +190,7 @@ def gen_fact_evolution(
                 "must_contain": [update_token],
                 "must_not_contain": [],
                 "type": "pattern_match",
-                "note": "Should reflect updated value, not original",
+                "note": f"Should reflect updated value: {update_token}",
             },
         })
     return cases
