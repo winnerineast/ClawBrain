@@ -1,0 +1,7 @@
+[
+  {
+    "test_id": "p10_load_dynamics_v1.8",
+    "status": "PASS",
+    "evidence_log": "tests/results/test_p10_memory_router.log"
+  }
+]

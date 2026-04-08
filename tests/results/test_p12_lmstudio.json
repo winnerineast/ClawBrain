@@ -1,0 +1,7 @@
+[
+  {
+    "test_id": "p12_lmstudio_v1.1_fix_audit",
+    "status": "PASS",
+    "evidence_log": "tests/results/test_p12_lmstudio.log"
+  }
+]

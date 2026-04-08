@@ -181,12 +181,12 @@ class Hippocampus:
 
     def search(self, query: str, context_id: str = "default") -> List[str]:
         """
-        两级降级搜索，严格按 context_id 隔离 (P15 + P18)。
+        Two-level fallback search, strictly isolated by context_id (P15 + P18).
         """
         if not query or not query.strip():
             return []
         with sqlite3.connect(self.db_path) as conn:
-            # Level 1: 精确短语 + session 过滤
+            # Level 1: Exact phrase + session filtering
             try:
                 cursor = conn.execute(
                     "SELECT trace_id FROM search_idx WHERE content MATCH ? AND context_id = ?",
@@ -198,7 +198,7 @@ class Hippocampus:
             except sqlite3.OperationalError:
                 pass
 
-            # Level 2: 关键词 AND + session 过滤
+            # Level 2: Keyword AND + session filtering
             try:
                 special = set('"*^()[]{}: ')
                 keywords = [
@@ -234,7 +234,7 @@ class Hippocampus:
             return raw_content
 
     def get_recent_traces(self, limit: int, context_id: str = None) -> List[Dict[str, Any]]:
-        """按 session 过滤最近记录 (P18 新增 context_id 参数)"""
+        """Filter recent records by session (P18 added context_id parameter)"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             if context_id:
@@ -250,7 +250,7 @@ class Hippocampus:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_all_session_ids(self) -> List[str]:
-        """返回 traces 表中所有已知的 context_id（用于 hydrate）"""
+        """Return all known context_ids in the traces table (used for hydration)"""
         with sqlite3.connect(self.db_path) as conn:
             try:
                 cursor = conn.execute(
@@ -260,10 +260,10 @@ class Hippocampus:
             except Exception:
                 return []
 
-    # ── P22: WorkingMemory 精确持久化 ────────────────────────────────────────
+    # ── P22: WorkingMemory Exact Persistence ──────────────────────────────────
 
     def save_wm_state(self, session_id: str, items) -> None:
-        """将 session 的 WM 活跃快照覆盖写入 wm_state 表。"""
+        """Overwrite the active WM snapshot of the session into the wm_state table."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DELETE FROM wm_state WHERE session_id = ?", (session_id,))
             for item in items:
@@ -273,7 +273,7 @@ class Hippocampus:
                 )
 
     def load_wm_state(self, session_id: str) -> List[Dict[str, Any]]:
-        """读取 session 的 WM 快照，返回按 timestamp 升序排列的字典列表。"""
+        """Read the WM snapshot of the session and return a list of dictionaries sorted by timestamp in ascending order."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
@@ -284,6 +284,6 @@ class Hippocampus:
             return [dict(row) for row in cursor.fetchall()]
 
     def clear_wm_state(self, session_id: str) -> None:
-        """清除指定 session 的 WM 快照（管理 API DELETE 联动）。"""
+        """Clear the WM snapshot of the specified session (linked with the management API DELETE)."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DELETE FROM wm_state WHERE session_id = ?", (session_id,))

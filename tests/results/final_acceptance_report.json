@@ -1,0 +1,18 @@
+{
+  "report_id": "ClawBrain_Final_Acceptance_v1.32",
+  "verdict": "FAIL",
+  "metrics": {
+    "total_cases": 34,
+    "passed": 28,
+    "failed": 6,
+    "errors": 0,
+    "success_rate": "82.4%"
+  },
+  "critical_fixes_verified": [
+    "Detector_Tools_Extraction",
+    "Memory_Hydration_Isolation",
+    "Routing_501_Security_Barrier",
+    "LMStudio_Real_E2E"
+  ],
+  "evidence_file": "tests/results/final_regression.log"
+}

@@ -1,0 +1,23 @@
+P21 Docker Deployment — Audit Log
+Date: 2026-04-05
+
+FILES GENERATED:
+  Dockerfile          python:3.12-slim base, non-root user clawbrain(1000), 156MB
+  docker-compose.yml  port 11435, ./data volume mount, env_file .env, healthcheck
+  .env.example        all CLAWBRAIN_* env vars documented
+  .dockerignore       excludes venv/, tests/, data/, .git/ — build context 93KB
+
+BUILD:
+  docker build -t clawbrain:p21 .
+  Result: SUCCESS — image 52e5d8082050, 156MB
+
+SMOKE TEST:
+  docker run --rm -d -p 11435:11435 clawbrain:p21
+  GET /health → {"status":"ok","mode":"Universal Neural Relay","version":"1.39"}
+  Result: PASS
+
+KEY DECISIONS:
+  workers=1: in-memory WorkingMemory is not multi-process safe
+  healthcheck: uses python3 urllib (no curl in slim image)
+  data persistence: ./data:/app/data volume (SQLite + blobs survive restarts)
+  secrets: passed via .env file, never baked into image

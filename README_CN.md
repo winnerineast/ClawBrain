@@ -365,7 +365,7 @@ ClawBrain 遵循**"无影准则"**：
 
 ## 🧪 审计哲学
 
-项目遵循 **GEMINI.md** 宪法：代码变更前先更新设计文档，每个 Phase 在 `results/` 留存 Side-by-Side 审计证据。
+项目遵循 **GEMINI.md** 宪法：代码变更前先更新设计文档，每个 Phase 在 `tests/results/` 留存 Side-by-Side 审计证据。
 
 运行时结构化日志标签：
 

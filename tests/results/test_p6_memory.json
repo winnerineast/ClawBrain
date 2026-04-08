@@ -1,0 +1,7 @@
+[
+  {
+    "test_id": "p6_memory_v1.8_decomposer_audit",
+    "status": "PASS",
+    "evidence_log": "tests/results/test_p6_memory.log"
+  }
+]

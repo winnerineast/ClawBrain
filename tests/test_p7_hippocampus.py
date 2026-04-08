@@ -13,7 +13,7 @@ TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "tests/data/p7_hippocampus_tmp")
 
 def visual_audit_high_fid(test_name, input_desc, expected_evidence, actual_evidence):
     """
-    高保真审计输出：展示精确的证据对比
+    High-fidelity audit output: displays precise evidence comparison
     """
     print(f"\n[HIGH-FIDELITY AUDIT: {test_name}]")
     print("=" * 80)
@@ -39,65 +39,65 @@ def get_hash(data: str) -> str:
     return hashlib.sha256(data.encode('utf-8')).hexdigest()
 
 def test_p7_storage_integrity_audit():
-    """Phase 7 深度审计：大文件分流后的字节一致性与 SHA-256 校验 (Fixed Bug 7)"""
+    """Phase 7 Deep Audit: Byte consistency and SHA-256 verification after large file offloading (Fixed Bug 7)"""
     if os.path.exists(TEST_DATA_DIR): shutil.rmtree(TEST_DATA_DIR)
     hp = Hippocampus(db_dir=TEST_DATA_DIR)
     
-    # 构造 1MB 的大文件数据 (> 512KB)
+    # Construct 1MB large file data (> 512KB)
     raw_content = "CANARY_DATA_" + "A" * (1024 * 1024)
     input_payload = {"content": raw_content}
     
-    # 计算原始 JSON 字符串的 Hash (预期)
+    # Calculate Hash of the original JSON string (Expected)
     original_json_str = json.dumps(input_payload)
     expected_hash = get_hash(original_json_str)
     
-    # 存入海马体
+    # Store in Hippocampus
     res = hp.save_trace("trace-deep-audit", input_payload)
     
-    # 1. 验证返回契约中的 checksum (Bug 7 修复验证)
+    # 1. Verify checksum in the return contract (Bug 7 fix verification)
     system_hash = res.get("checksum")
     
-    # 2. 从磁盘读取产生的内容并计算 Hash (物理确证)
+    # 2. Read the generated content from disk and calculate Hash (Physical verification)
     assert res["is_blob"] is True
     with open(res["blob_path"], "r", encoding="utf-8") as f:
         on_disk_content = f.read()
         on_disk_hash = get_hash(on_disk_content)
     
-    # 3. 从数据库中读取存证 Hash (持久化确证)
+    # 3. Read the stored Hash from the database (Persistence verification)
     db_path = os.path.join(TEST_DATA_DIR, "hippocampus.db")
     conn = sqlite3.connect(db_path)
     db_hash = conn.execute("SELECT checksum FROM traces WHERE trace_id='trace-deep-audit'").fetchone()[0]
     conn.close()
     
-    # 高保真审计展示 (Fixed Visual Bug: 确保比较的是哈希本身)
+    # High-fidelity audit display (Fixed Visual Bug: Ensure that the comparison is of the hash itself)
     visual_audit_high_fid(
         "Storage Byte Integrity & SHA-256",
         "1MB Payload -> Blob Offloading + Hash Check",
-        expected_hash, # 纯哈希用于比较
-        on_disk_hash   # 纯哈希用于比较
+        expected_hash, # Pure hash for comparison
+        on_disk_hash   # Pure hash for comparison
     )
     
-    # 额外打印多方证据用于肉眼复核
+    # Extra print of multi-party evidence for visual review
     print(f"DEBUG EVIDENCE: SYSTEM={system_hash[:8]}... DB={db_hash[:8]}... DISK={on_disk_hash[:8]}...")
     
-    # 硬核断言：四方 Hash 必须完全一致
+    # Hardcore assertion: Four-way Hash must be completely consistent
     assert system_hash == expected_hash, "Return metadata checksum mismatch"
     assert db_hash == expected_hash, "Database persistent checksum mismatch"
     assert on_disk_hash == expected_hash, "Physical file content checksum mismatch"
 
 def test_p7_fts_recall_precision_audit():
-    """Phase 7 深度审计：全文检索的召回精度验证"""
+    """Phase 7 Deep Audit: Full-text search recall precision verification"""
     hp = Hippocampus(db_dir=TEST_DATA_DIR)
     
-    # 模拟高噪音环境：存入 5 条无用记录
+    # Simulate a high-noise environment: Store 5 useless records
     for i in range(5):
         hp.save_trace(f"noise-{i}", {"text": f"Normal system log line {i}"}, search_text=f"Normal log {i}")
     
-    # 插入包含特殊符号（连字符）的目标金丝雀
+    # Insert target canary containing special symbols (hyphens)
     target_fact = "CRITICAL_SECURITY_EVENT: Port 22 opened by user 'admin-root'"
     hp.save_trace("target-99", {"text": target_fact}, search_text=target_fact)
     
-    # 执行搜索：带有连字符的词
+    # Perform search: Word with hyphens
     results = hp.search("admin-root")
     
     expected_list = "['target-99']"
@@ -110,6 +110,6 @@ def test_p7_fts_recall_precision_audit():
         actual_list
     )
     
-    # 精确验证：必须且仅能搜到 target-99
+    # Precise verification: Must and can only search for target-99
     assert len(results) == 1
     assert results[0] == "target-99"

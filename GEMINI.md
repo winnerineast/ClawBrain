@@ -8,13 +8,16 @@
 
 4. **Self-Consistent Design Traceability**: Every spec must be a complete, self-contained functional specification. The first line of every source file must cite `# Generated from design/[file] v[ver]`.
 
-5. **Phase-Based Audit Evidence**: Results are preserved independently per Phase. `results/` must contain associated log audit evidence with Input / Expected / Actual triples.
+5. **Phase-Based Audit Evidence**: Results are preserved independently per Phase. `tests/results/` must contain associated log audit evidence with Input / Expected / Actual triples.
 
 6. **Full Synchronous Updates**: Code, tests, data, and docs must change in lockstep. No partial updates.
 
 7. **Canonical Naming Convention**: Filenames must be concise and include the phase identifier. Version numbers in filenames are prohibited.
 
-8. **Centralised Test Data**: All static test data lives under `tests/data/`, named to match the Phase.
+8. **Centralised Test Artifacts**: All test code, static data, and execution results must reside in different subdirectories of the same parent directory (`tests/` for the core project, `benchmark/` for benchmarking).
+   - Code: `tests/*.py` / `benchmark/src/*.py`
+   - Data: `tests/data/` / `benchmark/data/`
+   - Results: `tests/results/` / `benchmark/results/`
 
 9. **English Everywhere**: Design documents, source code, inline comments, commit messages, and test output labels must all be written in English.
 

@@ -5,9 +5,7 @@ __pycache__/
 *.pyo
 .git/
 .env
-tests/
 data/
-results/
 design/
 *.md
 .gitignore

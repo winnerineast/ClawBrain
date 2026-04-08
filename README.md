@@ -370,7 +370,7 @@ ClawBrain adheres to the **"No-Shadow Principle"**:
 
 ## 🧪 Audit Philosophy
 
-The project follows the **GEMINI.md** constitution: design docs updated before code, every phase produces Side-by-Side audit evidence in `results/`.
+The project follows the **GEMINI.md** constitution: design docs updated before code, every phase produces Side-by-Side audit evidence in `tests/results/`.
 
 Structured log tags emitted at runtime:
 

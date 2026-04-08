@@ -12,7 +12,7 @@ def visual_audit(test_name, input_desc, expected, actual):
     print(f"{'EXPECTED ATTRIBUTE':<38} | {'ACTUAL ATTRIBUTE'}")
     print(f"{'-'*38} | {'-'*38}")
     
-    # 打印对比行
+    # Print comparison rows
     for key in expected:
         exp_val = str(expected[key])
         act_val = str(actual.get(key, "MISSING"))
@@ -23,7 +23,7 @@ def visual_audit(test_name, input_desc, expected, actual):
     print("=" * 80)
 
 def test_p13_anthropic_role_normalization():
-    """验证：连续两条 User 消息是否被合并（符合 Anthropic 规格）"""
+    """Verify: Whether consecutive User messages are merged (compliant with Anthropic specs)"""
     std_req = StandardRequest(
         model="anthropic/claude-3",
         messages=[
@@ -33,7 +33,7 @@ def test_p13_anthropic_role_normalization():
     )
     payload = DialectTranslator.to_anthropic(std_req)
     
-    # 预期：messages 长度应为 1，且内容合并
+    # Expected: messages length should be 1, and content should be merged
     expected = {"msg_count": 1, "first_role": "user"}
     actual = {"msg_count": len(payload["messages"]), "first_role": payload["messages"][0]["role"]}
     
@@ -42,9 +42,9 @@ def test_p13_anthropic_role_normalization():
     assert "how are you?" in payload["messages"][0]["content"]
 
 def test_p13_anthropic_mandatory_fields():
-    """验证：max_tokens 是否被自动补全"""
+    """Verify: Whether max_tokens is auto-filled"""
     std_req = StandardRequest(model="anthropic/claude-3", messages=[Message(role="user", content="Hi")])
-    # 原始请求未指定 max_tokens
+    # Original request does not specify max_tokens
     payload = DialectTranslator.to_anthropic(std_req)
     
     expected = {"max_tokens": 4096}
@@ -52,7 +52,7 @@ def test_p13_anthropic_mandatory_fields():
     assert payload["max_tokens"] == 4096
 
 def test_p13_anthropic_system_mapping():
-    """验证：System 消息正确映射到顶层"""
+    """Verify: Whether System messages are correctly mapped to the top level"""
     std_req = StandardRequest(
         model="anthropic/claude-3",
         messages=[
