@@ -2,10 +2,12 @@
 import pytest
 import json
 import respx
+import os
 from httpx import Response
 from pathlib import Path
 from fastapi.testclient import TestClient
 from src.main import app
+from src.memory.storage import clear_chroma_clients
 
 def visual_audit(test_name, input_summary, expected_keywords, actual):
     found = any(kw.lower() in str(actual).lower() for kw in expected_keywords)
@@ -25,8 +27,11 @@ def visual_audit(test_name, input_summary, expected_keywords, actual):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_e2e_multi_round_marathon():
+async def test_e2e_multi_round_marathon(tmp_path):
     """E2E: 21-round marathon conversation test."""
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
+    
     data_path = Path("tests/data/p5_e2e.json")
     thread = json.loads(data_path.read_text())["multi_round_thread"]
     
@@ -51,7 +56,9 @@ async def test_e2e_multi_round_marathon():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_e2e_ollama_chat_lifespan():
+async def test_e2e_ollama_chat_lifespan(tmp_path):
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
     respx.post("http://127.0.0.1:11434/api/chat").mock(return_value=Response(200, json={
         "message": {"role": "assistant", "content": "1+1=2"}
     }))
@@ -62,8 +69,10 @@ async def test_e2e_ollama_chat_lifespan():
         assert "2" in response.text
 
 @pytest.mark.asyncio
-async def test_e2e_qualification_interception():
+async def test_e2e_qualification_interception(tmp_path):
     """Verify TIER_3 models with tools are intercepted with 422."""
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
     payload = {
         "model": "qwen2.5:latest",
         "messages": [{"role": "user", "content": "test"}],

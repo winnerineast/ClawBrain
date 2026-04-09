@@ -10,6 +10,45 @@ class DialectTranslator:
     """
     
     @staticmethod
+    def extract_query(protocol: str, payload: Dict[str, Any]) -> str:
+        """从不同协议中提取用户最新的查询意图。"""
+        messages = payload.get("messages", [])
+        if not messages:
+            # api/generate 可能是 prompt 模式
+            return payload.get("prompt", "")
+            
+        # 寻找最后一条 user 消息
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                return msg.get("content", "")
+        return ""
+
+    @staticmethod
+    def inject_context(protocol: str, payload: Dict[str, Any], context: str) -> Dict[str, Any]:
+        """将记忆上下文注入到系统提示词中。"""
+        if not context:
+            return payload
+            
+        messages = payload.get("messages", [])
+        
+        # 寻找系统消息
+        system_msg = next((m for m in messages if m.get("role") == "system"), None)
+        
+        if system_msg:
+            # 追加到现有系统消息
+            system_msg["content"] = f"{context}\n\n{system_msg['content']}"
+        else:
+            # 插入新的系统消息到顶部
+            messages.insert(0, {"role": "system", "content": context})
+            payload["messages"] = messages
+            
+        # 如果是 prompt 模式 (api/generate)
+        if "prompt" in payload and not messages:
+            payload["prompt"] = f"{context}\n\n{payload['prompt']}"
+            
+        return payload
+
+    @staticmethod
     def to_ollama(request: StandardRequest) -> Dict[str, Any]:
         return request.model_dump(exclude_none=True)
 

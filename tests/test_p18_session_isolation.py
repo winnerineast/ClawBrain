@@ -1,18 +1,9 @@
 # Generated from design/memory_hippocampus.md v1.7 / design/memory_router.md v1.10
 import pytest
 import os
-import shutil
 import asyncio
-from src.memory.storage import Hippocampus
+from src.memory.storage import Hippocampus, clear_chroma_clients
 from src.memory.router import MemoryRouter
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p18_tmp")
-
-def setup_function():
-    if os.path.exists(TEST_DIR):
-        shutil.rmtree(TEST_DIR)
-    os.makedirs(TEST_DIR)
 
 def visual_audit(test_name, description, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
@@ -28,9 +19,10 @@ def visual_audit(test_name, description, expected, actual):
 
 # ── P18-A: Hippocampus storage layer session isolation ──────────────────
 
-def test_p18_hippo_search_session_isolation():
+def test_p18_hippo_search_session_isolation(tmp_path):
     """Content across sessions should not be recalled from each other"""
-    hp = Hippocampus(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    hp = Hippocampus(db_dir=str(tmp_path))
 
     hp.save_trace("alice-1", {"x": 1}, search_text="project ALPHA secret key",    context_id="alice")
     hp.save_trace("bob-1",   {"x": 2}, search_text="project BETA confidential",    context_id="bob")
@@ -42,33 +34,34 @@ def test_p18_hippo_search_session_isolation():
     visual_audit("Hippo Search: Alice sees ALPHA",
                  "alice should get her own ALPHA traces",
                  True, len(alice_results) > 0)
+    
     visual_audit("Hippo Search: Bob cannot see Alice's ALPHA",
-                 "bob's search for ALPHA should return nothing",
-                 0, len(bob_results))
+                 "bob's search for ALPHA should return nothing related to Alice",
+                 True, all("alice" not in r for r in bob_results))
 
     assert len(alice_results) > 0
     assert all(r in ["alice-1", "alice-2"] for r in alice_results)
-    assert len(bob_results) == 0
+    assert all("alice" not in r for r in bob_results)
 
-def test_p18_hippo_save_context_id_persisted():
-    """context_id is correctly written to the traces table"""
-    hp = Hippocampus(db_dir=TEST_DIR)
+def test_p18_hippo_save_context_id_persisted(tmp_path):
+    """context_id is correctly written to ChromaDB"""
+    clear_chroma_clients()
+    hp = Hippocampus(db_dir=str(tmp_path))
     hp.save_trace("trace-x", {"msg": "hello"}, search_text="hello world", context_id="session-99")
 
-    import sqlite3
-    conn = sqlite3.connect(hp.db_path)
-    row = conn.execute("SELECT context_id FROM traces WHERE trace_id='trace-x'").fetchone()
-    conn.close()
+    res = hp.traces_col.get(ids=["trace-x"])
+    meta = res["metadatas"][0] if res["metadatas"] else {}
+    persisted_cid = meta.get("context_id")
 
     visual_audit("Hippo Persist context_id",
-                 "context_id should be 'session-99' in DB",
-                 "session-99", row[0] if row else None)
-    assert row is not None
-    assert row[0] == "session-99"
+                 "context_id should be 'session-99' in ChromaDB",
+                 "session-99", persisted_cid)
+    assert persisted_cid == "session-99"
 
-def test_p18_hippo_get_recent_traces_filtered():
+def test_p18_hippo_get_recent_traces_filtered(tmp_path):
     """get_recent_traces filters by session"""
-    hp = Hippocampus(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    hp = Hippocampus(db_dir=str(tmp_path))
     hp.save_trace("s1-t1", {"x": 1}, context_id="session-A")
     hp.save_trace("s1-t2", {"x": 2}, context_id="session-A")
     hp.save_trace("s2-t1", {"x": 3}, context_id="session-B")
@@ -88,9 +81,10 @@ def test_p18_hippo_get_recent_traces_filtered():
 # ── P18-B: MemoryRouter working memory session isolation ──────────────────
 
 @pytest.mark.asyncio
-async def test_p18_wm_session_isolation():
+async def test_p18_wm_session_isolation(tmp_path):
     """Working memories of different sessions do not interfere with each other"""
-    router = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router = MemoryRouter(db_dir=str(tmp_path))
 
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice content UNIQUE-ALICE"}]},
@@ -120,9 +114,10 @@ async def test_p18_wm_session_isolation():
     assert not bob_has_alice
 
 @pytest.mark.asyncio
-async def test_p18_get_combined_context_isolated():
+async def test_p18_get_combined_context_isolated(tmp_path):
     """get_combined_context is isolated by session; A's context does not contain B's content"""
-    router = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router = MemoryRouter(db_dir=str(tmp_path))
 
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice secret ALPHA-TOKEN"}]},
@@ -149,10 +144,11 @@ async def test_p18_get_combined_context_isolated():
 # ── P18-C: Hydrate by session recovery ──────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_p18_hydrate_per_session():
+async def test_p18_hydrate_per_session(tmp_path):
     """After restart, _hydrate recovers WM by session separately"""
+    clear_chroma_clients()
     # First router writes data
-    router1 = MemoryRouter(db_dir=TEST_DIR)
+    router1 = MemoryRouter(db_dir=str(tmp_path))
     await router1.ingest(
         {"messages": [{"role": "user", "content": "Hydrate ALICE persist test"}]},
         context_id="hydrate-alice"
@@ -162,8 +158,9 @@ async def test_p18_hydrate_per_session():
         context_id="hydrate-bob"
     )
 
-    # Second router simulates restart, triggering _hydrate
-    router2 = MemoryRouter(db_dir=TEST_DIR)
+    # Simulation of restart: reset connections, then reload from SAME tmp_path
+    clear_chroma_clients()
+    router2 = MemoryRouter(db_dir=str(tmp_path))
 
     alice_wm = router2._get_wm("hydrate-alice").get_active_contents()
     bob_wm   = router2._get_wm("hydrate-bob").get_active_contents()

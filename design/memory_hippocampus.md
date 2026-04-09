@@ -1,66 +1,51 @@
-# design/memory_hippocampus.md v1.8
+# design/memory_hippocampus.md v1.9
 
 ## 1. Objective
-Implement the **ClawBrain Hippocampus** storage engine from scratch. This engine handles lossless persistence of interaction traces, streaming offload of large payloads to disk, and full-text search via SQLite FTS5. It also enforces byte-level integrity audit. Core improvement: dynamic offload threshold based on model context window.
+Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This engine handles lossless persistence of interaction traces, streaming offload of large payloads to disk, and **semantic vector search** via an embedded ChromaDB instance. It also enforces byte-level integrity audit and session-isolated retrieval.
 
 ## 2. Architecture & Implementation Details
 
 ### 2.1 Storage Directory & Initialisation
 - Default directory: `db_dir`, with a `blobs/` subdirectory for oversized files.
-- Database file: `db_dir/hippocampus.db`.
-- **SQLite table schema**:
-  - `traces`: `trace_id` (TEXT PK), `timestamp` (REAL), `model` (TEXT), `is_blob` (INTEGER), `blob_path` (TEXT), `raw_content` (TEXT), `checksum` (TEXT), `context_id` (TEXT DEFAULT 'default').
-  - `search_idx`: FTS5 virtual table with `trace_id` (UNINDEXED), `context_id` (UNINDEXED), and `content`.
-  - `wm_state`: `session_id` (TEXT), `trace_id` (TEXT), `content` (TEXT), `activation` (REAL), `timestamp` (REAL), PRIMARY KEY `(session_id, trace_id)`.
+- **ChromaDB persistence**: `db_dir/chroma/`.
+- **Collections**:
+  - `traces`: Stores episodic archive. Documents are the `search_text` (intent) or `raw_content`. Metadata includes `timestamp`, `model`, `is_blob`, `blob_path`, `checksum`, and `context_id`.
+  - `wm_state`: Stores L1 working memory snapshot persistence.
 
 ### 2.2 Dynamic Tiered Storage (save_trace)
 - **Method signature**: `save_trace(trace_id, payload, search_text="", threshold=None, context_id="default")`
 - Serialise `payload` to JSON, compute byte length.
-- **SHA-256 checksum (Bug 7 fix)**: Compute the SHA-256 hash of the raw UTF-8 bytes (hex string format).
-- **Dynamic threshold**: If the caller provides `threshold` (in bytes), use it; otherwise fall back to 512 KB.
-- **Timestamp (Bug 5 fix)**: Record the real wall-clock time via `time.time()` at insertion.
+- **SHA-256 checksum**: Compute the SHA-256 hash of the raw UTF-8 bytes.
 - **Offload logic**:
-  - If `len > threshold`: write JSON to `blobs/{trace_id}.json`; set `is_blob=1`, `blob_path=<absolute path>`, `raw_content=""`.
-  - If `len <= threshold`: set `is_blob=0`, `blob_path=""`, `raw_content=<JSON string>`.
-- Store `checksum` and `context_id` in the `traces` row.
-- If `search_text` is non-empty, insert into `search_idx`.
-- **Return contract**: `{"trace_id": str, "is_blob": bool, "blob_path": str, "size": int, "checksum": str}`
+  - If `len > threshold`: write JSON to `blobs/{trace_id}.json`; set `is_blob=1`.
+  - If `len <= threshold`: set `is_blob=0`.
+- **ChromaDB Insert**: `traces_col.add(ids=[trace_id], documents=[search_text or raw_content], metadatas=[{...}])`.
 
-### 2.3 Two-Level Full-Text Search (P15)
-- **Background**: Exact-phrase matching (quoting the entire query) has very low recall against natural-language input.
+### 2.3 Semantic Vector Search (Phase 33)
+- **Background**: Replaces legacy SQLite FTS5 with semantic recall.
 - **Method signature**: `search(query: str, context_id: str = "default") -> List[str]`
-- **Level 1 (exact phrase + session filter)**:
-  `SELECT trace_id FROM search_idx WHERE content MATCH '"<full query>"' AND context_id = ?`
-  Return immediately if results exist.
-- **Level 2 (keyword AND + session filter)**:
-  Split query on whitespace; discard tokens with length ≤ 2 or containing FTS5 special characters (`"*^()[]{}`); quote remaining tokens; join as `"word1" "word2" ...` (FTS5 AND semantics); limit to 5 tokens.
-  `SELECT trace_id FROM search_idx WHERE content MATCH ? AND context_id = ?`
-- Both levels catch `OperationalError` and return `[]` on failure.
+- **Implementation**:
+  `traces_col.query(query_texts=[query], n_results=10, where={"context_id": context_id})`
+- Returns a list of `trace_id`s (from `results["ids"][0]`).
 
 ### 2.4 Data Retrieval Interfaces
-- **`get_content(trace_id: str) -> Optional[str]`**: If `is_blob`, read from the physical path; otherwise return `raw_content`.
-- **`get_recent_traces(limit: int, context_id: str = None) -> List[Dict]`**: `SELECT * FROM traces ORDER BY timestamp DESC LIMIT ?`, optionally filtered by `WHERE context_id = ?`.
-- **`get_all_session_ids() -> List[str]`**: `SELECT DISTINCT context_id FROM traces WHERE context_id IS NOT NULL` — used by `_hydrate`.
+- **`get_content(trace_id: str) -> Optional[str]`**: Retrieve from ChromaDB document or blob file.
+- **`get_recent_traces(limit: int, context_id: str = None) -> List[Dict]`**: Retrieve from ChromaDB, filtered by `context_id`, and sorted by `timestamp` in Python.
+- **`get_all_session_ids() -> List[str]`**: Scans ChromaDB metadatas for unique `context_id` values.
 
 ### 2.5 Session Isolation (P18)
-- **Background**: Without a `context_id` column, cross-session queries contaminate each other.
-- **Schema migration**: `ALTER TABLE traces ADD COLUMN context_id TEXT DEFAULT 'default'` (ignore `OperationalError` if already present). For `search_idx`, detect the missing column by probing with a `SELECT context_id`; if it raises `OperationalError`, drop and recreate the table.
-- All read/write paths carry `context_id` — see §2.2 and §2.3.
+- Strict isolation enforced via ChromaDB's `where={"context_id": context_id}` filter on all query/get operations.
 
 ### 2.6 TTL Auto-Cleanup & Dirty Data Purge (P20)
-- **Background**: The early `timestamp=0.0` bug left large numbers of invalid records; long-running production DBs grow unbounded.
-- **Cleanup strategy** (executed automatically at end of `_init_db`):
-  1. **Dirty data**: `DELETE FROM traces WHERE timestamp = 0.0`; sync-delete matching `search_idx` rows.
-  2. **TTL expiry**: Read `CLAWBRAIN_TRACE_TTL_DAYS` (default 30; `0` = disabled). `DELETE FROM traces WHERE timestamp > 0 AND timestamp < now - ttl_seconds`; sync-delete `search_idx` rows and blob files.
-  3. **Orphan blob cleanup**: Scan `blobs/` for `.json` files with no corresponding `blob_path` in `traces`; delete them.
-- **Log point**: After cleanup, emit `[HP_CLEAN] Purged dirty=N expired=N orphan_blobs=N`.
+- **Cleanup strategy**:
+  1. **Dirty data**: `traces_col.delete(where={"timestamp": 0.0})`.
+  2. **TTL expiry**: `traces_col.delete(where={"timestamp": {"$lt": cutoff}})`. Sync-delete blob files.
+  3. **Orphan blob cleanup**: Scan `blobs/` for files not referenced in ChromaDB metadata.
 
 ### 2.7 Working Memory Snapshot Persistence (P22)
-- **Background**: `_hydrate` reconstructed WM from `traces`, losing exact `activation` values and original `timestamps`, causing attention state to reset on every restart.
-- **Methods**:
-  - `save_wm_state(session_id, items)`: `DELETE FROM wm_state WHERE session_id = ?` then `INSERT` all current WM items.
-  - `load_wm_state(session_id) -> List[dict]`: Returns `(trace_id, content, activation, timestamp)` ordered by `timestamp ASC`.
-  - `clear_wm_state(session_id)`: `DELETE FROM wm_state WHERE session_id = ?` (called by management API DELETE).
+- **Collection**: `wm_state`.
+- **Methods**: `save_wm_state`, `load_wm_state`, `clear_wm_state`.
+- Items are sorted by `timestamp` in Python after retrieval.
 
 ## 3. Test Specification (High-Fidelity TDD)
 

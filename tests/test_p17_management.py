@@ -5,9 +5,7 @@ import shutil
 import asyncio
 from fastapi.testclient import TestClient
 from src.main import app
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEST_DB_DIR = os.path.join(PROJECT_ROOT, "tests/data/p17_tmp")
+from src.memory.storage import clear_chroma_clients
 
 def visual_audit(test_name, description, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
@@ -21,11 +19,13 @@ def visual_audit(test_name, description, expected, actual):
     print(f"MATCH: {match}")
     print("=" * 70)
 
-def test_p17_get_memory_state_structure():
+def test_p17_get_memory_state_structure(tmp_path):
     """GET /v1/memory/{session_id} returns a complete structure"""
-    if os.path.exists(TEST_DB_DIR): shutil.rmtree(TEST_DB_DIR)
-    os.environ["CLAWBRAIN_DB_DIR"] = TEST_DB_DIR
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
 
+    # Note: TestClient with app might share state if not careful. 
+    # But since we use tmp_path, new router will be created if app restarts or we force it.
     with TestClient(app) as client:
         response = client.get("/v1/memory/test_session")
         data = response.json()
@@ -53,10 +53,10 @@ def test_p17_get_memory_state_structure():
         assert "working_memory_count" in data
         assert isinstance(data["working_memory_preview"], list)
 
-def test_p17_delete_clears_summary():
+def test_p17_delete_clears_summary(tmp_path):
     """DELETE /v1/memory/{session_id} clears Neocortex summary"""
-    if os.path.exists(TEST_DB_DIR): shutil.rmtree(TEST_DB_DIR)
-    os.environ["CLAWBRAIN_DB_DIR"] = TEST_DB_DIR
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
 
     with TestClient(app) as client:
         # Save summary first
@@ -78,10 +78,10 @@ def test_p17_delete_clears_summary():
         visual_audit("DELETE: After", "Summary should be null after delete", None, after["neocortex_summary"])
         assert after["neocortex_summary"] is None
 
-def test_p17_manual_distill_trigger():
+def test_p17_manual_distill_trigger(tmp_path):
     """POST /v1/memory/{session_id}/distill immediately returns triggered status"""
-    if os.path.exists(TEST_DB_DIR): shutil.rmtree(TEST_DB_DIR)
-    os.environ["CLAWBRAIN_DB_DIR"] = TEST_DB_DIR
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
 
     with TestClient(app) as client:
         response = client.post("/v1/memory/distill_session/distill")

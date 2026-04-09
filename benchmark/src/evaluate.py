@@ -56,7 +56,14 @@ def _pattern_recall(text: str, patterns: list[str]) -> float:
     if not patterns:
         return 1.0
     text_lower = text.lower()
-    found = sum(1 for p in patterns if p.lower() in text_lower)
+    found = 0
+    for p in patterns:
+        p_lower = p.lower()
+        if p_lower in text_lower:
+            found += 1
+        else:
+            print(f"DEBUG_RECALL_FAIL: '{p_lower}' NOT FOUND in text (len {len(text)})")
+            # print(f"DEBUG_TEXT_BLOB: {text_lower}")
     return found / len(patterns)
 
 

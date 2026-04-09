@@ -42,11 +42,11 @@ def load_generated(dim: str | None = None) -> list[dict]:
     return cases
 
 
-def save_results(tag: str, scores: list, tier: int) -> Path:
+def save_results(tag: str, items: list, tier: int) -> Path:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = RESULTS_DIR / f"{ts}_{tag}_tier{tier}.jsonl"
     with open(path, "w") as f:
-        for s in scores:
+        for s in items:
             f.write(json.dumps(asdict(s)) + "\n")
     return path
 
@@ -101,24 +101,37 @@ def cmd_run(args: argparse.Namespace) -> None:
         print(f"\n{'='*60}")
         print("  TIER 1 — Direct API (no LLM)")
         print(f"{'='*60}")
+        print(f"DEBUG_PATH: {sys.path}")
+        import runner_direct
+        print(f"DEBUG_IMPORT: {runner_direct.__file__}")
+        from evaluate import score_case
+        import httpx
+        import asyncio
+        
+        async def run_raw():
+            results = []
+            for i, c in enumerate(cases):
+                print(f"DEBUG: Starting case {i+1}/{len(cases)}: {c['test_id']}")
+                if c['conversation']:
+                    print(f"DEBUG: Turn 1 keys: {list(c['conversation'][0].keys())}")
+                    # Check last turn for recall query
+                    print(f"DEBUG: Last turn keys: {list(c['conversation'][-1].keys())} | is_recall: {c['conversation'][-1].get('is_recall_query')}")
+                async with httpx.AsyncClient() as client:
+                    res = await runner_direct.run_case(client, c)
+                print(f"INTERNAL_DEBUG: {c['test_id']} res.addition_on len: {len(res.addition_on)} | Error: '{res.error}'")
+                results.append(res)
+            return results
 
-        if not check_server():
-            print("ERROR: ClawBrain server not reachable at "
-                  f"{__import__('os').getenv('CLAWBRAIN_URL','http://localhost:11435')}")
-            print("  Start it with: docker compose up -d  or  "
-                  "PYTHONPATH=. uvicorn src.main:app --port 11435")
-            if tier == "1":
-                sys.exit(1)
-        else:
-            import runner_direct
-            t0 = time.monotonic()
-            scores_t1 = runner_direct.run(cases, concurrency=4)
-            elapsed = time.monotonic() - t0
+        t0 = time.monotonic()
+        loop = asyncio.get_event_loop()
+        raw_results = loop.run_until_complete(run_raw())
+        scores_t1 = [score_case(r) for r in raw_results]
+        elapsed = time.monotonic() - t0
 
-            path = save_results("t1", scores_t1, tier=1)
-            summaries = summarize(scores_t1)
-            print(format_report(summaries, tier=1))
-            print(f"\nElapsed: {elapsed:.1f}s | Results: {path}")
+        path = save_results("t1_raw", raw_results, tier=1)
+        summaries = summarize(scores_t1)
+        print(format_report(summaries, tier=1))
+        print(f"\nElapsed: {elapsed:.1f}s | Results: {path}")
 
     # ── Tier 2 ────────────────────────────────────────────────────────────────
     if tier in ("2", "all"):

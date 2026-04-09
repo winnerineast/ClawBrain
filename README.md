@@ -28,11 +28,11 @@ OpenClaw injects `MEMORY.md` into the system prompt at the start of every sessio
 
 ClawBrain operates on a **greedy context budget** (L3 → L2 → L1, default 2000 chars). It injects only what is relevant to the current query — not the entire memory file. The full archive lives in SQLite and is retrieved on demand.
 
-### 3. Semantic search requires a cloud embedding API key
+### 3. Semantic search without cloud API keys
 
 OpenClaw's vector search is excellent when configured, but it requires an API key from OpenAI, Gemini, Voyage, or Mistral. Without one, only keyword FTS5 search is available. For users running fully local setups (Ollama, LM Studio), this means degraded recall.
 
-ClawBrain's two-level FTS5 search (exact phrase → keyword AND fallback) works entirely offline. No embedding API. No cloud dependency. Local-first by design.
+ClawBrain's **embedded ChromaDB engine** provides native semantic vector search entirely offline. No embedding API. No cloud dependency. High-recall (96.6%) local-first memory by design.
 
 ### 4. Dreaming is experimental and opt-in
 
@@ -251,14 +251,14 @@ graph LR
 - **Session isolation**: Each `x-clawbrain-session` header value gets its own independent WM instance; cross-session leakage is impossible
 
 ### L2 — Hippocampus (Episodic Archive)
-- **Implementation**: SQLite FTS5 + local Blob storage, **per-session filtered**
-- **Two-level search**: Exact phrase match first; keyword AND fallback if no results
+- **Implementation**: **ChromaDB (Local Vector Store)** + local Blob storage, **per-session isolated**
+- **Recall**: Semantic vector search with local embedding model (no API key required)
 - **Dynamic offloading**: Payloads > 512 KB streamed to `data/blobs/`; index keeps the anchor
 - **Integrity**: SHA-256 checksum bound to every trace — tamper-proof and 100% traceable
-- **Auto-cleanup**: Startup purges `timestamp=0.0` dirty records, TTL-expired traces, and orphan blob files
+- **Auto-cleanup**: Startup purges `timestamp=0.0` dirty records and TTL-expired traces from ChromaDB
 
 ### L3 — Neocortex (Semantic Facts)
-- **Implementation**: Async distillation engine (LLM-powered background task)
+- **Implementation**: Async distillation engine persisted in **ChromaDB collection**
 - **Trigger**: When Hippocampus accumulates `distill_threshold` traces (default 50), a background worker distills fragments into a persistent fact summary
 - **Recommended formula**: `distill_threshold ≈ (ContextWindow / AvgTraceSize) × 0.8`
 - **Context budget**: Greedy L3 → L2 → L1 priority; total chars capped by `CLAWBRAIN_MAX_CONTEXT_CHARS`

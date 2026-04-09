@@ -1,9 +1,11 @@
 # Generated from design/gateway.md v1.18
 import pytest
 import respx
+import os
 from httpx import Response
 from fastapi.testclient import TestClient
 from src.main import app
+from src.memory.storage import clear_chroma_clients
 
 def visual_audit(test_name, path, expected, actual):
     match = "YES" if expected == actual else "NO"
@@ -19,7 +21,9 @@ def visual_audit(test_name, path, expected, actual):
     print("=" * 60)
 
 @respx.mock
-def test_ollama_path_routing():
+def test_ollama_path_routing(tmp_path):
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
     # Mock upstream Ollama server
     respx.post("http://127.0.0.1:11434/api/chat").mock(return_value=Response(200, json={"message": {"content": "hi"}}))
     
@@ -28,7 +32,9 @@ def test_ollama_path_routing():
         visual_audit("Ollama Routing", "/api/chat", 200, response.status_code)
         assert response.status_code == 200
 
-def test_openai_path_routing():
+def test_openai_path_routing(tmp_path):
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
     with TestClient(app) as client:
         response = client.post("/v1/chat/completions", json={"model": "gpt-4", "messages": []})
         visual_audit("OpenAI Routing", "/v1/chat/completions", 501, response.status_code)

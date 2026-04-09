@@ -1,10 +1,12 @@
 # Generated from design/memory_neocortex.md v1.2 / design/management_api.md v1.0
 import sqlite3
+import chromadb
 import httpx
 import time
 import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from src.memory.storage import get_chroma_client
 
 class Neocortex:
     def __init__(self, db_dir: str = None, distill_url: str = None, distill_model: str = None, distill_provider: str = None):
@@ -13,9 +15,16 @@ class Neocortex:
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             db_dir = os.path.join(base_dir, "data")
             
-        # §2.1: Ensure storage directory exists to prevent sqlite3 failures
+        # §2.1: Ensure storage directory exists
         self.db_dir = Path(db_dir)
         self.db_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Phase 33: ChromaDB summaries
+        self.chroma_path = self.db_dir / "chroma"
+        self.client = get_chroma_client(self.chroma_path)
+        self.summary_col = self.client.get_or_create_collection(name="summaries")
+        
+        # Legacy DB path for migration period
         self.db_path = self.db_dir / "hippocampus.db"
         
         # §2.1 & ISSUE-004: Dynamic Distillation Config
@@ -28,15 +37,8 @@ class Neocortex:
         self._init_db()
 
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS neocortex_summaries (
-                    context_id TEXT PRIMARY KEY,
-                    summary_text TEXT,
-                    last_updated REAL,
-                    hebbian_weight REAL DEFAULT 1.0
-                )
-            """)
+        """Legacy initialization. Deprecated in favor of ChromaDB."""
+        pass
 
     async def distill(self, context_id: str, traces: List[Dict[str, Any]]) -> str:
         """§2.2: Async distillation logic with universal provider support (ISSUE-004)."""
@@ -110,20 +112,29 @@ class Neocortex:
             return f"[Error] Distillation connection error: {str(e)}"
 
     def _save_summary(self, context_id: str, summary: str):
-        """Internal summary persistence (shared by tests and distill)."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO neocortex_summaries (context_id, summary_text, last_updated) VALUES (?, ?, ?)",
-                (context_id, summary, time.time())
-            )
+        """Phase 33: Summary persistence in ChromaDB."""
+        self.summary_col.upsert(
+            ids=[context_id],
+            documents=[summary],
+            metadatas=[{"last_updated": time.time()}]
+        )
 
     def get_summary(self, context_id: str) -> Optional[str]:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("SELECT summary_text FROM neocortex_summaries WHERE context_id = ?", (context_id,))
-            row = cursor.fetchone()
-            return row[0] if row else None
+        # Phase 33: Fetch from ChromaDB
+        res = self.summary_col.get(ids=[context_id])
+        if res and res["documents"]:
+            return res["documents"][0]
+            
+        # Legacy fallback
+        if os.path.exists(self.db_path):
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.execute("SELECT summary_text FROM neocortex_summaries WHERE context_id = ?", (context_id,))
+                    row = cursor.fetchone()
+                    return row[0] if row else None
+            except Exception: pass
+        return None
 
     def clear_summary(self, context_id: str):
         """P17 Management API: Clear Neocortex summary for a specific session."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("DELETE FROM neocortex_summaries WHERE context_id = ?", (context_id,))
+        self.summary_col.delete(ids=[context_id])

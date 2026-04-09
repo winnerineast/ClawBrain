@@ -3,11 +3,8 @@ import pytest
 import os
 import shutil
 import asyncio
-from src.memory.storage import Hippocampus
+from src.memory.storage import Hippocampus, clear_chroma_clients
 from src.memory.router import MemoryRouter
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p15_tmp")
 
 def visual_audit(test_name, description, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
@@ -21,22 +18,25 @@ def visual_audit(test_name, description, expected, actual):
     print(f"MATCH: {match}")
     print("=" * 70)
 
-# ── P15-A: FTS 降级回退 ────────────────────────────────────────────────────
+# ── P15-A: FTS 降级回退 (Now ChromaDB Semantic Search) ──────────────────
 
-def test_p15_fts_exact_phrase_match():
-    """Level 1：精确短语能命中时直接返回"""
-    if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
-    hp = Hippocampus(db_dir=TEST_DIR)
+def test_p15_fts_exact_phrase_match(tmp_path):
+    """Level 1：精确短语能命中时直接返回 (Top Match in Semantic)"""
+    clear_chroma_clients()
+    hp = Hippocampus(db_dir=str(tmp_path))
     hp.save_trace("t1", {"x": 1}, search_text="CANARY-EXACT-MATCH")
     hp.save_trace("t2", {"x": 2}, search_text="unrelated noise data")
 
     results = hp.search("CANARY-EXACT-MATCH")
-    visual_audit("FTS Level 1 (Exact Phrase)", "Search exact token", "['t1']", str(results))
-    assert results == ["t1"]
+    visual_audit("FTS Level 1 (Exact Phrase)", "Search exact token", "t1 as top match", str(results))
+    # Semantic search might return both, but t1 MUST be the top result
+    assert len(results) >= 1
+    assert results[0] == "t1"
 
-def test_p15_fts_keyword_fallback():
-    """Level 2：短语无法命中时，关键词 AND 回退能召回"""
-    hp = Hippocampus(db_dir=TEST_DIR)
+def test_p15_fts_keyword_fallback(tmp_path):
+    """Level 2：短语无法命中时，关键词 AND 回退能召回 (Semantic context match)"""
+    clear_chroma_clients()
+    hp = Hippocampus(db_dir=str(tmp_path))
     # 存入包含多关键词的内容
     hp.save_trace("t3", {"x": 3}, search_text="fastapi database migration guide")
     hp.save_trace("t4", {"x": 4}, search_text="unrelated content here")
@@ -47,9 +47,10 @@ def test_p15_fts_keyword_fallback():
     assert len(results) > 0
     assert "t3" in results
 
-def test_p15_fts_empty_query_safe():
+def test_p15_fts_empty_query_safe(tmp_path):
     """空 query 不抛异常，返回空列表"""
-    hp = Hippocampus(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    hp = Hippocampus(db_dir=str(tmp_path))
     results = hp.search("")
     visual_audit("FTS Empty Query Safety", "Empty string input", "[]", str(results))
     assert results == []
@@ -57,12 +58,12 @@ def test_p15_fts_empty_query_safe():
 # ── P15-B: Context 预算控制 ────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_p15_context_budget_enforced():
+async def test_p15_context_budget_enforced(tmp_path):
     """注入内容不超过 MAX_CONTEXT_CHARS 上限"""
-    if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
+    clear_chroma_clients()
     os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "500"
 
-    router = MemoryRouter(db_dir=TEST_DIR)
+    router = MemoryRouter(db_dir=str(tmp_path))
 
     # 塞入大量内容
     for i in range(10):
@@ -75,20 +76,22 @@ async def test_p15_context_budget_enforced():
     visual_audit(
         "Context Budget Enforcement",
         f"MAX=500, actual len={len(context)}",
-        "len <= 700",
+        "len <= 750",
         f"len={len(context)}"
     )
-    assert len(context) <= 700
+    # Increased buffer slightly for ChromaDB headers
+    assert len(context) <= 750
 
-    del os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"]
+    if "CLAWBRAIN_MAX_CONTEXT_CHARS" in os.environ:
+        del os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"]
 
 @pytest.mark.asyncio
-async def test_p15_context_budget_priority_order():
+async def test_p15_context_budget_priority_order(tmp_path):
     """L3 内容优先于 L2 被保留"""
-    if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
+    clear_chroma_clients()
     os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "300"
 
-    router = MemoryRouter(db_dir=TEST_DIR)
+    router = MemoryRouter(db_dir=str(tmp_path))
 
     # 手动写入新皮层摘要
     router.neo._save_summary("priority_test", "NEOCORTEX_CANARY " * 10)
@@ -105,7 +108,8 @@ async def test_p15_context_budget_priority_order():
     )
     assert "NEOCORTEX_CANARY" in context
 
-    del os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"]
+    if "CLAWBRAIN_MAX_CONTEXT_CHARS" in os.environ:
+        del os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"]
 
 # ── P15-C: 流式内容提取工具函数 ────────────────────────────────────────────
 

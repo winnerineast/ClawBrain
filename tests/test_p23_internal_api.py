@@ -195,7 +195,10 @@ def test_p23_after_turn_persists_wm_snapshot(isolate_db):
             "content": "After-turn persistence test canary ZETA-99.",
         })
 
-        resp = client.post("/internal/after-turn", json={"session_id": "turn-session"})
+        resp = client.post("/internal/after-turn", json={
+            "session_id": "turn-session",
+            "new_messages": [{"role": "user", "content": "hello"}]
+        })
 
     assert resp.status_code == 200
     data = resp.json()
@@ -212,7 +215,10 @@ def test_p23_after_turn_wm_in_db(isolate_db):
             "role": "user",
             "content": "Snapshot verification canary OMEGA-42.",
         })
-        client.post("/internal/after-turn", json={"session_id": "snap-session"})
+        client.post("/internal/after-turn", json={
+            "session_id": "snap-session",
+            "new_messages": [{"role": "user", "content": "hello"}]
+        })
 
         # Query management API to confirm WM is live
         state = client.get("/v1/memory/snap-session").json()
@@ -249,7 +255,10 @@ def test_p23_full_hook_sequence(isolate_db):
         addition = r_assemble.json()["system_prompt_addition"]
 
         # 3. after-turn (model run completed)
-        r_after = client.post("/internal/after-turn", json={"session_id": "full-session"})
+        r_after = client.post("/internal/after-turn", json={
+            "session_id": "full-session",
+            "new_messages": [{"role": "user", "content": "hello"}]
+        })
 
     visual_audit("Full sequence: assemble has content",
                  "addition must be non-empty after ingest",

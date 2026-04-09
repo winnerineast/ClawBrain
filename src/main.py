@@ -98,209 +98,85 @@ def prepare_upstream_headers(raw_headers: Dict[str, str], provider_config: Any, 
             
     return upstream_headers
 
-async def _process_request(request: Request):
-    client: httpx.AsyncClient = request.app.state.http_client
-    registry: ProviderRegistry = request.app.state.registry
-    scout: ModelScout = request.app.state.scout
-    memory_router: MemoryRouter = request.app.state.memory_router
-    pipeline: Pipeline = request.app.state.pipeline
-
-    try:
-        raw_body = await request.json()
-    except:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-    # 1. Protocol Detection
-    source_protocol, std_req = ProtocolDetector.detect_and_standardize(raw_body)
-    context_id = request.headers.get("x-clawbrain-session", "default")
-    
-    # 2. Provider Resolution
-    provider_name, provider_config = registry.resolve_provider(std_req.model)
-    if not provider_config:
-        logger.warning(f"[ROUTER] 501 Block: {std_req.model}")
-        raise HTTPException(status_code=501, detail=f"Route for '{std_req.model}' is not configured.")
-
-    target_protocol = provider_config.protocol
-    
-    # P27: Apply Security Filtering
-    pass_headers = prepare_upstream_headers(dict(request.headers), provider_config, target_protocol)
-    logger.info(f"[ADAPTER] Target: {provider_name} | Dialect: {target_protocol} | Headers Sanitized")
-
-    # 3. Model Gating & Neural Augmentation
-    tier = await scout.get_model_tier(std_req.model)
-    if provider_name != "ollama": tier = ModelTier.TIER_1
-
-    # P28: Tier-based Capability Gating
-    if tier == ModelTier.TIER_3 and std_req.tools:
-        logger.warning(f"[GATE] TIER_3 model '{std_req.model}' blocked for tool calling.")
-        raise HTTPException(status_code=422, detail="TIER_3 models do not support tool calling in this relay.")
-
-    last_msg_content = std_req.messages[-1].content if std_req.messages else ""
-    intent = pipeline.compressor.compress(last_msg_content)
-    enriched_context = await memory_router.get_combined_context(context_id, intent)
-    prominent_context = f"\n[IMPORTANT: PRIORITIZE THESE FACTS]\n{enriched_context}\n"
-    std_req.messages.insert(0, Message(role="system", content=prominent_context))
-    std_req = pipeline.run(std_req, tier)
-
-    # 4. Dialect Translation
-    if target_protocol == "ollama":
-        target_payload = DialectTranslator.to_ollama(std_req)
-        endpoint = f"{provider_config.base_url}/api/chat"
-    elif target_protocol == "google":
-        target_payload = DialectTranslator.to_google(std_req)
-        model_id = std_req.model.split("/", 1)[1] if "/" in std_req.model else std_req.model
-        endpoint = f"{provider_config.base_url}/v1beta/models/{model_id}:generateContent"
-    elif target_protocol == "anthropic":
-        target_payload = DialectTranslator.to_anthropic(std_req)
-        endpoint = f"{provider_config.base_url}/v1/messages"
-    else:
-        target_payload = DialectTranslator.to_openai(std_req)
-        endpoint = f"{provider_config.base_url}/v1/chat/completions"
-
-    # 5. Forwarding
-    try:
-        if std_req.stream:
-            async def stream_generator():
-                async with client.stream("POST", endpoint, json=target_payload, headers=pass_headers) as resp:
-                    async for chunk in resp.aiter_bytes():
-                        yield chunk
-                # Fallback ingestion for Relay Mode
-                await memory_router.ingest(raw_body, {"message": {"content": "[Streamed]"}}, context_id=context_id)
-            return StreamingResponse(stream_generator())
-        else:
-            resp = await client.post(endpoint, json=target_payload, headers=pass_headers)
-            resp_json = resp.json()
-            await memory_router.ingest(raw_body, resp_json, context_id=context_id)
-            return resp_json
-    except Exception as e:
-        logger.error(f"Forwarding error: {e}")
-        raise HTTPException(status_code=502, detail=str(e))
-
-@app.post("/api/chat")
-async def handle_ollama(request: Request): return await _process_request(request)
-
-@app.post("/v1/chat/completions")
-async def handle_openai(request: Request): return await _process_request(request)
-
 @app.get("/health")
-async def health(): return {"status": "ok", "mode": "Universal Neural Relay", "version": "1.42"}
-
-# ── P23 Context Engine Internal API (v1.1) ──────────────────────────────────
-
-class IngestRequest(BaseModel):
-    session_id: str
-    role: str
-    content: str
-    is_heartbeat: bool = False
-
-class AfterTurnRequest(BaseModel):
-    session_id: str
-    new_messages: Optional[List[Dict[str, Any]]] = None
-
-class AssembleRequest(BaseModel):
-    session_id: str
-    current_focus: Optional[str] = ""
-    token_budget: Optional[int] = 4096
-
-class CompactRequest(BaseModel):
-    session_id: str
-    force: Optional[bool] = False
-
-@app.get("/v1/memory/{session_id}")
-async def get_memory_state(session_id: str, request: Request):
-    """P17: Inspect memory state."""
-    mr: MemoryRouter = request.app.state.memory_router
-    summary = mr.neo.get_summary(session_id)
-    wm = mr._get_wm(session_id)
+async def health_check():
     return {
-        "session_id": session_id,
-        "neocortex_summary": summary,
-        "working_memory_count": len(wm.items),
-        "working_memory_preview": [item.content for item in wm.items[-5:]]
+        "status": "ok",
+        "version": "1.42",
+        "engine": "ClawBrain Universal Relay (ChromaDB Enhanced)"
     }
 
-@app.delete("/v1/memory/{session_id}")
-async def delete_memory_state(session_id: str, request: Request):
-    """P17: Clear memory state."""
-    mr: MemoryRouter = request.app.state.memory_router
-    mr.neo.clear_summary(session_id)
-    mr.hippo.clear_wm_state(session_id)
-    # Also clear in-memory WM cache
-    if session_id in mr._wm_sessions:
-        del mr._wm_sessions[session_id]
-    return {"status": "cleared", "session_id": session_id}
-
-@app.post("/v1/memory/{session_id}/distill")
-async def manual_distill(session_id: str, request: Request):
-    """P17: Trigger manual distillation."""
-    mr: MemoryRouter = request.app.state.memory_router
-    asyncio.create_task(mr._auto_distill_worker(session_id))
-    return {"status": "distillation_triggered", "session_id": session_id}
+# ── INTERNAL ENDPOINTS (Must be before catch-all) ──
 
 @app.post("/internal/ingest")
-async def internal_ingest(body: IngestRequest, request: Request):
-    """3.1: Individual ingestion (legacy/heartbeat support)."""
-    mr: MemoryRouter = request.app.state.memory_router
-    if body.is_heartbeat: return {"trace_id": None, "ingested": False}
-    payload = {"messages": [{"role": body.role, "content": body.content}]}
-    trace_id = await mr.ingest(payload, context_id=body.session_id)
+async def internal_ingest(request: Request):
+    body = await request.json()
+    session_id = body.get("session_id", "default")
+    role = body.get("role", "user")
+    content = body.get("content", "")
+    sync = body.get("sync", False)
+    is_heartbeat = body.get("is_heartbeat", False)
+    
+    if is_heartbeat:
+        return {"trace_id": None, "ingested": False}
+        
+    mr = request.app.state.memory_router
+    
+    # Reconstruct Trace
+    stimulus = {"messages": [{"role": role, "content": content}]}
+    trace_id = await mr. ingest(stimulus, context_id=session_id, sync_distill=sync)
+    
     return {"trace_id": trace_id, "ingested": True}
 
 @app.post("/internal/assemble")
 async def internal_assemble(request: Request):
-    """3.2: Context Assembly (Pre-model run)."""
-    raw = await request.json()
-    session_id = raw.get("session_id")
-    focus = raw.get("current_focus") or ""
-    mr: MemoryRouter = request.app.state.memory_router
-    context = await mr.get_combined_context(session_id, focus)
-    addition = f"[CLAWBRAIN MEMORY]\n{context}\n[END CLAWBRAIN MEMORY]" if context.strip() else ""
-    return {"system_prompt_addition": addition, "chars_used": len(addition)}
+    body = await request.json()
+    session_id = body.get("session_id", "default")
+    current_focus = body.get("current_focus", "")
+    token_budget = body.get("token_budget", 2000)
+    
+    mr = request.app.state.memory_router
+    
+    context = await mr.get_combined_context(session_id, current_focus, max_chars=token_budget)
+    
+    return {
+        "system_prompt_addition": context,
+        "chars_used": len(context),
+        "budget_chars": token_budget
+    }
 
 @app.post("/internal/compact")
 async def internal_compact(request: Request):
-    """3.3: Manual Compaction / Distillation (Blocking)."""
-    raw = await request.json()
-    session_id = raw.get("session_id")
-    mr: MemoryRouter = request.app.state.memory_router
+    """P23: Management - Manually trigger distillation and WM pruning."""
+    body = await request.json()
+    session_id = body.get("session_id", "default")
+    force = body.get("force", False)
     
-    # 1. Distillation (L3)
-    rows = mr.hippo.get_recent_traces(limit=mr.distill_threshold, context_id=session_id)
-    traces = []
-    for row in rows:
-        raw_c = row.get("raw_content") or mr.hippo.get_content(row["trace_id"])
-        if raw_c:
-            try: traces.append(json.loads(raw_c))
-            except: pass
-    if traces:
-        # Phase 29: Await distillation to ensure completion for benchmarks
-        await mr.neo.distill(session_id, traces)
-        logger.info(f"[INT_COMPACT] Distillation complete for session={session_id}")
-
-    # 2. Working Memory Pruning (L1)
+    mr = request.app.state.memory_router
+    
+    # Prune WM logic (simplified for compact)
     keep_recent = int(os.getenv("CLAWBRAIN_WM_COMPACT_KEEP_RECENT", "5"))
     wm = mr._get_wm(session_id)
-    if len(wm.items) > keep_recent:
-        wm.items = wm.items[-keep_recent:]
-        mr.hippo.save_wm_state(session_id, wm.items)
-        logger.info(f"[INT_COMPACT] WM pruned to {keep_recent} items for session={session_id}")
+    if len(wm.items) > keep_recent or force:
+        asyncio.create_task(mr._auto_distill_worker(session_id))
+        # Keep recent items
+        wm.items = wm.items[-keep_recent:] if len(wm.items) > keep_recent else wm.items
+        return {"ok": True, "compacted": True, "session_id": session_id}
+        
+    return {"ok": True, "compacted": False, "session_id": session_id}
 
-    return {"ok": True, "compacted": True}
+class AfterTurnBody(BaseModel):
+    session_id: str
+    new_messages: List[Dict[str, Any]]
+    sync: bool = False
 
 @app.post("/internal/after-turn")
-async def internal_after_turn(body: AfterTurnRequest, request: Request):
-    """
-    3.4: Turn Settlement Center (v1.1) - Primary Ingestion Point for Issue #001.
-    """
-    mr: MemoryRouter = request.app.state.memory_router
+async def internal_after_turn(request: Request, body: AfterTurnBody):
+    """P25: OpenClaw Loopback - Update L1 WM and L2 Archive after a full turn completes."""
     session_id = body.session_id
     new_msgs = body.new_messages
+    mr = request.app.state.memory_router
     
-    if not new_msgs:
-        # Mandatory audit log for empty turns
-        logger.error(f"[INT_AFTER_TURN] Error: No new messages received for turn session={session_id}")
-        return {"ok": True, "ingested_count": 0}
-
     # 1. Batch Ingestion: Pair User stimulus with Assistant reaction
     user_msg = next((m for m in reversed(new_msgs) if m.get("role") == "user"), None)
     assistant_msg = next((m for m in reversed(new_msgs) if m.get("role") == "assistant"), None)
@@ -309,17 +185,132 @@ async def internal_after_turn(body: AfterTurnRequest, request: Request):
         # Reconstruct Trace
         stimulus = {"messages": [user_msg]}
         reaction = {"message": assistant_msg} if assistant_msg else None
-        trace_id = await mr.ingest(stimulus, reaction=reaction, context_id=session_id)
+        trace_id = await mr.ingest(stimulus, reaction=reaction, context_id=session_id, sync_distill=body.sync)
         logger.info(f"[INT_AFTER_TURN] Ingested Turn Trace | session={session_id} trace={trace_id}")
 
     # 2. State Solidification
     wm = mr._get_wm(session_id)
     mr.hippo.save_wm_state(session_id, wm.items)
     
-    # 3. Distillation Counter
-    mr._trace_counter += 1
-    if mr._trace_counter >= mr.distill_threshold:
+    # 3. Distillation Counter (P18: Per-session isolated counter)
+    if session_id not in mr._trace_counters:
+        mr._trace_counters[session_id] = 0
+        
+    mr._trace_counters[session_id] += 1
+    if mr._trace_counters[session_id] >= mr.distill_threshold:
         asyncio.create_task(mr._auto_distill_worker(session_id))
-        mr._trace_counter = 0
+        mr._trace_counters[session_id] = 0
         
     return {"ok": True, "ingested_count": len(new_msgs)}
+
+# ── MANAGEMENT API (Must be before catch-all) ──
+
+@app.get("/v1/memory/{session_id}")
+async def get_memory_state(session_id: str, request: Request):
+    mr = request.app.state.memory_router
+    wm = mr._get_wm(session_id)
+    summary = mr.neo.get_summary(session_id)
+    
+    return {
+        "session_id": session_id,
+        "neocortex_summary": summary,
+        "working_memory_count": len(wm.items),
+        "working_memory_preview": wm.get_active_contents()
+    }
+
+@app.delete("/v1/memory/{session_id}")
+async def clear_memory_session(session_id: str, request: Request):
+    mr = request.app.state.memory_router
+    mr.hippo.clear_wm_state(session_id)
+    mr.neo.clear_summary(session_id)
+    if session_id in mr._wm_sessions:
+        del mr._wm_sessions[session_id]
+    return {"status": "cleared", "session_id": session_id}
+
+@app.post("/v1/memory/{session_id}/distill")
+async def trigger_manual_distill(session_id: str, request: Request):
+    mr = request.app.state.memory_router
+    asyncio.create_task(mr._auto_distill_worker(session_id))
+    return {"status": "distillation_triggered", "session_id": session_id}
+
+# ── CATCH-ALL GATEWAY RELAY ──
+
+@app.post("/{path:path}")
+async def gateway_relay(path: str, request: Request):
+    mr = request.app.state.memory_router
+    registry = request.app.state.registry
+    pipeline = request.app.state.pipeline
+    http_client = request.app.state.http_client
+    
+    # 1. Detect Input Protocol & Session
+    body = await request.json()
+    headers = dict(request.headers)
+    session_id = headers.get("x-clawbrain-session", "default")
+    logger.info(f"[GATEWAY] Incoming request | session={session_id} path={path}")
+    
+    input_protocol = ProtocolDetector.detect(path, body)
+    
+    # 2. Model-based Routing Security (P16 + Bug 11)
+    full_model_name = body.get("model", "")
+    
+    # §2.4 Qualification Interception (Phase 24/25)
+    # TIER_3 models do not support tools/function calling yet in ClawBrain.
+    scout = request.app.state.scout
+    tier = await scout.get_model_tier(full_model_name)
+    if tier == ModelTier.TIER_3 and body.get("tools"):
+        logger.warning(f"[GATEWAY] Blocked TIER_3 model {full_model_name} with tools.")
+        raise HTTPException(status_code=422, detail="ClawBrain currently does not support tool calling for TIER_3 models.")
+
+    provider_name, provider_config = registry.resolve_provider(full_model_name)
+    
+    if not provider_config:
+        # P12: Strict OpenAI routing security - block unauthorized models
+        if input_protocol == "openai":
+             logger.warning(f"[GATEWAY] Blocked unauthorized OpenAI model: {full_model_name}")
+             raise HTTPException(status_code=501, detail=f"Model {full_model_name} is not authorized for OpenAI relay.")
+             
+        # Fallback to path-based default if no model match (for local test setups)
+        provider_config = registry.get_provider(input_protocol)
+        target_protocol = provider_config.protocol
+    else:
+        target_protocol = provider_config.protocol
+        # Apply prefix stripping if needed (Standard for ClawBrain routing)
+        if "/" in full_model_name and provider_name in full_model_name:
+             body["model"] = full_model_name.split("/", 1)[1]
+
+    # 3. Context Injection (Phase 32 Sequential Gate)
+    user_query = DialectTranslator.extract_query(input_protocol, body)
+    context_budget = int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", "2000"))
+    
+    enriched_context = await mr.get_combined_context(session_id, user_query, max_chars=context_budget)
+    
+    # Apply Dialect Injection
+    body = DialectTranslator.inject_context(input_protocol, body, enriched_context)
+    
+    # 4. Upstream Forwarding
+    upstream_url = f"{provider_config.base_url}/{path.lstrip('/')}"
+    upstream_headers = prepare_upstream_headers(headers, provider_config, target_protocol)
+    
+    # Phase 32: Sequential response handling
+    is_stream = body.get("stream", False)
+    
+    try:
+        if is_stream:
+            return StreamingResponse(
+                pipeline.stream_relay(http_client, upstream_url, body, upstream_headers, session_id, mr),
+                media_type="text/event-stream"
+            )
+        else:
+            resp = await http_client.post(upstream_url, json=body, headers=upstream_headers)
+            resp.raise_for_status()
+            final_json = resp.json()
+            
+            # Post-turn analysis (L1 charge + L2 archive)
+            # Phase 25: We pass the original body (stimulus) to allow archival
+            await pipeline.post_turn_solidification(final_json, input_protocol, session_id, mr, body)
+            
+            return final_json
+            
+    except Exception as e:
+        logger.error(f"Forwarding error: {e}")
+        raise HTTPException(status_code=502, detail=str(e))

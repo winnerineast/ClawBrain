@@ -8,6 +8,21 @@ class ProtocolDetector:
     2.3 准则修正：深度提取 tools, options, stream 等元数据。
     """
     @staticmethod
+    def detect(path: str, payload: Dict[str, Any]) -> str:
+        # 1. Path-based detection (Priority)
+        path_lower = path.lower()
+        if "v1/" in path_lower or "chat/completions" in path_lower:
+            return "openai"
+        if "api/chat" in path_lower or "api/generate" in path_lower:
+            return "ollama"
+            
+        # 2. Payload-based fallback
+        if "options" in payload:
+            return "ollama"
+            
+        return "openai"
+
+    @staticmethod
     def detect_and_standardize(payload: Dict[str, Any]) -> Tuple[str, StandardRequest]:
         # 1. 探测协议
         source_protocol = "ollama" if "options" in payload else "openai"

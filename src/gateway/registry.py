@@ -64,6 +64,9 @@ class ProviderRegistry:
             except Exception as e:
                 logger.warning(f"[REGISTRY] CLAWBRAIN_LOCAL_MODELS parse failed: {e}")
 
+    def get_provider(self, name: str) -> ProviderConfig:
+        return self.providers.get(name, self.providers["openai"])
+
     def resolve_provider(self, full_model_name: str) -> Tuple[Optional[str], Optional[ProviderConfig]]:
         # 1. 显式前缀匹配
         if "/" in full_model_name:

@@ -63,11 +63,9 @@ def test_p7_storage_integrity_audit():
         on_disk_content = f.read()
         on_disk_hash = get_hash(on_disk_content)
     
-    # 3. Read the stored Hash from the database (Persistence verification)
-    db_path = os.path.join(TEST_DATA_DIR, "hippocampus.db")
-    conn = sqlite3.connect(db_path)
-    db_hash = conn.execute("SELECT checksum FROM traces WHERE trace_id='trace-deep-audit'").fetchone()[0]
-    conn.close()
+    # 3. Read the stored Hash from ChromaDB (Persistence verification)
+    chroma_res = hp.traces_col.get(ids=["trace-deep-audit"])
+    db_hash = chroma_res["metadatas"][0]["checksum"]
     
     # High-fidelity audit display (Fixed Visual Bug: Ensure that the comparison is of the hash itself)
     visual_audit_high_fid(
@@ -110,6 +108,6 @@ def test_p7_fts_recall_precision_audit():
         actual_list
     )
     
-    # Precise verification: Must and can only search for target-99
-    assert len(results) == 1
+    # Semantic verification: target-99 MUST be the top result (highest similarity)
+    assert len(results) >= 1
     assert results[0] == "target-99"

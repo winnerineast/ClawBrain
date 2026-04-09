@@ -1,7 +1,14 @@
-# Generated from design/gateway.md v1.8
+# Generated from design/gateway.md v1.8 / Phase 25 / Phase 32
 import re
+import json
+import asyncio
+import logging
+from typing import Dict, Any, AsyncGenerator, List
 from src.models import StandardRequest
 from src.scout import ModelTier
+from src.memory.router import MemoryRouter
+
+logger = logging.getLogger("GATEWAY.PIPELINE")
 
 class WhitespaceCompressor:
     """
@@ -55,3 +62,67 @@ class Pipeline:
                 msg.content = self.compressor.compress(msg.content)
         request = self.enforcer.apply(request, tier)
         return request
+
+    async def post_turn_solidification(self, final_json: Dict[str, Any], protocol: str, session_id: str, mr: MemoryRouter, original_body: Dict[str, Any] = None):
+        """P25: OpenClaw Loopback - Archive the turn after a successful response."""
+        try:
+            # 1. Extract assistant response content based on protocol
+            assistant_content = ""
+            if protocol == "ollama":
+                assistant_content = final_json.get("message", {}).get("content", "")
+            else:
+                choices = final_json.get("choices", [])
+                if choices:
+                    assistant_content = choices[0].get("message", {}).get("content", "")
+
+            if not assistant_content:
+                return
+
+            # 2. Reconstruct reaction object
+            reaction = {"message": {"role": "assistant", "content": assistant_content}}
+
+            # 3. Trigger ingest (L1 charge + L2 archive)
+            # Use original_body as the stimulus
+            if original_body:
+                await mr.ingest(original_body, reaction=reaction, context_id=session_id)
+                logger.info(f"[PIPELINE] Archived turn for session: {session_id}")
+            
+        except Exception as e:
+            logger.error(f"Post-turn solidification failed: {e}")
+
+    async def stream_relay(self, http_client, upstream_url, body, upstream_headers, session_id, mr) -> AsyncGenerator[bytes, None]:
+        """Phase 32: Asynchronous streaming relay with turn capture."""
+        assistant_chunks = []
+        try:
+            async with http_client.stream("POST", upstream_url, json=body, headers=upstream_headers) as resp:
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+                    # Capture assistant content from SSE chunks
+                    # Note: This is a simplified parser for Ollama/OpenAI SSE
+                    try:
+                        text = chunk.decode("utf-8", errors="ignore").strip()
+                        if text.startswith("data:"):
+                            text = text[5:].strip()
+                        if text and text != "[DONE]":
+                            data = json.loads(text)
+                            # Ollama format
+                            if "message" in data:
+                                assistant_chunks.append(data["message"].get("content", ""))
+                            # OpenAI format
+                            elif "choices" in data and data["choices"]:
+                                delta = data["choices"][0].get("delta", {})
+                                assistant_chunks.append(delta.get("content", ""))
+                    except:
+                        pass
+            
+            # After stream ends, archive the full turn
+            assistant_final = "".join(assistant_chunks)
+            if assistant_final:
+                reaction = {"message": {"role": "assistant", "content": assistant_final}}
+                # Note: ingest is async, we fire and forget or await
+                asyncio.create_task(mr.ingest(body, reaction=reaction, context_id=session_id))
+                logger.info(f"[STREAM] Captured and archived turn for session: {session_id}")
+            
+        except Exception as e:
+            logger.error(f"Stream relay failed: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n".encode()

@@ -1,20 +1,9 @@
 # Generated from design/memory_working.md v1.4 / design/memory_router.md v1.11
 import pytest
 import os
-import shutil
 import asyncio
-import sqlite3
-import time
-from src.memory.storage import Hippocampus
+from src.memory.storage import Hippocampus, clear_chroma_clients
 from src.memory.router import MemoryRouter
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p22_tmp")
-
-def setup_function():
-    if os.path.exists(TEST_DIR):
-        shutil.rmtree(TEST_DIR)
-    os.makedirs(TEST_DIR)
 
 def visual_audit(test_name, description, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
@@ -31,32 +20,33 @@ def visual_audit(test_name, description, expected, actual):
 # ── P22-A: wm_state table write verification ─────────────────────────────
 
 @pytest.mark.asyncio
-async def test_p22_wm_state_written_after_ingest():
-    """There should be corresponding records in the wm_state table after ingest"""
-    router = MemoryRouter(db_dir=TEST_DIR)
+async def test_p22_wm_state_written_after_ingest(tmp_path):
+    """There should be corresponding records in ChromaDB wm_col after ingest"""
+    clear_chroma_clients()
+    router = MemoryRouter(db_dir=str(tmp_path))
     await router.ingest(
         {"messages": [{"role": "user", "content": "hello persistence test"}]},
         context_id="session-A"
     )
 
-    with sqlite3.connect(router.hippo.db_path) as conn:
-        rows = conn.execute(
-            "SELECT trace_id, content, activation, timestamp FROM wm_state WHERE session_id='session-A'"
-        ).fetchall()
+    # Check ChromaDB
+    res = router.hippo.wm_col.get(where={"session_id": "session-A"})
+    metas = res["metadatas"]
 
-    visual_audit("wm_state rows after ingest", "should have ≥1 row", True, len(rows) > 0)
+    visual_audit("wm_state rows after ingest", "should have ≥1 row", True, len(metas) > 0)
     visual_audit("wm_state activation range", "activation should be 0..1", True,
-                 all(0.0 <= r[2] <= 1.0 for r in rows))
+                 all(0.0 <= m["activation"] <= 1.0 for m in metas))
 
-    assert len(rows) > 0
-    assert all(0.0 <= r[2] <= 1.0 for r in rows)
+    assert len(metas) > 0
+    assert all(0.0 <= m["activation"] <= 1.0 for m in metas)
 
 # ── P22-B: Exact activation restoration across restarts ───────────────────
 
 @pytest.mark.asyncio
-async def test_p22_exact_activation_restored_after_restart():
+async def test_p22_exact_activation_restored_after_restart(tmp_path):
     """The activation value of WM after restart should be exactly the same as before restart"""
-    router1 = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router1 = MemoryRouter(db_dir=str(tmp_path))
     await router1.ingest(
         {"messages": [{"role": "user", "content": "topic ALPHA project detail"}]},
         context_id="persist-session"
@@ -72,17 +62,13 @@ async def test_p22_exact_activation_restored_after_restart():
 
     visual_audit("Before restart: WM item count",
                  "should have 2 items", 2, len(wm_before))
-    print(f"  Before activations: {before_state}")
-
+    
     # Simulate restart
-    router2 = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router2 = MemoryRouter(db_dir=str(tmp_path))
     wm_after = router2._get_wm("persist-session").items
     after_state = {it.trace_id: round(it.activation, 4) for it in wm_after}
 
-    print(f"  After  activations: {after_state}")
-
-    visual_audit("After restart: WM item count matches",
-                 "exact same number of items", len(before_state), len(after_state))
     visual_audit("After restart: activations match exactly",
                  "activation values identical after restore",
                  before_state, after_state)
@@ -93,9 +79,10 @@ async def test_p22_exact_activation_restored_after_restart():
 # ── P22-C: Multi-session snapshots are isolated ──────────────────────────
 
 @pytest.mark.asyncio
-async def test_p22_multi_session_snapshots_isolated():
+async def test_p22_multi_session_snapshots_isolated(tmp_path):
     """wm_state rows of different sessions do not pollute each other"""
-    router = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router = MemoryRouter(db_dir=str(tmp_path))
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice working on PROJECT-A"}]},
         context_id="alice"
@@ -105,16 +92,14 @@ async def test_p22_multi_session_snapshots_isolated():
         context_id="bob"
     )
 
-    with sqlite3.connect(router.hippo.db_path) as conn:
-        alice_rows = conn.execute(
-            "SELECT content FROM wm_state WHERE session_id='alice'"
-        ).fetchall()
-        bob_rows = conn.execute(
-            "SELECT content FROM wm_state WHERE session_id='bob'"
-        ).fetchall()
+    alice_res = router.hippo.wm_col.get(where={"session_id": "alice"})
+    bob_res = router.hippo.wm_col.get(where={"session_id": "bob"})
+    
+    alice_docs = alice_res["documents"]
+    bob_docs = bob_res["documents"]
 
-    alice_has_bob = any("PROJECT-B" in r[0] for r in alice_rows)
-    bob_has_alice = any("PROJECT-A" in r[0] for r in bob_rows)
+    alice_has_bob = any("PROJECT-B" in d for d in alice_docs)
+    bob_has_alice = any("PROJECT-A" in d for d in bob_docs)
 
     visual_audit("Alice snapshot: no Bob content", "PROJECT-B absent in alice wm_state",
                  False, alice_has_bob)
@@ -127,9 +112,10 @@ async def test_p22_multi_session_snapshots_isolated():
 # ── P22-D: clear_wm_state clears snapshots ──────────────────────────────
 
 @pytest.mark.asyncio
-async def test_p22_clear_wm_state():
+async def test_p22_clear_wm_state(tmp_path):
     """clear_wm_state should delete all wm_state rows for the specified session"""
-    router = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router = MemoryRouter(db_dir=str(tmp_path))
     await router.ingest(
         {"messages": [{"role": "user", "content": "content to be cleared"}]},
         context_id="clear-session"
@@ -150,9 +136,10 @@ async def test_p22_clear_wm_state():
 # ── P22-E: Snapshot takes priority over traces rebuild ──────────────────
 
 @pytest.mark.asyncio
-async def test_p22_snapshot_takes_priority_over_traces_rebuild():
+async def test_p22_snapshot_takes_priority_over_traces_rebuild(tmp_path):
     """_hydrate does not take the traces rebuild path when a snapshot exists; fall back to traces rebuild when no snapshot exists"""
-    router1 = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router1 = MemoryRouter(db_dir=str(tmp_path))
     await router1.ingest(
         {"messages": [{"role": "user", "content": "snapshot priority test CANARY"}]},
         context_id="snap-test"
@@ -163,7 +150,8 @@ async def test_p22_snapshot_takes_priority_over_traces_rebuild():
     assert len(snap) > 0, "Snapshot must exist before restart"
 
     # Restart — should take snapshot path
-    router2 = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router2 = MemoryRouter(db_dir=str(tmp_path))
     wm_contents = router2._get_wm("snap-test").get_active_contents()
     has_canary = any("CANARY" in c for c in wm_contents)
 
@@ -174,7 +162,8 @@ async def test_p22_snapshot_takes_priority_over_traces_rebuild():
 
     # Manually delete snapshot and restart — fallback to traces rebuild
     router2.hippo.clear_wm_state("snap-test")
-    router3 = MemoryRouter(db_dir=TEST_DIR)
+    clear_chroma_clients()
+    router3 = MemoryRouter(db_dir=str(tmp_path))
     wm_fallback = router3._get_wm("snap-test").get_active_contents()
     has_canary_fallback = any("CANARY" in c for c in wm_fallback)
 

@@ -3,44 +3,35 @@ import pytest
 import os
 import shutil
 import asyncio
-import sqlite3
 from src.memory.router import MemoryRouter
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p10_trigger_tmp")
-DB_PATH = os.path.join(TEST_DIR, "hippocampus.db")
+from src.memory.storage import clear_chroma_clients
 
 @pytest.mark.asyncio
-async def test_p10_auto_distill_trigger_audit():
+async def test_p10_auto_distill_trigger_audit(tmp_path):
     """Verify: not only is the Worker triggered, but Neocortex indeed produces valid summary content."""
-    if os.path.exists(TEST_DIR): 
-        shutil.rmtree(TEST_DIR)
-    os.makedirs(TEST_DIR, exist_ok=True)
+    clear_chroma_clients()
+    test_dir = str(tmp_path)
     
-    router = MemoryRouter(db_dir=TEST_DIR, distill_threshold=50)
+    router = MemoryRouter(db_dir=test_dir, distill_threshold=50)
     
     print("\n[MARATHON TRIGGER TEST] Pumping 50 messages...")
     for i in range(50):
         # Pump messages with semantics to produce a more meaningful summary
         await router.ingest({
-            "context_id": "marathon_audit", 
             "messages": [{"role": "user", "content": f"Fact #{i}: The system component {i} is verified."}]
-        })
+        }, context_id="marathon_audit")
     
     print("Pumping complete. Waiting 15s for LLM Distillation (NC_DIST)...")
     await asyncio.sleep(15.0)
     
-    # Ultimate confirmation: penetration database audit
+    # Ultimate confirmation: penetration database audit (Now ChromaDB)
     print("\n[DATABASE PENETRATION AUDIT]")
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.execute("SELECT summary_text FROM neocortex_summaries WHERE context_id='marathon_audit'")
-    row = cursor.fetchone()
-    conn.close()
+    res = router.neo.summary_col.get(ids=["marathon_audit"])
     
-    if not row:
-        pytest.fail("AUDIT FAIL: No summary record found in neocortex_summaries table.")
+    if not res or not res["documents"]:
+        pytest.fail("AUDIT FAIL: No summary record found in ChromaDB collection.")
     
-    summary_text = row[0]
+    summary_text = res["documents"][0]
     print(f"Captured Summary: {summary_text[:150]}...")
     
     # Assertion logic: non-empty, no error

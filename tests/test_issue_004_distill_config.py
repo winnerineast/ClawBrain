@@ -7,26 +7,18 @@ import json
 import respx
 from httpx import Response
 from src.memory.neocortex import Neocortex
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/issue_004_tmp")
-
-@pytest.fixture
-def clean_env():
-    if os.path.exists(TEST_DIR):
-        shutil.rmtree(TEST_DIR)
-    os.makedirs(TEST_DIR)
-    yield
-    # shutil.rmtree(TEST_DIR)
+from src.memory.storage import clear_chroma_clients
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_ollama_distillation_protocol(clean_env):
+async def test_ollama_distillation_protocol(tmp_path):
     """Verify Neocortex correctly calls Ollama /api/generate."""
+    clear_chroma_clients()
     url = "http://mock-ollama:11434"
     model = "mock-gemma"
+    test_dir = str(tmp_path)
     
-    nc = Neocortex(db_dir=TEST_DIR, distill_url=url, distill_model=model, distill_provider="ollama")
+    nc = Neocortex(db_dir=test_dir, distill_url=url, distill_model=model, distill_provider="ollama")
     
     # Mock Ollama response
     route = respx.post(f"{url}/api/generate").mock(return_value=Response(200, json={"response": "Ollama Summary"}))
@@ -46,12 +38,14 @@ async def test_ollama_distillation_protocol(clean_env):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_openai_distillation_protocol(clean_env):
+async def test_openai_distillation_protocol(tmp_path):
     """Verify Neocortex correctly calls OpenAI-compatible /chat/completions."""
+    clear_chroma_clients()
     url = "http://mock-openai:8080/v1"
     model = "mock-gpt"
+    test_dir = str(tmp_path)
     
-    nc = Neocortex(db_dir=TEST_DIR, distill_url=url, distill_model=model, distill_provider="openai")
+    nc = Neocortex(db_dir=test_dir, distill_url=url, distill_model=model, distill_provider="openai")
     
     # Mock OpenAI response
     route = respx.post(f"{url}/chat/completions").mock(return_value=Response(200, json={
@@ -72,14 +66,16 @@ async def test_openai_distillation_protocol(clean_env):
     assert nc.get_summary("session_openai") == "OpenAI Summary"
 
 @pytest.mark.asyncio
-async def test_config_priority(clean_env):
+async def test_config_priority(tmp_path):
     """Verify environment variables override constructor args."""
+    clear_chroma_clients()
+    test_dir = str(tmp_path)
     os.environ["CLAWBRAIN_DISTILL_URL"] = "http://env-url"
     os.environ["CLAWBRAIN_DISTILL_MODEL"] = "env-model"
     os.environ["CLAWBRAIN_DISTILL_PROVIDER"] = "env-provider"
     
     try:
-        nc = Neocortex(db_dir=TEST_DIR, distill_url="http://arg-url", distill_model="arg-model", distill_provider="arg-provider")
+        nc = Neocortex(db_dir=test_dir, distill_url="http://arg-url", distill_model="arg-model", distill_provider="arg-provider")
         assert nc.distill_url == "http://env-url"
         assert nc.distill_model == "env-model"
         assert nc.distill_provider == "env-provider"

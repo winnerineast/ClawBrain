@@ -19,6 +19,7 @@ class MemoryRouter:
     """
     def __init__(self, db_dir: str = None, distill_threshold: int = 50, 
                  distill_url: str = None, distill_model: str = None, distill_provider: str = None):
+        logger.info(f"[ROUTER] Initializing with db_dir={db_dir}")
         if db_dir is None:
             # Dynamic default path for portability (Issue-003)
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,15 +27,23 @@ class MemoryRouter:
             
         self.db_dir = db_dir
         self.distill_threshold = distill_threshold
+        
+        logger.info("[ROUTER] Creating Hippocampus...")
         self.hippo = Hippocampus(db_dir=db_dir)
+        
+        logger.info("[ROUTER] Creating Neocortex...")
         self.neo = Neocortex(db_dir=db_dir, distill_url=distill_url, 
                              distill_model=distill_model, distill_provider=distill_provider)
+        
         self._wm_sessions: Dict[str, WorkingMemory] = {}   # P18: Isolated by session
         self.decomposer = SignalDecomposer()
 
         self._trace_counters: Dict[str, int] = {}
         self._session_locks: Dict[str, asyncio.Lock] = {} # Phase 32: Per-session serialization
+        
+        logger.info("[ROUTER] Starting Hydration...")
         self._hydrate()
+        logger.info("[ROUTER] Initialization complete.")
 
     def _get_session_lock(self, session_id: str) -> asyncio.Lock:
         """Lazily create session lock."""
@@ -51,10 +60,13 @@ class MemoryRouter:
 
     def _hydrate(self):
         """Restore working memory per session (P22: Priority to exact restore from wm_state)."""
+        logger.info("[ROUTER.HYDRATE] Fetching all session IDs...")
         try:
             sessions = self.hippo.get_all_session_ids()
+            logger.info(f"[ROUTER.HYDRATE] Found {len(sessions)} sessions.")
             for session in sessions:
                 # P22: Priority restore from exact snapshot (preserves activation + timestamp)
+                logger.info(f"[ROUTER.HYDRATE] Processing session: {session}")
                 snapshot = self.hippo.load_wm_state(session)
                 if snapshot:
                     wm = self._get_wm(session)
@@ -70,6 +82,7 @@ class MemoryRouter:
                     continue
 
                 # Fallback: Rebuild from traces (Legacy behavior)
+                logger.info(f"[ROUTER.HYDRATE] Fallback: Fetching recent traces for session: {session}")
                 recent = self.hippo.get_recent_traces(limit=15, context_id=session)
                 wm = self._get_wm(session)
                 for row in reversed(recent):
@@ -83,7 +96,7 @@ class MemoryRouter:
                             pass
                 logger.info(f"[WM_HYDRATE] Fallback rebuild: session={session} items={len(recent)}")
         except Exception as e:
-            logger.error(f"Hydration failed: {e}")
+            logger.exception(f"Hydration failed: {e}")
 
     async def ingest(self, payload: Dict[str, Any], reaction: Dict[str, Any] = None,
                      offload_threshold: int = None, context_id: str = "default",
@@ -101,7 +114,7 @@ class MemoryRouter:
                 threshold=offload_threshold,
                 context_id=context_id
             )
-            logger.info(f"[HP_STOR] Action: {'BLOB' if res['is_blob'] else 'SQL'} | TraceID: {trace_id} | Session: {context_id}")
+            logger.info(f"[HP_STOR] Action: {'BLOB' if res['is_blob'] else 'CHROMA'} | TraceID: {trace_id} | Session: {context_id}")
 
             # Working Memory: Write to session WM and persist snapshot (P22)
             wm = self._get_wm(context_id)
@@ -142,10 +155,10 @@ class MemoryRouter:
         except Exception as e:
             logger.error(f"Distillation worker failed: {e}")
 
-    async def get_combined_context(self, context_id: str, current_focus: str) -> str:
+    async def get_combined_context(self, context_id: str, current_focus: str, max_chars: int = None) -> str:
         """Phase 32: Protected Context Assembly."""
         async with self._get_session_lock(context_id):
-            budget = int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", "2000"))
+            budget = max_chars if max_chars is not None else int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", "2000"))
             remaining = budget
 
             # L3: Neocortex Summary (Phase 29: Only inject if exists)
@@ -243,4 +256,8 @@ class MemoryRouter:
                 parts.append(header_l2)
                 parts.extend(recalled_contents)
 
-            return "\n".join(parts) if parts else ""
+            if not parts:
+                return ""
+                
+            combined = "\n".join(parts)
+            return f"[CLAWBRAIN MEMORY]\n{combined}\n[END CLAWBRAIN MEMORY]"
