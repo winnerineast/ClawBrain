@@ -59,14 +59,21 @@ Both modes use the same tri-layer memory backend. Mode B gives tighter integrati
 
 ---
 
-## 🚀 Quick Start (Docker)
+## 🚀 One-Minute Launch (Auto-Setup)
+
+ClawBrain features an automated onboarding utility that detects your OS, creates a virtual environment, and discovers your local LLM services (Ollama/LM Studio) and Obsidian Vaults automatically.
 
 ```bash
 git clone https://github.com/winnerineast/ClawBrain.git
 cd ClawBrain
-cp .env.example .env        # configure env vars
-docker compose up -d        # start on port 11435
-curl http://localhost:11435/health
+./install.sh
+```
+
+The script will generate an optimal `.env` file and verify your system health. Once complete, start the server:
+
+```bash
+source venv/bin/activate
+python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435
 ```
 
 ---
@@ -270,8 +277,16 @@ ClawBrain is engineered for high-availability agentic workflows. It employs **Ne
 ### L3 — Neocortex (Semantic Facts)
 - **Implementation**: Async distillation engine persisted in **ChromaDB collection**
 - **Trigger**: When Hippocampus accumulates `distill_threshold` traces (default 50), a background worker distills fragments into a persistent fact summary
-- **Recommended formula**: `distill_threshold ≈ (ContextWindow / AvgTraceSize) × 0.8`
-- **Context budget**: Greedy L3 → L2 → L1 priority; total chars capped by `CLAWBRAIN_MAX_CONTEXT_CHARS`
+- **Context budget**: Greedy L3 → Vault → L1 → L2 priority; total chars capped by `CLAWBRAIN_MAX_CONTEXT_CHARS`
+
+### External Knowledge — Vault
+- **Implementation**: `VaultIndexer` with **mtime + SHA-256** incremental scanning
+- **Source**: Local Obsidian vaults (configured via `CLAWBRAIN_VAULT_PATH`)
+- **Recall**: Seamlessly integrates your static project documentation into the RAG pipeline
+
+### Robust Context Assembly
+- **Stack Math**: All context injection uses rigorous character counting (headers + content) to guarantee zero budget overruns.
+- **Network Plane Isolation**: Dedicated HTTP clients for Relay vs. Cognitive tasks ensure background tasks never block your chat.
 
 ---
 
@@ -316,6 +331,17 @@ POST /v1/memory/{session_id}/distill
 
 # Health check
 GET /health
+```
+
+---
+
+## ✅ Verification
+
+Ensure your environment is stable by running the unmocked, real-world regression suite:
+
+```bash
+# Sanitizes environment and runs all 91 tests
+./run_regression.sh
 ```
 
 ---
