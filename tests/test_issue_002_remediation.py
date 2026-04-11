@@ -83,8 +83,17 @@ async def test_combined_layers_formatting(tmp_path):
 async def test_phase_31_priority_order(tmp_path):
     """Verify that L1 (Working Memory) is prioritized over L2 (Hippocampus) when budget is tight."""
     clear_chroma_clients()
-    # Set a very tight budget
-    os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "200"
+    
+    # --- STACK MATH DERIVATION FOR BUDGET (250) ---
+    # The goal is to allow L3 + L1 but strictly exclude L2.
+    # 1. Outer Wrapper: [CLAWBRAIN MEMORY]...[END...]  -> ~50 chars
+    # 2. L3 (Neocortex): Header(41) + Msg(35) + Spacers(2) -> 78 chars
+    # 3. L1 (WM): Header(44) + Msg(35) + Spacers(2)        -> 81 chars
+    # Sum for L3 + L1 = 50 + 78 + 81 = 209 chars.
+    # Remaining budget = 250 - 209 = 41 chars.
+    # L2 Header (49 chars) > 41, so L2 is guaranteed to be excluded.
+    os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "250"
+    
     router = MemoryRouter(db_dir=str(tmp_path))
     
     # 1. Add L3 (High priority) - ~50 chars

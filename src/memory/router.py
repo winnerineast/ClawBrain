@@ -1,15 +1,17 @@
-# Generated from design/memory_router.md v1.11
+# Generated from design/memory_router.md v1.13
 import uuid
 import json
 import os
 import asyncio
 import logging
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from src.memory.storage import Hippocampus, clear_chroma_clients
 from src.memory.working import WorkingMemory, WorkingMemoryItem
 from src.memory.signals import SignalDecomposer
 from src.memory.neocortex import Neocortex
 from src.memory.room_detector import RoomDetector
+from src.memory.vault_indexer import VaultIndexer
 
 logger = logging.getLogger("GATEWAY.MEMORY.ROUTER")
 
@@ -18,6 +20,7 @@ class MemoryRouter:
     ClawBrain Memory Central Router.
     P18: Working Memory and Hippocampus search paths are isolated by context_id.
     P34: Organized into semantic Rooms within sessions.
+    P35: Integration of External Knowledge (Vault).
     """
     def __init__(self, db_dir: str = None, distill_threshold: int = 50, 
                  distill_url: str = None, distill_model: str = None, distill_provider: str = None,
@@ -52,6 +55,15 @@ class MemoryRouter:
             api_key=self.neo.api_key,
             client=self.internal_client
         )
+
+        # P35: Vault Indexer
+        self.vault_path = os.getenv("CLAWBRAIN_VAULT_PATH")
+        self.vault_indexer = None
+        if self.vault_path:
+            logger.info(f"[ROUTER] Vault enabled: {self.vault_path}")
+            self.vault_indexer = VaultIndexer(self.vault_path, Path(db_dir), self.hippo.client)
+            # Start background scan loop
+            asyncio.create_task(self._vault_scan_loop())
         
         self._wm_sessions: Dict[str, WorkingMemory] = {}   # P18: Isolated by session
         self._current_rooms: Dict[str, str] = {}           # P34: Current room per session
@@ -192,8 +204,21 @@ class MemoryRouter:
         except Exception as e:
             logger.error(f"[ROOM_UPDATE_FAIL] {e}")
 
+    async def _vault_scan_loop(self):
+        """Phase 35: Periodic background scan of the external vault."""
+        interval = int(os.getenv("CLAWBRAIN_VAULT_SCAN_INTERVAL", "300"))
+        while True:
+            try:
+                if self.vault_indexer:
+                    stats = await self.vault_indexer.scan()
+                    if stats["indexed"] > 0 or stats["scanned"] > 0:
+                        logger.info(f"[VAULT_SCAN] {stats}")
+            except Exception as e:
+                logger.error(f"[VAULT_SCAN_ERROR] {e}")
+            await asyncio.sleep(interval)
+
     async def get_combined_context(self, context_id: str, current_focus: str, max_chars: int = None) -> str:
-        """Phase 32: Protected Context Assembly. P34: Room-Prioritized Search."""
+        """Phase 32: Protected Context Assembly. P34: Room-Prioritized Search. P35: External Vault Search."""
         async with self._get_session_lock(context_id):
             budget = max_chars if max_chars is not None else int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", "2000"))
             
@@ -202,6 +227,7 @@ class MemoryRouter:
             
             # Headers
             header_l3 = "=== SYSTEM MEMORY SUMMARY (NEOCORTEX) ==="
+            header_v1 = "=== EXTERNAL KNOWLEDGE (VAULT) ==="
             header_l1 = "=== ACTIVE CONVERSATION (WORKING MEMORY) ==="
             header_l2 = "=== RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS) ==="
 
@@ -218,18 +244,46 @@ class MemoryRouter:
                     summary_text = summary_text[:limit_l3] + "..."
                 remaining -= len(summary_text)
 
+            # P35: External Vault Search
+            vault_text = ""
+            if self.vault_indexer and remaining > 200:
+                try:
+                    v_res = self.vault_indexer.collection.query(
+                        query_texts=[current_focus],
+                        n_results=3
+                    )
+                    if v_res and v_res["documents"] and v_res["documents"][0]:
+                        # Prepare segments
+                        v_parts = []
+                        for doc in v_res["documents"][0]:
+                            v_parts.append(f"- {doc.strip()}")
+                        
+                        candidate_vault = "\n".join(v_parts)
+                        # Check if header + content fits
+                        if len(header_v1) + len(candidate_vault) + 10 < remaining:
+                            vault_text = candidate_vault
+                            remaining -= (len(header_v1) + len(vault_text) + 2)
+                except Exception as e:
+                    logger.error(f"[VAULT_SEARCH_ERROR] {e}")
+
             # L1: Working Memory (Highest precision)
             wm = self._get_wm(context_id)
             active_contents = wm.get_active_contents()
             wm_text = ""
             if active_contents:
                 # Account for L1 header
-                remaining -= len(header_l1) + 2
                 wm_text = "\n".join(active_contents)
                 # Budget check
-                if len(wm_text) > remaining:
-                    wm_text = wm_text[:max(0, remaining)] + "..."
-                remaining -= len(wm_text)
+                if len(header_l1) + len(wm_text) + 2 > remaining:
+                    # If we can't fit at least part of WM with its header, skip or crop
+                    available = remaining - len(header_l1) - 2
+                    if available > 20:
+                        wm_text = wm_text[:available] + "..."
+                    else:
+                        wm_text = ""
+                
+                if wm_text:
+                    remaining -= (len(header_l1) + len(wm_text) + 2)
 
             # L2: Hippocampus (Semantic Recall)
             # P34: Priority to current room
@@ -238,7 +292,7 @@ class MemoryRouter:
             
             # Only proceed if we have meaningful space left for L2 header + at least one snippet
             if remaining > (len(header_l2) + 50):
-                remaining -= len(header_l2) + 2
+                remaining_for_l2 = remaining - (len(header_l2) + 2)
                 
                 # Phase 1: Room-Locked Search
                 search_ids = self.hippo.search(current_focus, context_id=context_id, room_id=current_room)
@@ -252,7 +306,7 @@ class MemoryRouter:
                             search_ids.append(gid)
 
                 for tid in search_ids:
-                    if remaining <= 10: break
+                    if remaining_for_l2 <= 10: break
                     raw = self.hippo.get_content(tid)
                     if raw:
                         try:
@@ -263,20 +317,18 @@ class MemoryRouter:
                                 msg = data.get("stimulus", {}).get("content", "")
                             
                             formatted = f"- {msg}"
-                            if len(formatted) > remaining:
+                            if len(formatted) > remaining_for_l2:
                                 # Don't add partial bullets if they are too short
-                                if remaining > 20:
-                                    formatted = formatted[:remaining-3] + "..."
+                                if remaining_for_l2 > 20:
+                                    formatted = formatted[:remaining_for_l2-3] + "..."
                                     recalled_contents.append(formatted)
-                                    remaining = 0
+                                    remaining_for_l2 = 0
                                 break
                             
                             recalled_contents.append(formatted)
-                            remaining -= len(formatted)
+                            remaining_for_l2 -= len(formatted)
                         except:
                             pass
-            
-            total_used = budget - max(0, remaining)
 
             # Final Dynamic assembly with rigid budget enforcement
             parts = []
@@ -287,23 +339,23 @@ class MemoryRouter:
                 parts.append(summary_text)
                 current_len += len(header_l3) + len(summary_text) + 2
             
+            if vault_text:
+                if parts: parts.append("")
+                parts.append(header_v1)
+                parts.append(vault_text)
+                current_len += len(header_v1) + len(vault_text) + 2
+
             if wm_text:
                 candidate_header = "\n" + header_l1 if parts else header_l1
-                # Only add if it actually fits and adds value
-                if current_len + len(candidate_header) + 10 < budget:
+                if current_len + len(candidate_header) + len(wm_text) < budget:
                     parts.append("") if parts else None
                     parts.append(header_l1)
-                    # Fit what we can of WM
-                    available = budget - current_len - len(candidate_header) - 1
-                    if len(wm_text) > available:
-                        wm_text = wm_text[:max(0, available-3)] + "..."
                     parts.append(wm_text)
                     current_len += len(candidate_header) + len(wm_text) + 1
             
             if recalled_contents:
                 candidate_header = "\n" + header_l2 if parts else header_l2
-                # Only add if it actually fits and adds value
-                if current_len + len(candidate_header) + 20 < budget:
+                if current_len + len(candidate_header) + 10 < budget: 
                     parts.append("") if parts else None
                     parts.append(header_l2)
                     current_len += len(candidate_header) + 1
@@ -312,7 +364,6 @@ class MemoryRouter:
                             parts.append(snippet)
                             current_len += len(snippet) + 1
                         else:
-                            # Try a partial snippet as last resort
                             available = budget - current_len - 1
                             if available > 20:
                                 parts.append(snippet[:available-3] + "...")
