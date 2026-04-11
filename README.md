@@ -109,23 +109,28 @@ ClawBrain operates on two distinct planes: the **Relay Plane** for low-latency t
 
 ```mermaid
 flowchart TB
+    %% Class Definitions for Visual Distinction
+    classDef capture stroke:#2ecc71,stroke-width:2px,fill:#e8f8f5
+    classDef cognitive stroke:#3498db,stroke-width:2px,fill:#ebf5fb
+    classDef storage fill:#f9f9f9,stroke:#333,stroke-dasharray: 5 5
+
     subgraph Client [Agentic Frontend]
         OC[OpenClaw / CLI]
     end
 
     subgraph Relay [ClawBrain Relay Plane]
         direction TB
-        Ingest[Ingestion Engine]
-        Assemble[Context Assembler]
-        Logic[Stack Math Controller]
+        Ingest[Ingestion Engine]:::capture
+        Assemble[Context Assembler]:::cognitive
+        Logic[Stack Math Controller]:::cognitive
     end
 
     subgraph Memory [Cognitive Memory Plane]
         direction TB
-        L3[(L3: Neocortex\nDistilled Hard Facts)]
-        Ext[(Ext: Vault\nObsidian Knowledge)]
-        L1[(L1: Working Memory\nActive Attention)]
-        L2[(L2: Hippocampus\nEpisodic Vector Store)]
+        L3[(L3: Neocortex\nDistilled Hard Facts)]:::storage
+        Ext[(Ext: Vault\nObsidian Knowledge)]:::storage
+        L1[(L1: Working Memory\nActive Attention)]:::storage
+        L2[(L2: Hippocampus\nEpisodic Vector Store)]:::storage
     end
 
     subgraph LLM [Backend Intelligence]
@@ -133,18 +138,26 @@ flowchart TB
         Cloud[Cloud: OpenAI/Claude]
     end
 
-    OC <--> Ingest
-    Ingest -- "1. Passively Archive" --> L1 & L2
-    Assemble -- "2. Priority Retrieve" --> L3
-    Assemble -- "3. Priority Retrieve" --> Ext
-    Assemble -- "4. Priority Retrieve" --> L1
-    Assemble -- "5. Priority Retrieve" --> L2
-    
-    L2 -- "Async Distillation" --> L3
+    %% 1. Capture Flow (How information enters)
+    OC -- "Turn Request" --> Ingest
+    Ingest -- "Passive Archive" --> L1
+    Ingest -- "Passive Archive" --> L2
     LocalFiles[(Obsidian Vault)] -- "mtime + hash scan" --> Ext
     
-    Logic <--> Assemble
-    Assemble <--> LLM
+    %% 2. Cognitive & Recall Flow (Internal processing & Context optimization)
+    L2 -- "Async Distillation" --> L3
+    Assemble -- "Priority Recall" --> L3
+    Assemble -- "Priority Recall" --> Ext
+    Assemble -- "Priority Recall" --> L1
+    Assemble -- "Priority Recall" --> L2
+    
+    Logic -- "Precision Budget" --> Assemble
+    Assemble -- "Enhanced Request" --> LLM
+    LLM -- "Reconstructed Stream" --> Ingest
+
+    %% Applying Classes to Flows
+    linkStyle 0,1,2,3 stroke:#2ecc71,stroke-width:2px,color:#27ae60
+    linkStyle 4,5,6,7,8,9,10,11 stroke:#3498db,stroke-width:2px,color:#2980b9
 ```
 
 ### Layer Details
