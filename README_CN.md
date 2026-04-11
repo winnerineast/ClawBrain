@@ -1,4 +1,4 @@
-# 🦞 ClawBrain：智能体工作流的"硅基海马体"
+# 🦞 ClawBrain: 智能体工作流的“硅基海马体”
 
 [English](./README.md) | 中文版
 
@@ -6,416 +6,100 @@
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain 是 **[OpenClaw](https://github.com/openclaw/openclaw) 的基础设施层记忆引擎**。它作为透明代理插入 OpenClaw 与 LLM 后端之间——自动捕获每一次交互、将其提纯为持久知识、并在恰当时机注入正确的上下文。无需修改 OpenClaw 的配置或代码。
+ClawBrain 是专为 AI 智能体（特别是 [OpenClaw](https://github.com/openclaw/openclaw)）打造的**基础设施层记忆引擎**。它旨在为智能体提供一个持久、进化且高度精准的“大脑”。
+
+它作为一个透明的神经中转站运行：在协议层自动捕获每一次交互，将零散的对话提纯为语义事实，并在最合适的时机将精准的上下文注入模型提示词——这一切都无需您编写代码或更改智能体的核心配置。
 
 ---
 
-## 既然 OpenClaw 已有记忆系统，为什么还需要 ClawBrain？
+## 💎 ClawBrain 的优势：为什么要使用它？
 
-OpenClaw 自带了一套设计精良的记忆系统：`MEMORY.md` 存储长期事实，每日笔记文件存储近期上下文，FTS5 + 向量混合检索，以及实验性的 Dreaming 机制将短期记录提升为长期记忆。这套设计是认真的。
+大多数 AI 记忆系统要么太浅（依赖手动“保存”工具），要么太重（盲目注入海量文件）。ClawBrain 在网络层解决了这些挑战。
 
-但存在四个结构性限制，ClawBrain 在基础设施层面解决了它们。
+### 1. 100% 无感捕获 (基础设施 vs. 模型)
+传统的记忆方式依赖模型“决定”去记住某些内容。在高认知负载下，模型经常忘记保存关键细节。ClawBrain 是**被动式**的：它在请求流过中转站时自动捕获 100% 的交互，确保万无一失。
 
-### 1. 记忆依赖模型主动决定去写
+### 2. 原生语义召回 (本地向量搜索)
+不同于依赖关键字匹配的系统，ClawBrain 内置了 **ChromaDB 引擎**。它能理解意图。即使关键字不匹配，搜索“数据库”也能找回关于“Postgres”或“数据存储”的记录。
 
-OpenClaw 的记忆是**按需写入**的——模型必须自己注意到某事值得记录、选择调用 `memory_write`、并准确措辞。在对话节奏快、上下文压力大或模型注意力分散时，这一步往往被跳过。重要的决策、用户偏好、已解决的问题就此悄然消失。
+### 3. 精准预算控制 (堆栈数学)
+ClawBrain 不会简单地将记忆塞进 Prompt。它使用**贪婪上下文预算策略**和**堆栈数学 (Stack Math)** 来精确计算每一层记忆的字符开销，确保上下文窗口被高效利用，且永不溢出。
 
-ClawBrain 在**网络层**自动捕获每一次交互，无需模型决策，没有任何遗漏。
+### 4. 外部知识库集成 (Vault)
+您的项目不仅存在于聊天记录中。ClawBrain 可以“挂载”您的 **Obsidian 库**，通过高性能的增量扫描（mtime + hash）将您现有的文档直接带入智能体的推理循环。
 
-### 2. `MEMORY.md` 每轮都注入上下文——而且会越来越大
-
-OpenClaw 在每次会话开始时将 `MEMORY.md` 注入 system prompt。这个设计本身是合理的，但有一个持续累积的代价：文件越大，每轮消耗的 token 越多，触发 compaction 的频率越高，API 费用也随之上升。OpenClaw 自己的文档也警告：*"保持 MEMORY.md 简洁——它会随时间增长，可能导致 context 使用量意外激增。"*
-
-ClawBrain 使用**贪心 context 预算**（L3 → L2 → L1，默认 2000 字符），只注入与当前查询相关的内容，而非整个记忆文件。完整的归档存储在 SQLite 中，按需检索。
-
-### 3. 语义搜索无需云端 API Key
-
-OpenClaw 的向量搜索功能强大，但需要 OpenAI、Gemini、Voyage 或 Mistral 的 API key。没有 key 时，只有 FTS5 关键词搜索可用。对于完全本地化部署（Ollama、LM Studio）的用户，这意味着召回质量大幅下降。
-
-ClawBrain **内置 ChromaDB 引擎**，提供完全离线的原生语义向量搜索。无需 Embedding API，不依赖云端，实现高召回（96.6%）的本地优先记忆系统。
-
-### 4. Dreaming 是实验性功能，默认关闭
-
-OpenClaw 的 Dreaming 功能——将每日短期记录提升至 `MEMORY.md` 长期存储——默认禁用，需要手动配置，且标注为实验性。大多数用户从未启用它。
-
-ClawBrain 的 Neocortex 提纯自动在后台运行。每 N 次交互，后台任务自动将近期记录整合为持久化的语义摘要——无需配置，始终开启。
+### 5. 不阻塞的健壮架构
+通过**网络资源平面隔离**，ClawBrain 将高优先级的对话流量与后台“认知”任务（如事实提纯、库扫描）彻底分开。即使后台大脑正在全力运转，您的智能体对话依然保持 100% 的即时响应。
 
 ---
 
-## 两种集成模式
+## 🚀 快速安装 (一分钟启动)
 
-ClawBrain 提供两种接入 OpenClaw 的方式，可以选择其中一种，也可以同时运行。
-
-| | 模式 A — HTTP 透明代理 | 模式 B — Context Engine 插件 |
-|---|---|---|
-| **原理** | 作为透明代理拦截 LLM 请求 | 原生 OpenClaw 插件，通过内部 API 集成 |
-| **接入成本** | 改一个 URL | 安装插件 + 两行配置 |
-| **记忆注入方式** | 以 `[IMPORTANT]` 系统消息注入每次请求 | 以 `systemPromptAddition` 在每次模型运行前注入 |
-| **会话追踪** | 通过 `x-clawbrain-session` Header | 通过 OpenClaw 原生 `sessionId` |
-| **兼容所有 LLM 后端** | 是 | 是 |
-| **OpenClaw 原生生命周期钩子** | 否 | 是（`ingest/assemble/compact/afterTurn`） |
-
-两种模式共用同一套三层记忆后端。模式 B 与 OpenClaw 会话生命周期结合更紧密。
-
----
-
-## 🚀 一分钟快速启动（自动安装）
-
-ClawBrain 提供全自动引导工具，可自动识别 OS、创建虚拟环境，并智能探测本地 LLM 服务（Ollama/LM Studio）及 Obsidian 知识库。
+ClawBrain 提供全自动引导工具，可一键完成环境探测、服务发现和配置生成。
 
 ```bash
+# 1. 克隆仓库
 git clone https://github.com/winnerineast/ClawBrain.git
 cd ClawBrain
+
+# 2. 运行自动化安装脚本
+# 脚本将自动探测 Ollama/LM Studio 和您的本地 Obsidian 库
 ./install.sh
-```
 
-脚本将自动生成最优的 `.env` 配置文件并验证系统健康状态。完成后，启动服务器：
-
-```bash
+# 3. 启动服务器
 source venv/bin/activate
 python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435
 ```
 
-
 ---
 
-## 🔌 与 OpenClaw 集成
+## 🔌 集成与使用
 
-### 模式 A — HTTP 透明代理（零配置）
+### 选项 1：透明 HTTP 代理 (推荐)
+将您智能体的 API `baseUrl` 指向 ClawBrain（端口 11435）。ClawBrain 将拦截请求，增强记忆，并转发给真实的 LLM 后端。
 
-将 OpenClaw 的模型端点指向 ClawBrain，ClawBrain 自动拦截每次请求、注入记忆、转发给真实后端。
-
-```
-OpenClaw  →  ClawBrain（端口 11435）  →  Ollama / OpenAI / Claude / Gemini
-                    │
-         ┌──────────┴──────────┐
-         │    每次请求时       │
-         │  1. 归档交互轨迹   │  ← 自动捕获，无需模型决策
-         │  2. 检索相关记忆   │  ← FTS5 召回，按 session 隔离
-         │  3. 注入上下文     │  ← 贪心预算，高价值事实优先
-         └─────────────────────┘
-```
-
-在 OpenClaw 的 provider 配置中，把 `baseUrl` 改为 ClawBrain 地址：
-
+**OpenClaw Provider 配置示例：**
 ```json
 "ollama": {
   "baseUrl": "http://127.0.0.1:11435",
-  "apiKey": "sk-xxx..."
+  "apiKey": "optional"
 }
 ```
 
-设置 session header，使记忆按用户/项目隔离：
-
-```
-x-clawbrain-session: my-project
-```
-
-完成。无需其他配置。
-
----
-
-### 模式 B — Context Engine 插件（OpenClaw 原生）
-
-ClawBrain 实现了 OpenClaw 的 [Context Engine 插件接口](https://github.com/openclaw/openclaw)。
-OpenClaw 直接调用 ClawBrain 的 `ingest/assemble/compact/afterTurn` 生命周期钩子，
-ClawBrain 精准控制注入内容和注入时机。
-
-**第一步 — 启动 ClawBrain**
-
+### 选项 2：原生 OpenClaw 插件
+ClawBrain 也可以作为原生的 Context Engine 插件运行：
 ```bash
-docker compose up -d
-# 或本地运行：
-PYTHONPATH=. uvicorn src.main:app --host 0.0.0.0 --port 11435
-```
-
-**第二步 — 安装插件**
-
-```bash
-# 从本地克隆安装：
-openclaw plugins install -l ./packages/openclaw
-
-# 如果 dist/ 不存在，先构建：
-cd packages/openclaw && npm install && npm run build
-cd ../..
 openclaw plugins install -l ./packages/openclaw
 ```
 
-**第三步 — 配置 `~/.openclaw/openclaw.json`**
+### 🔐 会话隔离
+通过发送一个简单的 HTTP Header，在不同项目或用户之间隔离记忆：
+`x-clawbrain-session: project-alpha`
 
-```json5
-{
-  plugins: {
-    slots: {
-      contextEngine: "clawbrain"   // ClawBrain 接管上下文组装与 compaction
-    },
-    entries: {
-      clawbrain: {
-        enabled: true,
-        // 可选覆盖：
-        // config: { url: "http://localhost:11435" }
-      }
-    },
-    load: {
-      paths: ["./packages/openclaw/dist/index.js"]
-    }
-  }
-}
-```
+---
 
-**第四步 — 重启 OpenClaw gateway**
+## 🧠 三层记忆架构
 
+| 层级 | 组件 | 功能 |
+|---|---|---|
+| **L1** | **工作记忆** | 活跃注意力。保存最近几轮对话，随时间指数衰减。 |
+| **L2** | **海马体** | 情节归档。基于 ChromaDB 的语义向量搜索。 |
+| **L3** | **新皮层** | 语义事实。异步 LLM 提纯，将旧记忆转化为硬事实。 |
+| **Ext** | **Vault** | 外部知识。本地 Obsidian Markdown 笔记的增量索引。 |
+
+---
+
+## 🛠️ 开发与验证
+
+### 设计先行哲学
+ClawBrain 遵循严格的**设计先行**工作流。所有架构变更必须在实施前记录于 `design/` 目录。核心章程请参考 `GEMINI.md`。
+
+### 自动化验证 (真实环境回归)
+运行我们的资源感知型回归测试集，确保系统稳定性：
 ```bash
-openclaw restart
-```
-
-**验证插件已激活：**
-
-```bash
-openclaw doctor
-# 应显示：contextEngine → clawbrain
-```
-
-#### 激活后的行为
-
-| 钩子 | OpenClaw 调用时机 | ClawBrain 的操作 |
-|------|------------------|-----------------|
-| `ingest` | 每条新消息到达时 | 归档至海马体，更新工作记忆 |
-| `assemble` | 每次模型运行前 | 检索 L3→L2→L1 上下文，以 `systemPromptAddition` 注入 |
-| `compact` | 上下文窗口满 / 执行 `/compact` 时 | 将轨迹提纯至新皮层，裁剪工作记忆 |
-| `afterTurn` | 模型运行结束后 | 持久化 WM 快照，可选触发后台提纯 |
-
-ClawBrain 设置 `ownsCompaction: true`——OpenClaw 内置的自动 compaction 被禁用，
-由 ClawBrain 的 SQLite 提纯机制接管。
-
-#### 插件环境变量
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `CLAWBRAIN_URL` | `http://localhost:11435` | ClawBrain 服务地址（插件读取） |
-| `CLAWBRAIN_TIMEOUT_MS` | `5000` | 单次请求超时（毫秒） |
-
----
-
-### 两种模式同时运行
-
-两种模式完全独立。可以同时运行 HTTP 透明代理处理通用 LLM 流量，
-并启用 Context Engine 插件处理 OpenClaw 会话——共享同一个服务器和同一套记忆存储。
-
----
-
-## 🏗️ 全景架构：信息流与记忆演变
-
-```mermaid
-graph LR
-    subgraph Client_Side [左：输入端]
-        OC[智能体客户端 / 开发者工具]
-    end
-
-    subgraph Relay_Core [中：ClawBrain 神经中继]
-        direction TB
-        Ingress[1. 协议探测与标准化]
-        Process[2. 认知增强管线]
-        Egress[3. 方言翻译与透传]
-
-        subgraph Neural_Engine [底层：三子算法记忆系统]
-            WM[L1 工作记忆：活跃注意力]
-            HP[L2 海马体：情节无损归档]
-            NC[L3 新皮层：语义事实摘要]
-
-            WM -- 衰减与整合 --> NC
-            WM -- 物理固化 --> HP
-            NC -- 泛化规则注入 --> Process
-            HP -- 全文语义检索 --> Process
-        end
-
-        Ingress --> Process
-        Process --> Egress
-    end
-
-    subgraph Provider_Side [右：输出端]
-        LLM[模型供应商：本地或云端]
-    end
-
-    OC -- "原生请求（含密钥）" --> Ingress
-    Egress -- "方言透传（含密钥）" --> LLM
-    LLM -- "流式响应返回" --> Egress
-    Egress -- "闭环记忆存证" --> WM
-    Egress -- "结果实时回传" --> OC
-```
-
-## 🛡️ 健壮性设计
-
-ClawBrain 专为高可靠的智能体工作流设计。它采用**网络资源平面隔离（Network Plane Isolation）**，确保后台认知任务绝不会拖慢用户体验：
-
-- **双通道 HTTP 架构**：系统维护两套独立的连接池。**中转平面 (Relay Plane)** 负责高优先级的 LLM 通讯，优化吞吐量；**认知平面 (Cognitive Plane)** 由 `MemoryRouter` 的内部客户端持有，专门处理 Room 探测和事实提纯。
-- **故障容错**：如果内部任务（如本地 Ollama 提纯）响应变慢或失败，影响将被隔离在认知平面内。您的主对话流将保持 100% 顺畅，不受任何干扰。
-- **无状态中转**：代理层保持极简状态，确保记忆增强为整体请求周期带来的延迟几乎可以忽略不计。
-
----
-
-## 🧠 深度设计哲学：三子记忆的演变算法
-
-### L1 — 工作记忆（活跃注意力层）
-- **工程实现**：内存中带权重的有序字典，**按 session 严格隔离**
-- **吸引子动力学**：新输入为相关旧记忆重新充电（权重 → 1.0）；无关项指数衰减，低于 0.3 阈值时自动逐出
-- **Session 隔离**：每个 `x-clawbrain-session` Header 值拥有独立的 WM 实例，跨会话泄漏在架构层面不可能发生
-
-### L2 — 海马体（情节记忆归档层）
-- **工程实现**：**ChromaDB (本地向量库)** + 本地 Blob 存储，**按 Session 隔离**
-- **召回机制**：完全离线的语义向量搜索，内置 Embedding 模型（无需 API Key）
-- **动态分流**：负载 > 512 KB 的内容流式写入 `data/blobs/`，索引保留锚点
-- **完整性审计**：每条记录绑定 SHA-256 校验和，历史不可篡改、100% 可回溯
-- **自动清理**：启动时从 ChromaDB 中清除 `timestamp=0.0` 脏数据及 TTL 过期记录
-
-### L3 — 新皮层（语义事实层）
-- **工程实现**：异步提纯引擎，摘要持久化于 **ChromaDB 集合**
-- **触发时机**：当海马体积累 `distill_threshold` 条记录（默认 50）时，后台任务自动将碎片提纯为持久化的事实摘要
-- **上下文预算**：贪心策略 L3 → Vault → L1 → L2 优先分配，总字符数上限由 `CLAWBRAIN_MAX_CONTEXT_CHARS` 控制
-
-### 外部知识库 — Vault
-- **工程实现**：`VaultIndexer` 支持 **mtime + SHA-256** 增量扫描
-- **知识来源**：本地 Obsidian 库（通过 `CLAWBRAIN_VAULT_PATH` 配置）
-- **召回价值**：将静态的项目文档、个人笔记无缝接入 RAG 流程
-
-### 健壮的上下文组装
-- **堆栈数学 (Stack Math)**：所有注入逻辑采用严谨的字符预计算（Header + 内容），确保 100% 不超预算。
-- **网络资源平面隔离**：中转平面与认知平面拥有独立的 HTTP 客户端，确保后台任务绝不阻塞对话。
-
-
----
-
-## 🔄 协议翻译与模型适配
-
-ClawBrain 内置万能方言翻译器，自动处理各提供商的 API 差异：
-
-| 类别 | 支持的平台 |
-|------|-----------|
-| **本地** | Ollama、LM Studio、vLLM、SGLang |
-| **云端** | OpenAI、DeepSeek、Anthropic（Claude）、Google（Gemini）、xAI（Grok）、Mistral、OpenRouter |
-
-自动处理：角色合并（Anthropic）、角色映射（Gemini）、非破坏性模型前缀剥离、小模型 Tool Call 准入拦截。
-
----
-
-## 🔐 Session 隔离
-
-每个请求通过单一 HTTP Header 绑定会话：
-
-```
-x-clawbrain-session: alice
-```
-
-- 工作记忆（L1）、海马体检索（L2）和上下文组装全链路按 session 隔离
-- 无 Header 时流量归入 `"default"` session，日志输出警告
-- Session 状态通过海马体水化（Hydrate）在服务重启后自动恢复
-
----
-
-## 🛠️ 管理 API
-
-```bash
-# 查询指定 session 的记忆状态
-GET /v1/memory/{session_id}
-
-# 清除指定 session 的新皮层摘要
-DELETE /v1/memory/{session_id}
-
-# 手动触发指定 session 的异步提纯任务
-POST /v1/memory/{session_id}/distill
-
-# 健康检查
-GET /health
-```
-
----
-
-## ✅ 自动化回归测试
-
-运行以下脚本，在真实环境下验证系统的稳健性：
-
-```bash
-# 净化环境并运行 91 项全量测试
+# 净化环境、重置 GPU 资源并运行 91 项测试
 ./run_regression.sh
 ```
 
 ---
-
-## ⚙️ 配置项一览
-
-所有运行时参数通过环境变量注入（配置于 `.env` 文件）：
-
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `CLAWBRAIN_DB_DIR` | `/app/data` | SQLite DB 与 blobs 目录 |
-| `CLAWBRAIN_MAX_CONTEXT_CHARS` | `2000` | 每次请求注入的上下文字符总上限 |
-| `CLAWBRAIN_TRACE_TTL_DAYS` | `30` | 记录过期天数（`0` = 禁用）|
-| `CLAWBRAIN_EXTRA_PROVIDERS` | _（空）_ | JSON 字符串，运行时动态注入额外 Provider |
-| `CLAWBRAIN_LOCAL_MODELS` | _（空）_ | JSON 字符串，追加本地模型白名单 |
-
-**动态注入 Provider 示例：**
-```bash
-CLAWBRAIN_EXTRA_PROVIDERS='{"myprovider": {"base_url": "http://192.168.1.10:8080", "protocol": "openai"}}'
-```
-
----
-
-## 🐳 Docker 部署
-
-```bash
-docker compose up -d          # 启动
-docker compose logs -f        # 实时日志
-docker compose down           # 停止（数据持久化在 ./data）
-```
-
-`./data` 目录通过 Volume 挂载——SQLite DB 与 blob 文件在容器重启和升级后均不丢失。
-
-> **注意**：ClawBrain 默认以 `--workers 1` 单进程运行。工作记忆（L1）存于进程内存，水平扩展需将 L1 迁移至外部存储（如 Redis）。
-
----
-
-## 🖥️ 本地开发
-
-```bash
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-# 使用 PYTHONPATH=. 启动以确保能找到本地模块
-PYTHONPATH=. ./venv/bin/python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435 --reload
-
-# 运行完整测试套件
-PYTHONPATH=. ./venv/bin/pytest tests/ --ignore=tests/test_p10_auto_trigger.py -v
-```
-
-> `test_p10_auto_trigger.py` 需要本地 Ollama 运行以执行提纯——在无本地模型的 CI 环境中可跳过。
-
----
-
-## 🛡️ 隐私与安全承诺
-
-ClawBrain 遵循**"无影准则"**：
-- **零记录政策**：系统核心逻辑严禁记录、保存或持久化任何 API 密钥或鉴权凭证
-- **透明透传架构**：所有身份验证信息仅在内存中瞬时中转，请求处理完成即销毁
-- **本地化存储**：所有记忆产物（海马体情节记录、新皮层语义事实）完全存储在本地 `data/` 目录，绝不上传至任何第三方云端
-
----
-
-## 🧪 审计哲学
-
-项目遵循 **GEMINI.md** 宪法：代码变更前先更新设计文档，每个 Phase 在 `tests/results/` 留存 Side-by-Side 审计证据。
-
-运行时结构化日志标签：
-
-| 标签 | 层级 |
-|------|------|
-| `[DETECTOR]` | 协议探测 |
-| `[PIPELINE]` | 认知管线 |
-| `[MODEL_QUAL]` | 模型分级与 Tool Call 准入 |
-| `[HP_STOR]` | 海马体落盘 |
-| `[HP_CLEAN]` | TTL / 脏数据清理 |
-| `[CTX_BUDGET]` | L3→L2→L1 预算分配 |
-| `[NC_DIST]` | 新皮层提纯 |
-| `[SESSION]` | Session Header 警告 |
-
----
-
-<p align="right">由 Claude Sonnet 4.6 依据源码 v1.40（P24）生成</p>
+<p align="right">ClawBrain 团队 🦞 荣誉出品</p>
