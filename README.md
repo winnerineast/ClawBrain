@@ -103,14 +103,69 @@ Isolate memory between different projects or users by sending a simple header:
 
 ---
 
-## 🧠 Tri-Layer Memory Architecture
+## 🧠 System Architecture: The Tri-Layer Memory Engine
 
-| Layer | Component | Function |
-|---|---|---|
-| **L1** | **Working Memory** | Active attention. Holds the last few turns with exponential decay. |
-| **L2** | **Hippocampus** | Episodic archive. ChromaDB-powered semantic vector search. |
-| **L3** | **Neocortex** | Semantic facts. Asynchronous LLM distillation of old memories into hard facts. |
-| **Ext** | **Vault** | External knowledge. Incremental indexing of local Obsidian markdown notes. |
+ClawBrain operates on two distinct planes: the **Relay Plane** for low-latency traffic and the **Cognitive Plane** for long-term intelligence.
+
+```mermaid
+flowchart TB
+    subgraph Client [Agentic Frontend]
+        OC[OpenClaw / CLI]
+    end
+
+    subgraph Relay [ClawBrain Relay Plane]
+        direction TB
+        Ingest[Ingestion Engine]
+        Assemble[Context Assembler]
+        Logic[Stack Math Controller]
+    end
+
+    subgraph Memory [Cognitive Memory Plane]
+        direction TB
+        L3[(L3: Neocortex\nDistilled Hard Facts)]
+        Ext[(Ext: Vault\nObsidian Knowledge)]
+        L1[(L1: Working Memory\nActive Attention)]
+        L2[(L2: Hippocampus\nEpisodic Vector Store)]
+    end
+
+    subgraph LLM [Backend Intelligence]
+        Ollama[Local: Ollama/LMS]
+        Cloud[Cloud: OpenAI/Claude]
+    end
+
+    OC <--> Ingest
+    Ingest -- "1. Passively Archive" --> L1 & L2
+    Assemble -- "2. Priority Retrieve" --> L3
+    Assemble -- "3. Priority Retrieve" --> Ext
+    Assemble -- "4. Priority Retrieve" --> L1
+    Assemble -- "5. Priority Retrieve" --> L2
+    
+    L2 -- "Async Distillation" --> L3
+    LocalFiles[(Obsidian Vault)] -- "mtime + hash scan" --> Ext
+    
+    Logic <--> Assemble
+    Assemble <--> LLM
+```
+
+### Layer Details
+
+#### **L1 — Working Memory (Active Attention)**
+*   **The Concept**: Mimics human short-term focus.
+*   **Mechanism**: A weighted queue where recent interactions have 1.0 "charge." Relevance to the current turn recharges old items, while irrelevant ones decay and are eventually evicted.
+*   **Storage**: High-speed in-memory state with periodic persistence.
+
+#### **L2 — Hippocampus (Episodic Archive)**
+*   **The Concept**: Every interaction you've ever had, perfectly preserved.
+*   **Mechanism**: An embedded **ChromaDB** vector store. It performs semantic search to find conversations that are conceptually similar to your current query, even if the keywords differ.
+*   **Integrity**: Every trace is hashed with SHA-256 to ensure a tamper-proof historical audit trail.
+
+#### **L3 — Neocortex (Semantic Facts)**
+*   **The Concept**: Distilled wisdom.
+*   **Mechanism**: A background process that periodically "reads" your L2 history and summarizes it into a single "Source of Truth" document. This provides the AI with high-level context (e.g., "The user prefers Python over Go") without wasting tokens on individual chat turns.
+
+#### **Ext — Knowledge Vault (External Logic)**
+*   **The Concept**: Bridges the gap between "what we said" and "what I know."
+*   **Mechanism**: Hooks into your **Obsidian Vault**. It treats your existing notes as primary documentation, indexing them incrementally to provide the most reliable facts first.
 
 ---
 

@@ -103,14 +103,69 @@ openclaw plugins install -l ./packages/openclaw
 
 ---
 
-## 🧠 三层记忆架构
+## 🧠 系统架构：三层记忆引擎
 
-| 层级 | 组件 | 功能 |
-|---|---|---|
-| **L1** | **工作记忆** | 活跃注意力。保存最近几轮对话，随时间指数衰减。 |
-| **L2** | **海马体** | 情节归档。基于 ChromaDB 的语义向量搜索。 |
-| **L3** | **新皮层** | 语义事实。异步 LLM 提纯，将旧记忆转化为硬事实。 |
-| **Ext** | **Vault** | 外部知识。本地 Obsidian Markdown 笔记的增量索引。 |
+ClawBrain 运行在两个互不干扰的平面上：负责低延迟流量的**中转平面 (Relay Plane)** 和负责深度智能的**认知平面 (Cognitive Plane)**。
+
+```mermaid
+flowchart TB
+    subgraph Client [智能体前端]
+        OC[OpenClaw / CLI]
+    end
+
+    subgraph Relay [ClawBrain 中转平面]
+        direction TB
+        Ingest[捕获引擎]
+        Assemble[上下文组装器]
+        Logic[堆栈数学控制器]
+    end
+
+    subgraph Memory [认知记忆平面]
+        direction TB
+        L3[(L3: 新皮层\n提纯后的硬事实)]
+        Ext[(Ext: Vault\nObsidian 外部知识)]
+        L1[(L1: 工作记忆\n活跃注意力)]
+        L2[(L2: 海马体\n情节向量库)]
+    end
+
+    subgraph LLM [后端智能]
+        Ollama[本地: Ollama/LMS]
+        Cloud[云端: OpenAI/Claude]
+    end
+
+    OC <--> Ingest
+    Ingest -- "1. 无感归档" --> L1 & L2
+    Assemble -- "2. 优先级检索" --> L3
+    Assemble -- "3. 优先级检索" --> Ext
+    Assemble -- "4. 优先级检索" --> L1
+    Assemble -- "5. 优先级检索" --> L2
+    
+    L2 -- "异步提纯" --> L3
+    LocalFiles[(Obsidian 库)] -- "mtime + hash 扫描" --> Ext
+    
+    Logic <--> Assemble
+    Assemble <--> LLM
+```
+
+### 层级技术细节
+
+#### **L1 — 工作记忆 (活跃注意力层)**
+*   **核心概念**：模拟人类的短期注意力。
+*   **工作机制**：一个带权重的队列，新交互初始权重为 1.0。若后续对话与旧项相关则为其“充电”，不相关的项随时间指数衰减，低于阈值后自动逐出。
+*   **存储**：极速内存状态，定期持久化。
+
+#### **L2 — 海马体 (情节记忆层)**
+*   **核心概念**：完美保留您经历过的每一次交互。
+*   **工作机制**：内置 **ChromaDB** 向量引擎。它执行语义搜索，即使关键字不匹配，也能找回意图相近的历史对话。
+*   **数据完整性**：每条记录经过 SHA-256 哈希校验，确保存储历史不可篡改且可追溯。
+
+#### **L3 — 新皮层 (语义事实层)**
+*   **核心概念**：沉淀后的智慧。
+*   **工作机制**：后台任务定期“阅读” L2 历史，并将其浓缩为一份“事实真相”文档。这为 AI 提供了高层级的背景（例如：“用户更喜欢用 Python 而不是 Go”），而无需浪费 Token 去重复阅读每一行聊天记录。
+
+#### **Ext — 知识库 (外部逻辑层)**
+*   **核心概念**：打破“对话记录”与“既有知识”的边界。
+*   **工作机制**：直接挂载您的 **Obsidian 库**。它将您的笔记视为最高优先级的权威文档，通过增量索引确保最可靠的事实被优先提供给 AI。
 
 ---
 
