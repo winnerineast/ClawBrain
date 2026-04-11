@@ -12,15 +12,15 @@ class RoomDetector:
     """
     
     SYSTEM_PROMPT = """
-    You are a conversation topic classifier. Your goal is to assign the CURRENT TURN to a specific topic-based "Room".
+    You are a highly precise conversation topic classifier. Your ONLY job is to assign the CURRENT TURN to a specific topic-based "Room".
     
     Rules:
     1. If the current turn continues an existing topic from the recent history, output the EXACT NAME of that room.
-    2. If the current turn starts a significantly different topic, output a NEW, concise room name (max 3 words, e.g., 'database-schema', 'ui-bugs').
-    3. If the topic is unclear or extremely broad, output 'general'.
+    2. If the current turn starts a different topic, you MUST output a NEW, concise room name (max 2 words, e.g., 'database', 'css', 'python-api').
+    3. NEVER output 'general' unless the input is literally just a greeting like 'hello' with no subject.
     
     Response Format:
-    Output ONLY the room name string. No preamble, no punctuation.
+    Output ONLY the room name string. No preamble, no punctuation, no quotes.
     """
 
     def __init__(self, url: str, model: str, provider: str = "ollama", api_key: str = "", client: httpx.AsyncClient = None):

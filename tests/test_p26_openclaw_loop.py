@@ -47,7 +47,7 @@ def background_server(test_data_dir):
     
     # Wait for startup
     start_time = time.time()
-    while time.time() - start_time < 30:
+    while time.time() - start_time < 60: # Increased for slow vault indexing
         try:
             with httpx.Client() as client:
                 resp = client.get(server_url, timeout=1.0)
@@ -59,9 +59,9 @@ def background_server(test_data_dir):
     else:
         # Failed to start
         process.terminate()
-        out, err = process.communicate()
-        print(f"[SERVER] Failed to start. STDOUT: {out.decode()} STDERR: {err.decode()}")
-        pytest.fail("Could not start ClawBrain server for E2E test.")
+        # Communicate returns (None, None) since we redirected to sys.stdout
+        process.communicate()
+        pytest.fail("Could not start ClawBrain server for E2E test within 60s.")
 
     yield True
 
@@ -113,17 +113,38 @@ async def test_p26_openclaw_to_clawbrain_loop(background_server, test_data_dir):
 
     # 2. Wait for ClawBrain async ingestion (SSE reconstruction)
     print("[3/3] Waiting for ClawBrain to solidify memory...")
-    time.sleep(5.0)
 
-    # 3. ChromaDB Penetration Verification
-    print("\n[VERIFICATION] Searching for trace in ClawBrain Hippocampus (ChromaDB)...")
-    
-    # Force reload to see new data
-    clear_chroma_clients()
-    hp = Hippocampus(db_dir=test_data_dir)
-    
-    # Get recent traces for this session
-    recent = hp.get_recent_traces(limit=1, context_id=session_id)
+    # 3. ChromaDB Penetration Verification with Polling
+    print("\n[VERIFICATION] Polling for trace in ClawBrain Hippocampus (ChromaDB)...")
+
+    start_time = time.time()
+    max_wait = 60
+    recent = []
+
+    while time.time() - start_time < max_wait:
+        # Force reload to see new data
+        clear_chroma_clients()
+        hp = Hippocampus(db_dir=test_data_dir)
+
+        # Get recent traces for this session
+        recent = hp.get_recent_traces(limit=1, context_id=session_id)
+
+        if recent:
+            data_json = recent[0]["raw_content"]
+            try:
+                data = json.loads(data_json)
+                reaction_obj = data.get("reaction", {})
+                reaction_text = reaction_obj.get("message", {}).get("content", "") if reaction_obj else ""
+
+                # Check if the stream has finished writing the reaction
+                if secret_canary in reaction_text:
+                    print(f"Success! Trace detected after {int(time.time() - start_time)}s.")
+                    break
+            except:
+                pass
+
+        print(f"  > Polling... ({int(time.time() - start_time)}s / {max_wait}s)")
+        time.sleep(2.0)
 
     if not recent:
         pytest.fail(f"FAILED: No trace recorded by ClawBrain for session {session_id}")
@@ -132,15 +153,14 @@ async def test_p26_openclaw_to_clawbrain_loop(background_server, test_data_dir):
     data = json.loads(data_json)
     stimulus_obj = data.get("stimulus", {})
     reaction_obj = data.get("reaction", {})
-    
+
     # Check stimulus (user message)
     stimulus_text = ""
     if "messages" in stimulus_obj:
         stimulus_text = " ".join(m.get("content", "") for m in stimulus_obj["messages"])
-    
-    # Check reaction (assistant response reconstructed from stream)
-    reaction_text = reaction_obj.get("message", {}).get("content", "")
 
+    # Check reaction (assistant response reconstructed from stream)
+    reaction_text = reaction_obj.get("message", {}).get("content", "") if reaction_obj else ""
     visual_audit("Full Loop", "Stimulus Capture", secret_canary, stimulus_text)
     visual_audit("Full Loop", "Reaction Capture", secret_canary, reaction_text)
 

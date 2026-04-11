@@ -1,8 +1,0 @@
-{
-  "marathon_history": [
-    {"stimulus": {"messages": [{"role": "user", "content": "I want to use PostgreSQL with FastAPI. The db version is 15.2."}]}, "reaction": {"message": {"content": "Got it, use sqlalchemy with asyncpg for PostgreSQL 15.2."}}},
-    {"stimulus": {"messages": [{"role": "user", "content": "Actually, my team prefers Tortoise ORM."}]}, "reaction": {"message": {"content": "Okay, switching to Tortoise ORM instead of SQLAlchemy."}}},
-    {"stimulus": {"messages": [{"role": "user", "content": "Set the default port to 5432."}]}, "reaction": {"message": {"content": "Port set to 5432."}}}
-  ],
-  "canary_fact": "PostgreSQL 15.2"
-}

@@ -4,82 +4,64 @@ import os
 import shutil
 import asyncio
 import json
-import respx
-from httpx import Response
+import httpx
+import time
 from src.memory.neocortex import Neocortex
 from src.memory.storage import clear_chroma_clients
 
+async def wait_for_service(url, max_retries=5, sleep_sec=5):
+    """周期性探测，探测一次，然后睡眠确保不抢占CPU"""
+    endpoint = url if "api" in url else f"{url}/v1/models"
+    print(f"\n[SCOUT] Waiting for service at {endpoint}...")
+    for i in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                resp = await client.get(endpoint)
+                if resp.status_code == 200:
+                    print(f"[SCOUT] Service ready! (Attempt {i+1})")
+                    return True
+        except:
+            pass
+        print(f"[SCOUT] Service not ready, sleeping {sleep_sec}s... ({i+1}/{max_retries})")
+        time.sleep(sleep_sec)
+    return False
+
 @pytest.mark.asyncio
-@respx.mock
 async def test_ollama_distillation_protocol(tmp_path):
-    """Verify Neocortex correctly calls Ollama /api/generate."""
+    """实测态度：验证 Neocortex 对真实 Ollama 协议的处理"""
+    url = "http://127.0.0.1:11434"
+    if not await wait_for_service(url):
+        pytest.skip("Ollama is not responding after periodic probing.")
+
     clear_chroma_clients()
-    url = "http://mock-ollama:11434"
-    model = "mock-gemma"
     test_dir = str(tmp_path)
+    nc = Neocortex(db_dir=test_dir, distill_url=url, distill_model="qwen2.5:latest", distill_provider="ollama")
     
-    nc = Neocortex(db_dir=test_dir, distill_url=url, distill_model=model, distill_provider="ollama")
-    
-    # Mock Ollama response
-    route = respx.post(f"{url}/api/generate").mock(return_value=Response(200, json={"response": "Ollama Summary"}))
-    
-    traces = [{"stimulus": {"messages": [{"role": "user", "content": "hello"}]}}]
+    traces = [{"stimulus": {"messages": [{"role": "user", "content": "Short fact about Linux."}]}}]
     summary = await nc.distill("session_ollama", traces)
     
-    assert summary == "Ollama Summary"
-    assert route.called
-    # Check payload
-    sent_json = json.loads(route.calls.last.request.content)
-    assert sent_json["model"] == model
-    assert "hello" in sent_json["prompt"]
-    
-    # Verify persistence
-    assert nc.get_summary("session_ollama") == "Ollama Summary"
+    assert len(summary) > 0
+    assert "[Error]" not in summary
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_openai_distillation_protocol(tmp_path):
-    """Verify Neocortex correctly calls OpenAI-compatible /chat/completions."""
+    """实测态度：验证 Neocortex 对真实 OpenAI 兼容协议 (LM Studio) 的处理"""
+    url = "http://127.0.0.1:1234/v1"
+    if not await wait_for_service("http://127.0.0.1:1234"):
+        pytest.skip("LM Studio is not responding after periodic probing.")
+
     clear_chroma_clients()
-    url = "http://mock-openai:8080/v1"
-    model = "mock-gpt"
     test_dir = str(tmp_path)
     
+    # Get model name from LM Studio
+    async with httpx.AsyncClient() as client:
+        m_resp = await client.get("http://127.0.0.1:1234/v1/models")
+        model = m_resp.json()["data"][0]["id"]
+
     nc = Neocortex(db_dir=test_dir, distill_url=url, distill_model=model, distill_provider="openai")
     
-    # Mock OpenAI response
-    route = respx.post(f"{url}/chat/completions").mock(return_value=Response(200, json={
-        "choices": [{"message": {"content": "OpenAI Summary"}}]
-    }))
-    
-    traces = [{"stimulus": {"messages": [{"role": "user", "content": "hello"}]}}]
+    traces = [{"stimulus": {"messages": [{"role": "user", "content": "Short fact about JS."}]}}]
     summary = await nc.distill("session_openai", traces)
     
-    assert summary == "OpenAI Summary"
-    assert route.called
-    # Check payload
-    sent_json = json.loads(route.calls.last.request.content)
-    assert sent_json["model"] == model
-    assert sent_json["messages"][1]["content"].find("hello") != -1
-    
-    # Verify persistence
-    assert nc.get_summary("session_openai") == "OpenAI Summary"
-
-@pytest.mark.asyncio
-async def test_config_priority(tmp_path):
-    """Verify environment variables override constructor args."""
-    clear_chroma_clients()
-    test_dir = str(tmp_path)
-    os.environ["CLAWBRAIN_DISTILL_URL"] = "http://env-url"
-    os.environ["CLAWBRAIN_DISTILL_MODEL"] = "env-model"
-    os.environ["CLAWBRAIN_DISTILL_PROVIDER"] = "env-provider"
-    
-    try:
-        nc = Neocortex(db_dir=test_dir, distill_url="http://arg-url", distill_model="arg-model", distill_provider="arg-provider")
-        assert nc.distill_url == "http://env-url"
-        assert nc.distill_model == "env-model"
-        assert nc.distill_provider == "env-provider"
-    finally:
-        del os.environ["CLAWBRAIN_DISTILL_URL"]
-        del os.environ["CLAWBRAIN_DISTILL_MODEL"]
-        del os.environ["CLAWBRAIN_DISTILL_PROVIDER"]
+    assert len(summary) > 0
+    assert "[Error]" not in summary

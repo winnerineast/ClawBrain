@@ -32,7 +32,8 @@ async def test_e2e_multi_round_marathon(tmp_path):
     clear_chroma_clients()
     os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
     
-    data_path = Path("tests/data/p5_e2e.json")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_path = Path(project_root) / "tests" / "fixtures" / "p5_e2e.json"
     thread = json.loads(data_path.read_text())["multi_round_thread"]
     
     question = "Round 21: Based on our talk about FastAPI (Round 2) and AWS ECS (Round 12), what is the single most critical step for production stability?"

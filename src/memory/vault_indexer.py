@@ -4,6 +4,7 @@ import json
 import hashlib
 import time
 import logging
+import asyncio
 from pathlib import Path
 from typing import Dict, Any, List
 import chromadb
@@ -110,7 +111,7 @@ class VaultIndexer:
         return stats
 
     async def _index_file(self, full_path: Path, rel_path: str):
-        """Chunks and embeds a single markdown file."""
+        """Chunks and embeds a single markdown file with batching."""
         content = full_path.read_text(encoding="utf-8")
         
         # Remove old entries for this file
@@ -127,12 +128,20 @@ class VaultIndexer:
             if i + size >= len(content):
                 break
         
-        ids = [f"vault_{rel_path}_{j}" for j in range(len(chunks))]
-        metadatas = [{"file_path": rel_path, "chunk_index": j} for j in range(len(chunks))]
-        
-        if ids:
+        if not chunks:
+            return
+
+        # Phase 35: Batched Addition to prevent ChromaDB/Rust crashes on large files
+        batch_size = 20 
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i : i + batch_size]
+            batch_ids = [f"vault_{rel_path}_{j}" for j in range(i, i + len(batch_chunks))]
+            batch_metas = [{"file_path": rel_path, "chunk_index": j} for j in range(i, i + len(batch_chunks))]
+            
             self.collection.add(
-                ids=ids,
-                documents=chunks,
-                metadatas=metadatas
+                ids=batch_ids,
+                documents=batch_chunks,
+                metadatas=batch_metas
             )
+            # Give ChromaDB/IO a small breath
+            await asyncio.sleep(0.01)
