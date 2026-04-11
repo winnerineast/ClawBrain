@@ -103,9 +103,9 @@ Isolate memory between different projects or users by sending a simple header:
 
 ---
 
-## 🧠 System Architecture: The Tri-Layer Memory Engine
+## 🧠 Information Flow Architecture
 
-ClawBrain operates on two distinct planes: the **Relay Plane** for low-latency traffic and the **Cognitive Plane** for long-term intelligence.
+ClawBrain separates the **Memory Capture** flow (how data becomes memory) from the **Context Optimization** flow (how memory improves AI responses).
 
 ```mermaid
 flowchart LR
@@ -115,66 +115,55 @@ flowchart LR
     classDef storage fill:#ffffff,stroke:#333,stroke-width:1px
     classDef external fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px
 
-    %% 1. Left: Frontend
+    %% 1. Horizontal Planes
     subgraph Left [Agentic Frontend]
         OC[OpenClaw / CLI]
     end
 
-    %% 2. Middle: ClawBrain Engine (Vertical Stack)
     subgraph Center [ClawBrain Memory Engine]
         direction TB
-        
-        subgraph Relay [Relay Plane - Real-time Traffic]
-            direction LR
-            Ingest[Ingestion Engine]:::capture
-            Assemble[Context Assembler]:::cognitive
-            Logic[Stack Math Controller]:::cognitive
+        subgraph Relay [Relay Plane]
+            Ingest[Data Capturer]:::capture
+            Assemble[Context Builder]:::cognitive
         end
-
-        subgraph CognitivePlane [Cognitive Plane - Memory Evolution]
+        subgraph Cognitive [Cognitive Plane]
             direction LR
-            L1[L1: Working Memory\nActive Attention]:::storage
-            L2[L2: Hippocampus\nEpisodic Archive]:::storage
-            L3[L3: Neocortex\nSemantic Facts]:::storage
+            L1[L1: Working Memory]:::storage
+            L2[L2: Hippocampus]:::storage
+            L3[L3: Neocortex]:::storage
         end
-
-        subgraph KnowledgePlane [Knowledge Bridge]
-            direction LR
+        subgraph Knowledge [Knowledge Bridge]
             Ext[Ext: Knowledge Vault]:::storage
         end
+        %% Vertical Stacking Constraints
+        Relay ~~~ Cognitive ~~~ Knowledge
     end
 
-    %% 3. Right: Backend Intelligence
     subgraph Right [Backend Intelligence]
         LLM[Ollama / Cloud LLM]
     end
 
-    %% 4. Bottom: Physical Storage
     Vault[(Obsidian Vault)]:::external
 
-    %% --- INFORMATION FLOWS ---
+    %% --- DATA FLOW 1: MEMORY CAPTURE (GREEN) ---
+    %% How information enters and becomes memory
+    OC -- "Turn Ingest" --> Ingest
+    LLM -- "Response Ingest" --> Ingest
+    Ingest -- "Archive" --> L1 & L2
+    Vault -- "File Sync" --> Ext
 
-    %% FLOW A: Memory Capture (Green)
-    OC -- "1. Interaction" --> Ingest
-    Ingest -- "2. Sync Write" --> L1
-    Ingest -- "2. Async Archive" --> L2
-    Vault -- "1. Incremental Scan" --> Ext
-    LLM -- "3. Capture Response" --> Ingest
-
-    %% FLOW B: Internal Evolution (Blue)
-    L2 -- "Background Distillation" --> L3
-
-    %% FLOW C: Context Optimization (Blue)
-    Logic -- "Budget" --> Assemble
-    Assemble -- "Priority 1" --> L3
-    Assemble -- "Priority 2" --> Ext
-    Assemble -- "Priority 3" --> L1
-    Assemble -- "Priority 4" --> L2
-    Assemble -- "4. Enhanced Request" --> LLM
+    %% --- DATA FLOW 2: OPTIMIZATION & RECALL (BLUE) ---
+    %% How memory is processed and retrieved for context
+    L2 -- "Distillation" --> L3
+    L3 -- "Retrieve" --> Assemble
+    Ext -- "Retrieve" --> Assemble
+    L1 -- "Retrieve" --> Assemble
+    L2 -- "Retrieve" --> Assemble
+    Assemble -- "Optimized Context" --> LLM
 
     %% Applying Link Styles
-    linkStyle 0,1,2,3,4 stroke:#2ecc71,stroke-width:2px,color:#27ae60
-    linkStyle 5,6,7,8,9,10,11 stroke:#3498db,stroke-width:2px,color:#2980b9
+    linkStyle 0,1,2,3 stroke:#2ecc71,stroke-width:2px,color:#27ae60
+    linkStyle 4,5,6,7,8,9,10 stroke:#3498db,stroke-width:2px,color:#2980b9
 ```
 
 ### Layer Details

@@ -103,9 +103,9 @@ openclaw plugins install -l ./packages/openclaw
 
 ---
 
-## 🧠 系统架构：三层记忆引擎
+## 🧠 信息流架构图
 
-ClawBrain 运行在两个互不干扰的平面上：负责低延迟流量的**中转平面 (Relay Plane)** 和负责深度智能的**认知平面 (Cognitive Plane)**。
+ClawBrain 严格区分 **记忆捕获流**（信息如何转化为记忆）与 **上下文优化流**（记忆如何提升 AI 回复质量）。
 
 ```mermaid
 flowchart LR
@@ -115,66 +115,55 @@ flowchart LR
     classDef storage fill:#ffffff,stroke:#333,stroke-width:1px
     classDef external fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px
 
-    %% 1. 左侧：智能体前端
+    %% 1. 水平平面布局
     subgraph Left [智能体前端]
         OC[OpenClaw / CLI]
     end
 
-    %% 2. 中间：ClawBrain 引擎 (纵向堆叠)
     subgraph Center [ClawBrain 记忆引擎]
         direction TB
-        
-        subgraph Relay [中转平面 - 实时流量]
-            direction LR
-            Ingest[捕获引擎]:::capture
+        subgraph Relay [中转平面]
+            Ingest[数据捕获器]:::capture
             Assemble[上下文组装器]:::cognitive
-            Logic[堆栈数学控制器]:::cognitive
         end
-
-        subgraph CognitivePlane [认知平面 - 记忆演进]
+        subgraph Cognitive [认知平面]
             direction LR
-            L1[L1: 工作记忆\n活跃注意力]:::storage
-            L2[L2: 海马体\n情节归档]:::storage
-            L3[L3: 新皮层\n语义事实]:::storage
+            L1[L1: 工作记忆]:::storage
+            L2[L2: 海马体]:::storage
+            L3[L3: 新皮层]:::storage
         end
-
-        subgraph KnowledgePlane [知识桥梁]
-            direction LR
+        subgraph Knowledge [知识桥梁]
             Ext[Ext: 外部知识库]:::storage
         end
+        %% 纵向堆叠约束
+        Relay ~~~ Cognitive ~~~ Knowledge
     end
 
-    %% 3. 右侧：后端智能
     subgraph Right [后端智能]
         LLM[Ollama / 云端模型]
     end
 
-    %% 4. 底部：物理存储
     Vault[(Obsidian 知识库)]:::external
 
-    %% --- 信息流向 ---
+    %% --- 数据流 1: 记忆捕获 (绿色) ---
+    %% 信息如何进入系统并转化为记忆
+    OC -- "交互捕获" --> Ingest
+    LLM -- "响应捕获" --> Ingest
+    Ingest -- "归档" --> L1 & L2
+    Vault -- "文件同步" --> Ext
 
-    %% 流程 A: 记忆捕获流 (绿色)
-    OC -- "1. 发起交互" --> Ingest
-    Ingest -- "2. 同步写入" --> L1
-    Ingest -- "2. 异步归档" --> L2
-    Vault -- "1. 增量扫描" --> Ext
-    LLM -- "3. 捕获响应" --> Ingest
-
-    %% 流程 B: 内部演进 (蓝色)
+    %% --- 数据流 2: 优化与召回 (蓝色) ---
+    %% 记忆如何被处理并检索以优化上下文
     L2 -- "异步提纯" --> L3
-
-    %% 流程 C: 上下文优化 (蓝色)
-    Logic -- "预算控制" --> Assemble
-    Assemble -- "优先级 1" --> L3
-    Assemble -- "优先级 2" --> Ext
-    Assemble -- "优先级 3" --> L1
-    Assemble -- "优先级 4" --> L2
-    Assemble -- "4. 增强请求" --> LLM
+    L3 -- "检索" --> Assemble
+    Ext -- "检索" --> Assemble
+    L1 -- "检索" --> Assemble
+    L2 -- "检索" --> Assemble
+    Assemble -- "优化后的上下文" --> LLM
 
     %% 应用连线样式
-    linkStyle 0,1,2,3,4 stroke:#2ecc71,stroke-width:2px,color:#27ae60
-    linkStyle 5,6,7,8,9,10,11 stroke:#3498db,stroke-width:2px,color:#2980b9
+    linkStyle 0,1,2,3 stroke:#2ecc71,stroke-width:2px,color:#27ae60
+    linkStyle 4,5,6,7,8,9,10 stroke:#3498db,stroke-width:2px,color:#2980b9
 ```
 
 ### 层级技术细节
