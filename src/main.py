@@ -45,11 +45,15 @@ async def lifespan(app: FastAPI):
     distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL")
     distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER")
     
+    # Phase 34: Support disabling room detection for tests/low-resource
+    disable_rooms = os.getenv("CLAWBRAIN_DISABLE_ROOM_DETECTION", "false").lower() == "true"
+    
     app.state.memory_router = MemoryRouter(
         db_dir=db_dir,
         distill_url=distill_url,
         distill_model=distill_model,
-        distill_provider=distill_provider
+        distill_provider=distill_provider,
+        enable_room_detection=not disable_rooms
     )
     
     logger.info(f"[INIT] Distillation Backend: {app.state.memory_router.neo.distill_provider} | URL: {app.state.memory_router.neo.distill_url}")
@@ -58,6 +62,7 @@ async def lifespan(app: FastAPI):
     app.state.pipeline = Pipeline()
     app.state.http_client = httpx.AsyncClient(timeout=300.0, limits=httpx.Limits(max_connections=100))
     yield
+    await app.state.memory_router.aclose()
     await app.state.http_client.aclose()
 
 app = FastAPI(title="ClawBrain Universal Relay", lifespan=lifespan)
@@ -188,19 +193,10 @@ async def internal_after_turn(request: Request, body: AfterTurnBody):
         trace_id = await mr.ingest(stimulus, reaction=reaction, context_id=session_id, sync_distill=body.sync)
         logger.info(f"[INT_AFTER_TURN] Ingested Turn Trace | session={session_id} trace={trace_id}")
 
-    # 2. State Solidification
+    # 2. State Solidification (L1 WM Snapshot)
     wm = mr._get_wm(session_id)
     mr.hippo.save_wm_state(session_id, wm.items)
     
-    # 3. Distillation Counter (P18: Per-session isolated counter)
-    if session_id not in mr._trace_counters:
-        mr._trace_counters[session_id] = 0
-        
-    mr._trace_counters[session_id] += 1
-    if mr._trace_counters[session_id] >= mr.distill_threshold:
-        asyncio.create_task(mr._auto_distill_worker(session_id))
-        mr._trace_counters[session_id] = 0
-        
     return {"ok": True, "ingested_count": len(new_msgs)}
 
 # ── MANAGEMENT API (Must be before catch-all) ──

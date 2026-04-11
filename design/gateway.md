@@ -52,7 +52,14 @@ Fully implement ClawBrain Gateway protocol adaptation for major LLM providers. B
     - `anthropic`: Forward `x-api-key`; remove `Authorization`.
     - `ollama`: Remove all auth headers by default.
 
+## 2.8 Network Plane Isolation (Stability & Performance)
+To prevent internal cognitive tasks from interfering with the main relay throughput and to ensure deterministic testing:
+- **Client Separation**: The `MemoryRouter` must own an independent `httpx.AsyncClient` (the "Cognitive Client"). This client is dedicated to background tasks like `distill` and `detect_room`.
+- **Non-blocking Guarantee**: Cognitive Plane tasks must never block the Relay Plane. Failures or timeouts in the Cognitive Plane (e.g., local Ollama being offline) must fail silently or log warnings without returning 5xx errors to the user.
+- **Mock Integrity**: Tests must use URL-targeted mocking (e.g., `respx`) instead of global class patching (`unittest.mock.patch`). This ensures that mocks intended for the Relay Plane do not accidentally capture or interfere with Cognitive Plane requests.
+
 ## 3. Test Specification (TDD & High-Fidelity Audit)
+...
 
 ### 3.3 Secure Header Leak Audit (New)
 - **Audit Case**: Send a request with `x-clawbrain-session` and `Authorization`.

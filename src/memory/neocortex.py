@@ -9,7 +9,8 @@ from typing import List, Dict, Any, Optional
 from src.memory.storage import get_chroma_client
 
 class Neocortex:
-    def __init__(self, db_dir: str = None, distill_url: str = None, distill_model: str = None, distill_provider: str = None):
+    def __init__(self, db_dir: str = None, distill_url: str = None, distill_model: str = None, 
+                 distill_provider: str = None, client: httpx.AsyncClient = None):
         if db_dir is None:
             # Dynamic default path for portability (Issue-003)
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,11 +29,13 @@ class Neocortex:
         self.db_path = self.db_dir / "hippocampus.db"
         
         # §2.1 & ISSUE-004: Dynamic Distillation Config
-        # Priority: Env Var > Constructor Argument > Default
         self.distill_url = os.getenv("CLAWBRAIN_DISTILL_URL", distill_url or "http://127.0.0.1:11434")
         self.distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", distill_model or "gemma4:e4b")
         self.distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER", distill_provider or "ollama")
         self.api_key = os.getenv("CLAWBRAIN_DISTILL_API_KEY", "")
+        
+        # Phase 34: Shared internal client
+        self.http_client = client
         
         self._init_db()
 
@@ -42,7 +45,7 @@ class Neocortex:
 
     async def distill(self, context_id: str, traces: List[Dict[str, Any]]) -> str:
         """§2.2: Async distillation logic with universal provider support (ISSUE-004)."""
-        # 1. Prepare corpus
+        # ... rest of corpus prep ...
         corpus = []
         for t in traces:
             stimulus = t.get("stimulus", {})
@@ -78,38 +81,46 @@ class Neocortex:
             if self.api_key:
                 headers["Authorization"] = f"Bearer {self.api_key}"
 
-            async with httpx.AsyncClient(timeout=90.0) as client:
-                if self.distill_provider == "ollama":
-                    # Ollama specific protocol
-                    resp = await client.post(f"{self.distill_url}/api/generate", headers=headers, json={
-                        "model": self.distill_model,
-                        "prompt": prompt,
-                        "stream": False
-                    })
-                    if resp.status_code != 200:
-                        return f"[Error] Ollama Distillation failed ({resp.status_code}): {resp.text}"
-                    summary = resp.json().get("response", "")
-                else:
-                    # Default to OpenAI-compatible Chat Completion protocol (OMLX, LM Studio, Cloud)
-                    resp = await client.post(f"{self.distill_url}/chat/completions", headers=headers, json={
-                        "model": self.distill_model,
-                        "messages": [
-                            {"role": "system", "content": "You are a professional memory distiller."},
-                            {"role": "user", "content": prompt}
-                        ],
-                        "stream": False
-                    })
-                    if resp.status_code != 200:
-                        return f"[Error] OpenAI-compatible Distillation failed ({resp.status_code}): {resp.text}"
-                    summary = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-
-                if summary:
-                    self._save_summary(context_id, summary)
-                    return summary
-                return "[Error] Empty summary returned from provider."
+            # Phase 34: Use Cognitive Plane client
+            # Use provided client or fallback to temporary one if not available
+            if self.http_client:
+                return await self._dispatch_request(self.http_client, headers, prompt, context_id)
+            else:
+                async with httpx.AsyncClient(timeout=90.0) as client:
+                    return await self._dispatch_request(client, headers, prompt, context_id)
                 
         except Exception as e:
             return f"[Error] Distillation connection error: {str(e)}"
+
+    async def _dispatch_request(self, client: httpx.AsyncClient, headers: Dict, prompt: str, context_id: str) -> str:
+        if self.distill_provider == "ollama":
+            # Ollama specific protocol
+            resp = await client.post(f"{self.distill_url}/api/generate", headers=headers, json={
+                "model": self.distill_model,
+                "prompt": prompt,
+                "stream": False
+            })
+            if resp.status_code != 200:
+                return f"[Error] Ollama Distillation failed ({resp.status_code}): {resp.text}"
+            summary = resp.json().get("response", "")
+        else:
+            # Default to OpenAI-compatible Chat Completion protocol (OMLX, LM Studio, Cloud)
+            resp = await client.post(f"{self.distill_url}/chat/completions", headers=headers, json={
+                "model": self.distill_model,
+                "messages": [
+                    {"role": "system", "content": "You are a professional memory distiller."},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False
+            })
+            if resp.status_code != 200:
+                return f"[Error] OpenAI-compatible Distillation failed ({resp.status_code}): {resp.text}"
+            summary = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        if summary:
+            self._save_summary(context_id, summary)
+            return summary
+        return "[Error] Empty summary returned from provider."
 
     def _save_summary(self, context_id: str, summary: str):
         """Phase 33: Summary persistence in ChromaDB."""

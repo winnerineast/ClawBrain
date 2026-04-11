@@ -146,7 +146,8 @@ class Hippocampus:
 
     def save_trace(self, trace_id: str, payload: Dict[str, Any],
                    search_text: str = "", threshold: int = None,
-                   context_id: str = "default") -> Dict[str, Any]:
+                   context_id: str = "default",
+                   room_id: str = "general") -> Dict[str, Any]:
         content_json = json.dumps(payload)
         content_bytes = content_json.encode('utf-8')
         content_size = len(content_bytes)
@@ -168,10 +169,11 @@ class Hippocampus:
 
         now = time.time()
         
-        # Phase 33: ChromaDB Storage
+        # Phase 33/34: ChromaDB Storage with Room support
         metadata = {
             "timestamp": now,
             "context_id": context_id,
+            "room_id": room_id,
             "model": payload.get("model", ""),
             "trace_id": trace_id,
             "is_blob": 1 if is_blob else 0,
@@ -193,18 +195,31 @@ class Hippocampus:
         return {"trace_id": trace_id, "is_blob": is_blob,
                 "blob_path": blob_path, "size": content_size, "checksum": checksum}
 
-    def search(self, query: str, context_id: str = "default") -> List[str]:
+    def search(self, query: str, context_id: str = "default", room_id: str = None) -> List[str]:
         """
-        Phase 33: Semantic Vector Search via ChromaDB, filtered by context_id.
+        Phase 33/34: Semantic Vector Search via ChromaDB.
+        Optionally filtered by room_id for higher precision.
         """
         if not query or not query.strip():
             return []
             
         try:
+            # Construct metadata filter
+            if room_id:
+                # ChromaDB requires explicit $and for multiple metadata filters
+                where_clause = {
+                    "$and": [
+                        {"context_id": context_id},
+                        {"room_id": room_id}
+                    ]
+                }
+            else:
+                where_clause = {"context_id": context_id}
+
             results = self.traces_col.query(
                 query_texts=[query],
                 n_results=10,
-                where={"context_id": context_id}
+                where=where_clause
             )
             
             if results and results["ids"]:
@@ -245,15 +260,12 @@ class Hippocampus:
             except Exception:
                 return None
         
-        # If it's not a blob, the document itself might be the intent, 
-        # but the actual raw_content should be stored in metadata or we 
-        # should have indexed raw_content. 
-        # In my save_trace, I indexed document=intent if available.
-        # This is a trade-off. Let's ensure raw_content is always in metadata
-        # for small traces to allow retrieval.
-        # Wait, ChromaDB documents can be large. 
-        # Let's assume the document IS the content we want to retrieve 
-        # if it's not a blob.
+        # If it's not a blob, the full JSON should be in metadata['raw_content']
+        # if it was saved by Phase 33+ logic.
+        if "raw_content" in meta and meta["raw_content"]:
+            return meta["raw_content"]
+            
+        # Fallback to document (might be intent or raw_content depending on version)
         return res["documents"][0]
 
     def get_recent_traces(self, limit: int, context_id: str = None) -> List[Dict[str, Any]]:
@@ -276,7 +288,8 @@ class Hippocampus:
                 "blob_path": meta.get("blob_path"),
                 "raw_content": meta.get("raw_content") or res["documents"][i], 
                 "checksum": meta.get("checksum"),
-                "context_id": meta.get("context_id")
+                "context_id": meta.get("context_id"),
+                "room_id": meta.get("room_id", "general")
             }
             traces.append(trace)
             

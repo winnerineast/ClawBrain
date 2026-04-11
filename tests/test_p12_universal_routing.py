@@ -1,9 +1,10 @@
 # Generated from design/gateway.md v1.29
 import pytest
 import asyncio
+import respx
+from httpx import Response
 from fastapi.testclient import TestClient
 from src.main import app
-from unittest.mock import patch, MagicMock, AsyncMock
 
 def visual_audit(test_name, input_desc, target_prov, actual_status):
     print(f"\n[DIALECT AUDIT: {test_name}]")
@@ -18,56 +19,53 @@ def visual_audit(test_name, input_desc, target_prov, actual_status):
     print("=" * 60)
 
 @pytest.mark.asyncio
+@respx.mock
 async def test_universal_routing_lmstudio():
     """验证 /v1/chat/completions 输入，被正确翻译并路由到 lmstudio"""
+    # 彻底隔离：关闭 Room Detection 以防产生背景流量干扰
+    import os
+    os.environ["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
+    
     payload = {
         "model": "lmstudio/llama-3",
         "messages": [{"role": "user", "content": "Hello"}]
     }
     
+    # 精准拦截：只拦截发往 LMStudio 的请求
+    route = respx.post("http://127.0.0.1:1234/v1/chat/completions").mock(
+        return_value=Response(200, json={"choices": [{"message": {"content": "mock"}}]})
+    )
+    
     with TestClient(app) as client:
-        with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-            mock_resp = MagicMock()
-            mock_resp.is_error = False
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = {"choices": [{"message": {"content": "mock"}}]}
-            mock_post.return_value = mock_resp
-            
-            response = client.post("/v1/chat/completions", json=payload)
-            
-            # 3.2 准则修复：等待异步日志传播
-            await asyncio.sleep(1)
-            
-            visual_audit("Universal Routing -> LMStudio", "lmstudio/llama-3 via /v1", "lmstudio (Dialect: openai)", response.status_code)
-            
-            assert response.status_code == 200
-            url_called = mock_post.call_args[0][0]
-            assert "1234/v1/chat/completions" in url_called
+        response = client.post("/v1/chat/completions", json=payload)
+        
+        visual_audit("Universal Routing -> LMStudio", "lmstudio/llama-3 via /v1", "lmstudio (Dialect: openai)", response.status_code)
+        
+        assert response.status_code == 200
+        assert route.called
 
 @pytest.mark.asyncio
+@respx.mock
 async def test_universal_routing_ollama():
     """验证 /api/chat 输入，被路由到默认 ollama"""
+    import os
+    os.environ["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
+    
     payload = {
         "model": "gemma4:e4b",
         "messages": [{"role": "user", "content": "Hello"}],
         "options": {"temperature": 0.5}
     }
     
+    # 精准拦截：只拦截发往 Ollama 的请求
+    route = respx.post("http://127.0.0.1:11434/api/chat").mock(
+        return_value=Response(200, json={"message": {"content": "mock"}})
+    )
+    
     with TestClient(app) as client:
-        with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-            mock_resp = MagicMock()
-            mock_resp.is_error = False
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = {"message": {"content": "mock"}}
-            mock_post.return_value = mock_resp
-            
-            response = client.post("/api/chat", json=payload)
-            
-            # 3.2 准则修复：等待异步日志传播
-            await asyncio.sleep(1)
-            
-            visual_audit("Universal Routing -> Ollama", "gemma4:e4b via /api", "ollama (Dialect: ollama)", response.status_code)
-            
-            assert response.status_code == 200
-            url_called = mock_post.call_args[0][0]
-            assert "11434/api/chat" in url_called
+        response = client.post("/api/chat", json=payload)
+        
+        visual_audit("Universal Routing -> Ollama", "gemma4:e4b via /api", "ollama (Dialect: ollama)", response.status_code)
+        
+        assert response.status_code == 200
+        assert route.called

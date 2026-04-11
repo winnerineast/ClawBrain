@@ -243,6 +243,16 @@ graph LR
 
 ---
 
+## 🛡️ Robustness by Design
+
+ClawBrain is engineered for high-availability agentic workflows. It employs **Network Plane Isolation** to ensure that internal background tasks never degrade the user experience:
+
+- **Dual-Channel HTTP Architecture**: The system maintains two separate connection pools. The **Relay Plane** handles high-priority LLM traffic with optimized throughput, while the **Cognitive Plane** (MemoryRouter internal client) manages background tasks like Room Detection and Fact Distillation.
+- **Fault Tolerance**: If an internal task (like local Ollama distillation) slows down or fails, it is isolated to the Cognitive Plane. Your main conversation flow remains 100% responsive and unaffected.
+- **Stateless Relay**: The gateway maintains minimal state, ensuring memory augmentation adds negligible latency to the overall request lifecycle.
+
+---
+
 ## 🧠 Tri-Layer Memory Dynamics
 
 ### L1 — Working Memory (Active Attention)
