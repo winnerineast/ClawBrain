@@ -108,56 +108,73 @@ openclaw plugins install -l ./packages/openclaw
 ClawBrain 运行在两个互不干扰的平面上：负责低延迟流量的**中转平面 (Relay Plane)** 和负责深度智能的**认知平面 (Cognitive Plane)**。
 
 ```mermaid
-flowchart TB
-    %% 视觉区分样式定义
+flowchart LR
+    %% 样式定义
     classDef capture stroke:#2ecc71,stroke-width:2px,fill:#e8f8f5
     classDef cognitive stroke:#3498db,stroke-width:2px,fill:#ebf5fb
-    classDef storage fill:#f9f9f9,stroke:#333,stroke-dasharray: 5 5
+    classDef storage fill:#ffffff,stroke:#333,stroke-width:1px
+    classDef external fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px
 
-    subgraph Client [智能体前端]
+    %% 1. 左侧：智能体前端
+    subgraph Left [智能体前端]
         OC[OpenClaw / CLI]
     end
 
-    subgraph Relay [ClawBrain 中转平面]
+    %% 2. 中间：ClawBrain 引擎 (纵向堆叠)
+    subgraph Center [ClawBrain 记忆引擎]
         direction TB
-        Ingest[捕获引擎]:::capture
-        Assemble[上下文组装器]:::cognitive
-        Logic[堆栈数学控制器]:::cognitive
+        
+        subgraph Relay [中转平面 - 实时流量]
+            direction LR
+            Ingest[捕获引擎]:::capture
+            Assemble[上下文组装器]:::cognitive
+            Logic[堆栈数学控制器]:::cognitive
+        end
+
+        subgraph CognitivePlane [认知平面 - 记忆演进]
+            direction LR
+            L1[L1: 工作记忆\n活跃注意力]:::storage
+            L2[L2: 海马体\n情节归档]:::storage
+            L3[L3: 新皮层\n语义事实]:::storage
+        end
+
+        subgraph KnowledgePlane [知识桥梁]
+            direction LR
+            Ext[Ext: 外部知识库]:::storage
+        end
     end
 
-    subgraph Memory [认知记忆平面]
-        direction TB
-        L3[(L3: 新皮层\n提纯后的硬事实)]:::storage
-        Ext[(Ext: Vault\nObsidian 外部知识)]:::storage
-        L1[(L1: 工作记忆\n活跃注意力)]:::storage
-        L2[(L2: 海马体\n情节向量库)]:::storage
+    %% 3. 右侧：后端智能
+    subgraph Right [后端智能]
+        LLM[Ollama / 云端模型]
     end
 
-    subgraph LLM [后端智能]
-        Ollama[本地: Ollama/LMS]
-        Cloud[云端: OpenAI/Claude]
-    end
+    %% 4. 底部：物理存储
+    Vault[(Obsidian 知识库)]:::external
 
-    %% 1. 记忆捕获流 (信息如何进入 ClawBrain)
-    OC -- "交互请求" --> Ingest
-    Ingest -- "无感归档" --> L1
-    Ingest -- "无感归档" --> L2
-    LocalFiles[(Obsidian 库)] -- "mtime + hash 扫描" --> Ext
-    
-    %% 2. 认知与检索流 (内部处理与上下文优化)
+    %% --- 信息流向 ---
+
+    %% 流程 A: 记忆捕获流 (绿色)
+    OC -- "1. 发起交互" --> Ingest
+    Ingest -- "2. 同步写入" --> L1
+    Ingest -- "2. 异步归档" --> L2
+    Vault -- "1. 增量扫描" --> Ext
+    LLM -- "3. 捕获响应" --> Ingest
+
+    %% 流程 B: 内部演进 (蓝色)
     L2 -- "异步提纯" --> L3
-    Assemble -- "优先级召回" --> L3
-    Assemble -- "优先级召回" --> Ext
-    Assemble -- "优先级召回" --> L1
-    Assemble -- "优先级召回" --> L2
-    
-    Logic -- "精准预算控制" --> Assemble
-    Assemble -- "增强后的请求" --> LLM
-    LLM -- "重构后的流数据" --> Ingest
 
-    %% 为不同流应用连线颜色
-    linkStyle 0,1,2,3 stroke:#2ecc71,stroke-width:2px,color:#27ae60
-    linkStyle 4,5,6,7,8,9,10,11 stroke:#3498db,stroke-width:2px,color:#2980b9
+    %% 流程 C: 上下文优化 (蓝色)
+    Logic -- "预算控制" --> Assemble
+    Assemble -- "优先级 1" --> L3
+    Assemble -- "优先级 2" --> Ext
+    Assemble -- "优先级 3" --> L1
+    Assemble -- "优先级 4" --> L2
+    Assemble -- "4. 增强请求" --> LLM
+
+    %% 应用连线样式
+    linkStyle 0,1,2,3,4 stroke:#2ecc71,stroke-width:2px,color:#27ae60
+    linkStyle 5,6,7,8,9,10,11 stroke:#3498db,stroke-width:2px,color:#2980b9
 ```
 
 ### 层级技术细节

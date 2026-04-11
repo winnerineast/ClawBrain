@@ -108,56 +108,73 @@ Isolate memory between different projects or users by sending a simple header:
 ClawBrain operates on two distinct planes: the **Relay Plane** for low-latency traffic and the **Cognitive Plane** for long-term intelligence.
 
 ```mermaid
-flowchart TB
-    %% Class Definitions for Visual Distinction
+flowchart LR
+    %% Style Definitions
     classDef capture stroke:#2ecc71,stroke-width:2px,fill:#e8f8f5
     classDef cognitive stroke:#3498db,stroke-width:2px,fill:#ebf5fb
-    classDef storage fill:#f9f9f9,stroke:#333,stroke-dasharray: 5 5
+    classDef storage fill:#ffffff,stroke:#333,stroke-width:1px
+    classDef external fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px
 
-    subgraph Client [Agentic Frontend]
+    %% 1. Left: Frontend
+    subgraph Left [Agentic Frontend]
         OC[OpenClaw / CLI]
     end
 
-    subgraph Relay [ClawBrain Relay Plane]
+    %% 2. Middle: ClawBrain Engine (Vertical Stack)
+    subgraph Center [ClawBrain Memory Engine]
         direction TB
-        Ingest[Ingestion Engine]:::capture
-        Assemble[Context Assembler]:::cognitive
-        Logic[Stack Math Controller]:::cognitive
+        
+        subgraph Relay [Relay Plane - Real-time Traffic]
+            direction LR
+            Ingest[Ingestion Engine]:::capture
+            Assemble[Context Assembler]:::cognitive
+            Logic[Stack Math Controller]:::cognitive
+        end
+
+        subgraph CognitivePlane [Cognitive Plane - Memory Evolution]
+            direction LR
+            L1[L1: Working Memory\nActive Attention]:::storage
+            L2[L2: Hippocampus\nEpisodic Archive]:::storage
+            L3[L3: Neocortex\nSemantic Facts]:::storage
+        end
+
+        subgraph KnowledgePlane [Knowledge Bridge]
+            direction LR
+            Ext[Ext: Knowledge Vault]:::storage
+        end
     end
 
-    subgraph Memory [Cognitive Memory Plane]
-        direction TB
-        L3[(L3: Neocortex\nDistilled Hard Facts)]:::storage
-        Ext[(Ext: Vault\nObsidian Knowledge)]:::storage
-        L1[(L1: Working Memory\nActive Attention)]:::storage
-        L2[(L2: Hippocampus\nEpisodic Vector Store)]:::storage
+    %% 3. Right: Backend Intelligence
+    subgraph Right [Backend Intelligence]
+        LLM[Ollama / Cloud LLM]
     end
 
-    subgraph LLM [Backend Intelligence]
-        Ollama[Local: Ollama/LMS]
-        Cloud[Cloud: OpenAI/Claude]
-    end
+    %% 4. Bottom: Physical Storage
+    Vault[(Obsidian Vault)]:::external
 
-    %% 1. Capture Flow (How information enters)
-    OC -- "Turn Request" --> Ingest
-    Ingest -- "Passive Archive" --> L1
-    Ingest -- "Passive Archive" --> L2
-    LocalFiles[(Obsidian Vault)] -- "mtime + hash scan" --> Ext
-    
-    %% 2. Cognitive & Recall Flow (Internal processing & Context optimization)
-    L2 -- "Async Distillation" --> L3
-    Assemble -- "Priority Recall" --> L3
-    Assemble -- "Priority Recall" --> Ext
-    Assemble -- "Priority Recall" --> L1
-    Assemble -- "Priority Recall" --> L2
-    
-    Logic -- "Precision Budget" --> Assemble
-    Assemble -- "Enhanced Request" --> LLM
-    LLM -- "Reconstructed Stream" --> Ingest
+    %% --- INFORMATION FLOWS ---
 
-    %% Applying Classes to Flows
-    linkStyle 0,1,2,3 stroke:#2ecc71,stroke-width:2px,color:#27ae60
-    linkStyle 4,5,6,7,8,9,10,11 stroke:#3498db,stroke-width:2px,color:#2980b9
+    %% FLOW A: Memory Capture (Green)
+    OC -- "1. Interaction" --> Ingest
+    Ingest -- "2. Sync Write" --> L1
+    Ingest -- "2. Async Archive" --> L2
+    Vault -- "1. Incremental Scan" --> Ext
+    LLM -- "3. Capture Response" --> Ingest
+
+    %% FLOW B: Internal Evolution (Blue)
+    L2 -- "Background Distillation" --> L3
+
+    %% FLOW C: Context Optimization (Blue)
+    Logic -- "Budget" --> Assemble
+    Assemble -- "Priority 1" --> L3
+    Assemble -- "Priority 2" --> Ext
+    Assemble -- "Priority 3" --> L1
+    Assemble -- "Priority 4" --> L2
+    Assemble -- "4. Enhanced Request" --> LLM
+
+    %% Applying Link Styles
+    linkStyle 0,1,2,3,4 stroke:#2ecc71,stroke-width:2px,color:#27ae60
+    linkStyle 5,6,7,8,9,10,11 stroke:#3498db,stroke-width:2px,color:#2980b9
 ```
 
 ### Layer Details
