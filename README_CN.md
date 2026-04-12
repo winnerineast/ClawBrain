@@ -103,67 +103,74 @@ openclaw plugins install -l ./packages/openclaw
 
 ---
 
-## 🧠 信息流架构图
+## 🧠 数据流与智能架构
 
-ClawBrain 严格区分 **记忆捕获流**（信息如何转化为记忆）与 **上下文优化流**（记忆如何提升 AI 回复质量）。
+ClawBrain 作为一个神经协调器，通过两个核心流向管理信息的生命周期：**记忆捕获流**与**认知优化流**。
 
 ```mermaid
 flowchart LR
-    %% 样式定义
-    classDef capture stroke:#2ecc71,stroke-width:2px,fill:#e8f8f5
-    classDef cognitive stroke:#3498db,stroke-width:2px,fill:#ebf5fb
-    classDef storage fill:#ffffff,stroke:#333,stroke-width:1px
-    classDef external fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px
+    %% 专业配色方案
+    classDef capture_node stroke:#27ae60,stroke-width:2px,fill:#f1f9f5,color:#1b5e20
+    classDef cognitive_node stroke:#2980b9,stroke-width:2px,fill:#f0f7fc,color:#0d47a1
+    classDef storage_node stroke:#7f8c8d,stroke-width:1px,fill:#ffffff,color:#2c3e50
+    classDef vault_node stroke:#f39c12,stroke-width:2px,fill:#fffef0,color:#7e5109
 
-    %% 1. 水平平面布局
+    %% 1. 水平布局
     subgraph Left [智能体前端]
-        OC[OpenClaw / CLI]
+        direction TB
+        User((💻 用户 / CLI))
     end
 
-    subgraph Center [ClawBrain 记忆引擎]
+    subgraph Center [ClawBrain 神经引擎]
         direction TB
-        subgraph Relay [中转平面]
-            Ingest[数据捕获器]:::capture
-            Assemble[上下文组装器]:::cognitive
-        end
-        subgraph Cognitive [认知平面]
+        
+        subgraph RelayPlane [中转平面：高速流量]
             direction LR
-            L1[L1: 工作记忆]:::storage
-            L2[L2: 海马体]:::storage
-            L3[L3: 新皮层]:::storage
+            Ingest[📥 记忆网关]:::capture_node
+            Assemble[🧠 上下文合成器]:::cognitive_node
         end
-        subgraph Knowledge [知识桥梁]
-            Ext[Ext: 外部知识库]:::storage
+
+        subgraph MemoryPlane [认知平面：知识演进]
+            direction LR
+            L1[[🧠 L1: 注意力层]]:::storage_node
+            L2[(📚 L2: 情节层)]:::storage_node
+            L3[💎 L3: 事实层]:::storage_node
         end
-        %% 纵向堆叠约束
-        Relay ~~~ Cognitive ~~~ Knowledge
+
+        subgraph KnowledgePlane [知识桥梁]
+            direction LR
+            Ext[(🗂️ Ext: 外部索引)]:::storage_node
+        end
+
+        %% 结构对齐（不可见）
+        RelayPlane ~~~ MemoryPlane ~~~ KnowledgePlane
     end
 
     subgraph Right [后端智能]
-        LLM[Ollama / 云端模型]
+        direction TB
+        LLM((🤖 LLM 大脑))
     end
 
-    Vault[(Obsidian 知识库)]:::external
+    Vault[(📝 Obsidian 知识库)]:::vault_node
 
-    %% --- 数据流 1: 记忆捕获 (绿色) ---
-    %% 信息如何进入系统并转化为记忆
-    OC -- "交互捕获" --> Ingest
-    LLM -- "响应捕获" --> Ingest
-    Ingest -- "归档" --> L1 & L2
-    Vault -- "文件同步" --> Ext
+    %% --- 流程 1: 记忆捕获 (绿色) ---
+    User -- "1. 交互" --> Ingest
+    LLM -- "2. 响应" --> Ingest
+    Ingest -- "实时写入" --> L1
+    Ingest -- "归档" --> L2
+    Vault -- "3. 扫描" --> Ext
 
-    %% --- 数据流 2: 优化与召回 (蓝色) ---
-    %% 记忆如何被处理并检索以优化上下文
-    L2 -- "异步提纯" --> L3
-    L3 -- "检索" --> Assemble
-    Ext -- "检索" --> Assemble
-    L1 -- "检索" --> Assemble
-    L2 -- "检索" --> Assemble
-    Assemble -- "优化后的上下文" --> LLM
+    %% --- 流程 2: 认知优化 (蓝色) ---
+    L2 -- "深度学习" --> L3
+    L3 -- "优先级 1" --> Assemble
+    Ext -- "优先级 2" --> Assemble
+    L1 -- "优先级 3" --> Assemble
+    L2 -- "优先级 4" --> Assemble
+    Assemble -- "4. 增强后的上下文" --> LLM
 
-    %% 应用连线样式
-    linkStyle 0,1,2,3 stroke:#2ecc71,stroke-width:2px,color:#27ae60
-    linkStyle 4,5,6,7,8,9,10 stroke:#3498db,stroke-width:2px,color:#2980b9
+    %% 连线专业样式
+    linkStyle 0,1,2,3,4 stroke:#27ae60,stroke-width:3px,color:#27ae60
+    linkStyle 5,6,7,8,9,10 stroke:#2980b9,stroke-width:3px,color:#2980b9
 ```
 
 ### 层级技术细节

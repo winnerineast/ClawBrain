@@ -103,67 +103,74 @@ Isolate memory between different projects or users by sending a simple header:
 
 ---
 
-## 🧠 Information Flow Architecture
+## 🧠 Data Flow & Intelligence Architecture
 
-ClawBrain separates the **Memory Capture** flow (how data becomes memory) from the **Context Optimization** flow (how memory improves AI responses).
+ClawBrain functions as a neural orchestrator, managing the lifecycle of information through two primary flows: **Memory Capture** and **Cognitive Optimization**.
 
 ```mermaid
 flowchart LR
-    %% Style Definitions
-    classDef capture stroke:#2ecc71,stroke-width:2px,fill:#e8f8f5
-    classDef cognitive stroke:#3498db,stroke-width:2px,fill:#ebf5fb
-    classDef storage fill:#ffffff,stroke:#333,stroke-width:1px
-    classDef external fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px
+    %% Professional Color Palette
+    classDef capture_node stroke:#27ae60,stroke-width:2px,fill:#f1f9f5,color:#1b5e20
+    classDef cognitive_node stroke:#2980b9,stroke-width:2px,fill:#f0f7fc,color:#0d47a1
+    classDef storage_node stroke:#7f8c8d,stroke-width:1px,fill:#ffffff,color:#2c3e50
+    classDef vault_node stroke:#f39c12,stroke-width:2px,fill:#fffef0,color:#7e5109
 
-    %% 1. Horizontal Planes
-    subgraph Left [Agentic Frontend]
-        OC[OpenClaw / CLI]
-    end
-
-    subgraph Center [ClawBrain Memory Engine]
+    %% 1. Horizontal Layout
+    subgraph Frontend [Agentic Frontend]
         direction TB
-        subgraph Relay [Relay Plane]
-            Ingest[Data Capturer]:::capture
-            Assemble[Context Builder]:::cognitive
-        end
-        subgraph Cognitive [Cognitive Plane]
+        User((💻 User / CLI))
+    end
+
+    subgraph ClawBrain [ClawBrain Neural Engine]
+        direction TB
+        
+        subgraph RelayPlane [Relay Plane: High-Speed Traffic]
             direction LR
-            L1[L1: Working Memory]:::storage
-            L2[L2: Hippocampus]:::storage
-            L3[L3: Neocortex]:::storage
+            Ingest[📥 Memory Gateway]:::capture_node
+            Assemble[🧠 Context Synthesizer]:::cognitive_node
         end
-        subgraph Knowledge [Knowledge Bridge]
-            Ext[Ext: Knowledge Vault]:::storage
+
+        subgraph MemoryPlane [Cognitive Plane: Knowledge Evolution]
+            direction LR
+            L1[[🧠 L1: Attention]]:::storage_node
+            L2[(📚 L2: Episodes)]:::storage_node
+            L3[💎 L3: Semantic Facts]:::storage_node
         end
-        %% Vertical Stacking Constraints
-        Relay ~~~ Cognitive ~~~ Knowledge
+
+        subgraph KnowledgePlane [Knowledge Bridge]
+            direction LR
+            Ext[(🗂️ Ext: Vault Index)]:::storage_node
+        end
+
+        %% Structural Alignment (Invisible)
+        RelayPlane ~~~ MemoryPlane ~~~ KnowledgePlane
     end
 
-    subgraph Right [Backend Intelligence]
-        LLM[Ollama / Cloud LLM]
+    subgraph Backend [Backend Intelligence]
+        direction TB
+        LLM((🤖 LLM Brain))
     end
 
-    Vault[(Obsidian Vault)]:::external
+    Vault[(📝 Obsidian Vault)]:::vault_node
 
-    %% --- DATA FLOW 1: MEMORY CAPTURE (GREEN) ---
-    %% How information enters and becomes memory
-    OC -- "Turn Ingest" --> Ingest
-    LLM -- "Response Ingest" --> Ingest
-    Ingest -- "Archive" --> L1 & L2
-    Vault -- "File Sync" --> Ext
+    %% --- FLOW 1: MEMORY CAPTURE (GREEN) ---
+    User -- "1. Interaction" --> Ingest
+    LLM -- "2. Response" --> Ingest
+    Ingest -- "Real-time" --> L1
+    Ingest -- "Archival" --> L2
+    Vault -- "3. Scan" --> Ext
 
-    %% --- DATA FLOW 2: OPTIMIZATION & RECALL (BLUE) ---
-    %% How memory is processed and retrieved for context
+    %% --- FLOW 2: COGNITIVE OPTIMIZATION (BLUE) ---
     L2 -- "Distillation" --> L3
-    L3 -- "Retrieve" --> Assemble
-    Ext -- "Retrieve" --> Assemble
-    L1 -- "Retrieve" --> Assemble
-    L2 -- "Retrieve" --> Assemble
-    Assemble -- "Optimized Context" --> LLM
+    L3 -- "Priority 1" --> Assemble
+    Ext -- "Priority 2" --> Assemble
+    L1 -- "Priority 3" --> Assemble
+    L2 -- "Priority 4" --> Assemble
+    Assemble -- "4. Optimized Context" --> LLM
 
-    %% Applying Link Styles
-    linkStyle 0,1,2,3 stroke:#2ecc71,stroke-width:2px,color:#27ae60
-    linkStyle 4,5,6,7,8,9,10 stroke:#3498db,stroke-width:2px,color:#2980b9
+    %% Professional Styling for Links
+    linkStyle 0,1,2,3,4 stroke:#27ae60,stroke-width:3px,color:#27ae60
+    linkStyle 5,6,7,8,9,10 stroke:#2980b9,stroke-width:3px,color:#2980b9
 ```
 
 ### Layer Details
