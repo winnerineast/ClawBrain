@@ -13,6 +13,7 @@ async def test_phase_29_neocortex_silence(tmp_path):
     """Verify that no L3 header or text is injected if summary is missing."""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
     
     # Context with NO memory at all
     context = await router.get_combined_context("session_empty", "some focus")
@@ -25,6 +26,7 @@ async def test_phase_29_neocortex_presence(tmp_path):
     """Verify that L3 header IS injected if summary exists."""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
     router.neo._save_summary("session_l3", "This is a summary.")
     
     context = await router.get_combined_context("session_l3", "some focus")
@@ -36,6 +38,7 @@ async def test_phase_30_plain_text_hippocampus(tmp_path):
     """Verify that L2 memories are injected as plain text bullet points, not JSON."""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
     
     # Ingest a trace
     msg_content = "Python is a programming language."
@@ -59,6 +62,7 @@ async def test_combined_layers_formatting(tmp_path):
     """Verify headers and spacing when multiple layers are present."""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
     
     # L3
     router.neo._save_summary("session_multi", "L3 Summary Content")
@@ -95,6 +99,7 @@ async def test_phase_31_priority_order(tmp_path):
     os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "250"
     
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
     
     # 1. Add L3 (High priority) - ~50 chars
     router.neo._save_summary("session_priority", "L3 Fact: User prefers Rust over C++.")

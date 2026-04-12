@@ -145,3 +145,20 @@ class VaultIndexer:
             )
             # Give ChromaDB/IO a small breath
             await asyncio.sleep(0.01)
+
+    def search(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
+        """Perform semantic search against vault knowledge."""
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=limit
+        )
+        
+        output = []
+        if results["documents"] and results["documents"][0]:
+            for i in range(len(results["documents"][0])):
+                output.append({
+                    "content": results["documents"][0][i],
+                    "title": results["metadatas"][0][i].get("file_path", "Unknown Note"),
+                    "distance": results["distances"][0][i] if "distances" in results else 0
+                })
+        return output

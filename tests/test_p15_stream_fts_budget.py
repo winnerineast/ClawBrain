@@ -64,6 +64,7 @@ async def test_p15_context_budget_enforced(tmp_path):
     os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "500"
 
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
 
     # 塞入大量内容
     for i in range(10):
@@ -92,6 +93,7 @@ async def test_p15_context_budget_priority_order(tmp_path):
     os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "300"
 
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
 
     # 手动写入新皮层摘要
     router.neo._save_summary("priority_test", "NEOCORTEX_CANARY " * 10)

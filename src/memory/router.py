@@ -28,7 +28,8 @@ class MemoryRouter:
                  distill_url: str = None, distill_model: str = None, distill_provider: str = None,
                  enable_room_detection: bool = True,
                  enable_auto_scan: bool = True,
-                 enable_auto_distill: bool = True):
+                 enable_auto_distill: bool = True,
+                 vault_path: str = None):
         logger.info(f"[ROUTER] Initializing with db_dir={db_dir}")
         if db_dir is None:
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,29 +44,19 @@ class MemoryRouter:
         # Phase 34: Isolated internal client
         self.internal_client = httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=20))
         
-        self.hippo = Hippocampus(db_dir=db_dir)
-        self.neo = Neocortex(db_dir=db_dir, distill_url=distill_url, 
-                             distill_model=distill_model, distill_provider=distill_provider,
-                             client=self.internal_client)
-        
-        self.room_detector = RoomDetector(
-            url=self.neo.distill_url,
-            model=self.neo.distill_model,
-            provider=self.neo.distill_provider,
-            api_key=self.neo.api_key,
-            client=self.internal_client
-        )
-
-        # P35: Vault Indexer
-        self.vault_path = os.getenv("CLAWBRAIN_VAULT_PATH")
-        self.vault_enabled = os.getenv("CLAWBRAIN_ENABLE_VAULT_SCAN", "true").lower() == "true"
+        # State placeholders (initialized in background)
+        self.hippo = None
+        self.neo = None
+        self.room_detector = None
         self.vault_indexer = None
         
-        if self.vault_path and self.vault_enabled:
-            logger.info(f"[ROUTER] Vault enabled: {self.vault_path}")
-            self.vault_indexer = VaultIndexer(self.vault_path, Path(db_dir), self.hippo.client)
-            if self.enable_auto_scan:
-                asyncio.create_task(self._vault_scan_loop())
+        self.distill_url = distill_url
+        self.distill_model = distill_model
+        self.distill_provider = distill_provider
+
+        # P35: Vault Config - Explicit param takes priority over ENV
+        self.vault_path = vault_path or os.getenv("CLAWBRAIN_VAULT_PATH")
+        self.vault_enabled = os.getenv("CLAWBRAIN_ENABLE_VAULT_SCAN", "true").lower() == "true"
         
         self._wm_sessions: Dict[str, WorkingMemory] = {}
         self._current_rooms: Dict[str, str] = {}
@@ -74,7 +65,56 @@ class MemoryRouter:
         self._trace_counters: Dict[str, int] = {}
         self._session_locks: Dict[str, asyncio.Lock] = {}
         
-        self._hydrate()
+        # Phase 36: Cognitive Plane Decoupling
+        self.ready_event = asyncio.Event()
+        asyncio.create_task(self._startup_routine())
+
+    async def wait_until_ready(self, timeout: float = 60.0):
+        """Wait for the cognitive plane to stabilize."""
+        try:
+            await asyncio.wait_for(self.ready_event.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            logger.error(f"[ROUTER] Engine failed to stabilize within {timeout}s")
+            raise
+
+    async def _startup_routine(self):
+        """Self-paced cognitive initialization (Non-blocking)."""
+        try:
+            logger.info("[COGNITIVE] Establishing long-term memory engine...")
+            
+            # 1. Initialize Core Storage (ChromaDB connection happens here)
+            self.hippo = Hippocampus(db_dir=self.db_dir)
+            self.neo = Neocortex(db_dir=self.db_dir, distill_url=self.distill_url, 
+                                 distill_model=self.distill_model, distill_provider=self.distill_provider,
+                                 client=self.internal_client)
+            
+            self.room_detector = RoomDetector(
+                url=self.neo.distill_url,
+                model=self.neo.distill_model,
+                provider=self.neo.distill_provider,
+                api_key=self.neo.api_key,
+                client=self.internal_client
+            )
+
+            # 2. Initialize Vault if enabled
+            if self.vault_path and self.vault_enabled:
+                logger.info(f"[COGNITIVE] Indexing Vault: {self.vault_path}")
+                self.vault_indexer = VaultIndexer(self.vault_path, Path(self.db_dir), self.hippo.client)
+            
+            # 3. Hydrate state
+            logger.info("[COGNITIVE] Hydrating working memory...")
+            self._hydrate()
+            
+            # 4. Signal readiness (Enable Relay Plane)
+            self.ready_event.set()
+            logger.info("[COGNITIVE] Intelligence layer fully stabilized.")
+
+            # 5. Trigger continuous scan loop if needed
+            if self.vault_indexer and self.enable_auto_scan:
+                asyncio.create_task(self._vault_scan_loop())
+                
+        except Exception as e:
+            logger.error(f"[COGNITIVE] Startup rhythm interrupted: {e}")
 
     async def aclose(self):
         await self.internal_client.aclose()
@@ -115,8 +155,9 @@ class MemoryRouter:
                     if content_json:
                         try:
                             payload = json.loads(content_json).get("stimulus", {})
-                            intent = self.decomposer.extract_core_intent(payload)
-                            wm.add_item(row["trace_id"], intent)
+                            content = payload.get("messages", [{}])[-1].get("content", "")
+                            if content:
+                                wm.items.append(WorkingMemoryItem(trace_id=row["trace_id"], content=content, timestamp=row["timestamp"]))
                         except: pass
         except Exception as e:
             logger.exception(f"Hydration failed: {e}")
@@ -124,149 +165,177 @@ class MemoryRouter:
     async def ingest(self, payload: Dict[str, Any], reaction: Dict[str, Any] = None,
                      offload_threshold: int = None, context_id: str = "default",
                      sync_distill: bool = False) -> str:
-        trace_id = str(uuid.uuid4())
-        intent = ""
-        
-        # 1. CORE WRITE (Locked)
+        """
+        Ingest a user stimulus and optionally an assistant reaction.
+        P18: Isolated by context_id.
+        P34: Organized by semantic rooms.
+        """
+        # Phase 36: Ensure stabilization before any write operation
+        await self.wait_until_ready()
+
         async with self._get_session_lock(context_id):
-            intent = self.decomposer.extract_core_intent(payload)
-            room_id = self._get_current_room(context_id)
-            res = self.hippo.save_trace(trace_id, {"stimulus": payload, "reaction": reaction},
-                                        search_text=intent, threshold=offload_threshold,
-                                        context_id=context_id, room_id=room_id)
             wm = self._get_wm(context_id)
-            wm.add_item(trace_id, intent)
+            room_id = self._get_current_room(context_id)
+            
+            # 1. Archive to Hippocampus (L2)
+            trace_id = str(uuid.uuid4())
+            search_text = payload.get("messages", [{}])[-1].get("content", "")
+            
+            self.hippo.save_trace(
+                trace_id=trace_id,
+                payload={"stimulus": payload, "reaction": reaction},
+                search_text=search_text,
+                context_id=context_id,
+                room_id=room_id
+            )
+            
+            # 2. Add to Working Memory (L1)
+            wm.add_item(trace_id, search_text)
+            
+            # 3. Persistence (P22)
             self.hippo.save_wm_state(context_id, wm.items)
             
-            if context_id not in self._trace_counters:
+            # 4. Signal Analysis
+            signals = self.decomposer.decompose(search_text)
+            for s in signals:
+                wm.boost_by_signal(s)
+            
+            # 5. Incremental Counter
+            self._trace_counters[context_id] = self._trace_counters.get(context_id, 0) + 1
+            
+        # --- TRIGGER COGNITIVE TASKS (Outside session lock) ---
+        
+        # A. Room Detection (P34)
+        if self.enable_room_detection and not sync_distill:
+            asyncio.create_task(self._perform_room_detection(context_id, search_text))
+            
+        # B. Distillation (L2 -> L3)
+        if self.enable_auto_distill:
+            if self._trace_counters.get(context_id, 0) >= (offload_threshold or self.distill_threshold) or sync_distill:
+                if sync_distill:
+                    await self._auto_distill_worker(context_id)
+                else:
+                    asyncio.create_task(self._auto_distill_worker(context_id))
                 self._trace_counters[context_id] = 0
-            self._trace_counters[context_id] += 1
-
-        # 2. COGNITIVE TASKS (Outside primary lock to avoid deadlocks)
-        if sync_distill:
-            if self.enable_room_detection:
-                await self._perform_room_detection(context_id, intent)
-            if self._trace_counters.get(context_id, 0) >= self.distill_threshold:
-                self._trace_counters[context_id] = 0
-                await self._perform_distillation(context_id)
-        else:
-            if self.enable_room_detection:
-                asyncio.create_task(self._perform_room_detection(context_id, intent))
-            if self._trace_counters.get(context_id, 0) >= self.distill_threshold:
-                self._trace_counters[context_id] = 0
-                if self.enable_auto_distill:
-                    asyncio.create_task(self._perform_distillation(context_id))
+                
         return trace_id
 
     async def _perform_room_detection(self, session_id: str, current_intent: str):
         try:
-            history = []
             async with self._get_session_lock(session_id):
                 wm = self._get_wm(session_id)
                 history = wm.get_active_contents()
                 known = self._get_known_rooms(session_id)
-
+            
             new_room = await self.room_detector.detect_room(history, current_intent, known)
-
+            
             # Update room status (Quick lock)
             async with self._get_session_lock(session_id):
-
-                if new_room != self._get_current_room(session_id):
+                if new_room:
                     self._current_rooms[session_id] = new_room
                     if session_id not in self._known_rooms: self._known_rooms[session_id] = {"general"}
                     self._known_rooms[session_id].add(new_room)
         except Exception as e: logger.error(f"[ROOM_DET_FAIL] {e}")
 
-    async def _perform_distillation(self, context_id: str):
+    async def _auto_distill_worker(self, session_id: str):
+        """Background worker to refine L2 fragments into L3 facts."""
         try:
-            traces = self.hippo.get_recent_traces(limit=self.distill_threshold, context_id=context_id)
-            if traces: await self.neo.distill(context_id, traces)
-        except Exception as e: logger.error(f"[NC_DIST_FAIL] {e}")
+            async with self._get_session_lock(session_id):
+                wm = self._get_wm(session_id)
+                # Use Hippo to fetch raw historical content for LLM
+                recent = self.hippo.get_recent_traces(limit=20, context_id=session_id)
+                raw_history = []
+                for r in reversed(recent):
+                    content = self.hippo.get_content(r["trace_id"])
+                    if content: raw_history.append(content)
+            
+            if not raw_history: return
+            
+            logger.info(f"[DISTILL] Starting distillation for session: {session_id}")
+            new_summary = await self.neo.distill(raw_history, session_id)
+            
+            if new_summary:
+                async with self._get_session_lock(session_id):
+                    # P23: Prune Working Memory after successful distillation
+                    wm.prune(keep_count=5)
+                    self.hippo.save_wm_state(session_id, wm.items)
+                logger.info(f"[DISTILL] Completed. L3 Summary updated for {session_id}")
+        except Exception as e:
+            logger.error(f"[DISTILL_ERROR] {e}")
+
+    async def get_combined_context(self, context_id: str, query: str, max_chars: int = 2000) -> str:
+        """
+        Assemble the optimal context using Stack Math budget allocation.
+        Priority: L3 Facts > Vault > L1 Working Memory > L2 Hippocampus.
+        """
+        # Ensure readiness
+        if not self.ready_event.is_set():
+            return ""
+
+        async with self._get_session_lock(context_id):
+            wm = self._get_wm(context_id)
+            current_room = self._get_current_room(context_id)
+            
+            # Layer retrieval
+            l3_summary = self.neo.get_summary(context_id) or ""
+            vault_results = []
+            if self.vault_indexer:
+                vault_results = self.vault_indexer.search(query, limit=3)
+            
+            working_contents = wm.get_active_contents()
+            
+            # L2 Retrieval (Favor current room)
+            # hippo.search returns List[str] (IDs), limit is handled by slicing
+            l2_ids = self.hippo.search(query, context_id=context_id, room_id=current_room)
+            l2_contents = [self.hippo.get_content(tid) for tid in l2_ids[:5]]
+            l2_contents = [c for c in l2_contents if c]
+
+            # --- STACK MATH ASSEMBLY ---
+            # Budget calculation (Precision Budgeting P31)
+            # Allocation Order: L3 > Vault > L1 > L2
+            
+            output_parts = []
+            current_len = 0
+            
+            def try_add_section(header: str, content_list: List[str]):
+                nonlocal current_len
+                if not content_list: return
+                
+                section_header = f"\n=== {header} ===\n"
+                section_content = "\n".join([f"- {c}" for c in content_list])
+                
+                total_section = section_header + section_content
+                if current_len + len(total_section) <= (max_chars - 50): # 50 for wrapper
+                    output_parts.append(total_section)
+                    current_len += len(total_section)
+
+            # 1. Neocortex (L3)
+            if l3_summary:
+                try_add_section("DISTILLED KNOWLEDGE (L3)", [l3_summary])
+            
+            # 2. Vault (External)
+            if vault_results:
+                try_add_section("EXTERNAL KNOWLEDGE (VAULT)", [f"# {r['title']}\n{r['content']}" for r in vault_results])
+                
+            # 3. Working Memory (L1)
+            try_add_section("ACTIVE CONVERSATION (WORKING MEMORY)", working_contents)
+            
+            # 4. Hippocampus (L2)
+            try_add_section("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents)
+
+            if not output_parts: return ""
+            
+            wrapped = "[CLAWBRAIN MEMORY]" + "".join(output_parts) + "\n[END CLAWBRAIN MEMORY]"
+            return wrapped
 
     async def _vault_scan_loop(self):
-        interval = int(os.getenv("CLAWBRAIN_VAULT_SCAN_INTERVAL", "300"))
-        while True:
+        """Independent rhythmic driver for Knowledge Bridge."""
+        if not self.vault_indexer: return
+        while self.enable_auto_scan:
             try:
-                if self.vault_indexer: await self.vault_indexer.scan()
-            except: pass
-            await asyncio.sleep(interval)
-
-    async def get_combined_context(self, context_id: str, current_focus: str, max_chars: int = None) -> str:
-        async with self._get_session_lock(context_id):
-            budget = max_chars if max_chars is not None else int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", "2000"))
-            remaining = budget - 50
-            header_l3 = "=== SYSTEM MEMORY SUMMARY (NEOCORTEX) ==="
-            header_v1 = "=== EXTERNAL KNOWLEDGE (VAULT) ==="
-            header_l1 = "=== ACTIVE CONVERSATION (WORKING MEMORY) ==="
-            header_l2 = "=== RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS) ==="
-
-            # L3
-            summary_raw = self.neo.get_summary(context_id)
-            summary_text = ""
-            if summary_raw:
-                remaining -= len(header_l3) + 2
-                summary_text = summary_raw[:int(budget * 0.4)]
-                remaining -= len(summary_text)
-
-            # Vault
-            vault_text = ""
-            if self.vault_indexer and remaining > 200:
-                try:
-                    v_res = self.vault_indexer.collection.query(query_texts=[current_focus], n_results=3)
-                    if v_res and v_res["documents"] and v_res["documents"][0]:
-                        v_parts = [f"- {d.strip()}" for d in v_res["documents"][0]]
-                        cand = "\n".join(v_parts)
-                        if len(header_v1) + len(cand) + 10 < remaining:
-                            vault_text = cand
-                            remaining -= (len(header_v1) + len(vault_text) + 2)
-                except: pass
-
-            # L1
-            wm = self._get_wm(context_id)
-            active = wm.get_active_contents()
-            wm_text = ""
-            if active:
-                cand_wm = "\n".join(active)
-                if len(header_l1) + len(cand_wm) + 2 > remaining:
-                    avail = remaining - len(header_l1) - 2
-                    wm_text = cand_wm[:avail] + "..." if avail > 20 else ""
-                else: wm_text = cand_wm
-                if wm_text: remaining -= (len(header_l1) + len(wm_text) + 2)
-
-            # L2
-            recalled = []
-            if remaining > (len(header_l2) + 50):
-                rem_l2 = remaining - (len(header_l2) + 2)
-                ids = self.hippo.search(current_focus, context_id=context_id, room_id=self._get_current_room(context_id))
-                if len(ids) < 3:
-                    for gid in self.hippo.search(current_focus, context_id=context_id):
-                        if gid not in ids: ids.append(gid)
-                for tid in ids:
-                    if rem_l2 <= 10: break
-                    raw = self.hippo.get_content(tid)
-                    if raw:
-                        try:
-                            data = json.loads(raw)
-                            msg = data.get("stimulus", {}).get("messages", [{}])[0].get("content", "") or data.get("stimulus", {}).get("content", "")
-                            fmt = f"- {msg}"
-                            if len(fmt) > rem_l2:
-                                if rem_l2 > 20: recalled.append(fmt[:rem_l2-3] + "..."); rem_l2 = 0
-                                break
-                            recalled.append(fmt); rem_l2 -= len(fmt)
-                        except: pass
-
-            # Assembly
-            parts = []
-            if summary_text: parts.extend([header_l3, summary_text])
-            if vault_text:
-                if parts: parts.append("")
-                parts.extend([header_v1, vault_text])
-            if wm_text:
-                if parts: parts.append("")
-                parts.extend([header_l1, wm_text])
-            if recalled:
-                if parts: parts.append("")
-                parts.append(header_l2); parts.extend(recalled)
-            
-            if not parts: return ""
-            return f"[CLAWBRAIN MEMORY]\n" + "\n".join(parts) + "\n[END CLAWBRAIN MEMORY]"
+                stats = await self.vault_indexer.scan()
+                if stats["indexed"] > 0:
+                    logger.info(f"[COGNITIVE] Vault Pulse: Indexed {stats['indexed']} files.")
+            except Exception as e:
+                logger.error(f"[VAULT_SCAN_ERROR] {e}")
+            await asyncio.sleep(300) # Every 5 minutes

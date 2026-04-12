@@ -85,6 +85,7 @@ async def test_p18_wm_session_isolation(tmp_path):
     """Working memories of different sessions do not interfere with each other"""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
 
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice content UNIQUE-ALICE"}]},
@@ -118,6 +119,7 @@ async def test_p18_get_combined_context_isolated(tmp_path):
     """get_combined_context is isolated by session; A's context does not contain B's content"""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
 
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice secret ALPHA-TOKEN"}]},
@@ -149,6 +151,7 @@ async def test_p18_hydrate_per_session(tmp_path):
     clear_chroma_clients()
     # First router writes data
     router1 = MemoryRouter(db_dir=str(tmp_path))
+    await router1.wait_until_ready()
     await router1.ingest(
         {"messages": [{"role": "user", "content": "Hydrate ALICE persist test"}]},
         context_id="hydrate-alice"
@@ -161,6 +164,7 @@ async def test_p18_hydrate_per_session(tmp_path):
     # Simulation of restart: reset connections, then reload from SAME tmp_path
     clear_chroma_clients()
     router2 = MemoryRouter(db_dir=str(tmp_path))
+    await router2.wait_until_ready()
 
     alice_wm = router2._get_wm("hydrate-alice").get_active_contents()
     bob_wm   = router2._get_wm("hydrate-bob").get_active_contents()

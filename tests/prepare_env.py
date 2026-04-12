@@ -68,6 +68,44 @@ def run_sanitization():
     except Exception as e:
         side_by_side_audit("Pre-flight: Ollama Service", "OFFLINE")
 
+    # 5. Cognitive Pre-warming & Snapshotting (P36)
+    # Cache the initialized DB to avoid re-indexing on every run
+    try:
+        import asyncio
+        from src.memory.router import MemoryRouter
+        
+        db_dir = os.getenv("CLAWBRAIN_DB_DIR", "tests/data/prewarm_active")
+        cache_dir = "tests/cache/prewarm"
+        
+        if os.path.exists(cache_dir):
+            # Restore from snapshot
+            if os.path.exists(db_dir): shutil.rmtree(db_dir)
+            shutil.copytree(cache_dir, db_dir)
+            side_by_side_audit("Cognitive Snapshot", "RESTORED (FAST)")
+        else:
+            # First run: Warm and Snapshot
+            async def do_warming():
+                # Force test vault for pre-warming consistency
+                os.environ["CLAWBRAIN_VAULT_PATH"] = os.path.abspath("tests/fixtures/test_vault")
+                os.environ["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
+                os.makedirs(db_dir, exist_ok=True)
+                
+                # Clear any lingering Chroma clients to avoid lock
+                from src.memory.storage import clear_chroma_clients
+                clear_chroma_clients()
+                
+                router = MemoryRouter(db_dir=db_dir)
+                await router.wait_until_ready(timeout=120.0)
+                await router.aclose()
+            
+            asyncio.run(do_warming())
+            # Save snapshot
+            os.makedirs(os.path.dirname(cache_dir), exist_ok=True)
+            shutil.copytree(db_dir, cache_dir)
+            side_by_side_audit("Cognitive Pre-warming", "PRIMED & SAVED")
+    except Exception as e:
+        side_by_side_audit("Cognitive Pre-warming", f"SKIP ({str(e)[:30]})")
+
     print("-" * 70)
     print("✨ Environment is sanitized and ready for regression.\n")
 

@@ -12,6 +12,7 @@ async def test_p10_dynamic_offload_audit():
     """验证：基于模型窗口动态触发磁盘分流"""
     if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
     router = MemoryRouter(db_dir=TEST_DIR)
+    await router.wait_until_ready()
     
     # 模拟一个 10KB 的输入
     data = "X" * 10240
@@ -36,6 +37,7 @@ async def test_p10_dynamic_offload_audit():
 async def test_p10_cognitive_load_trigger():
     """验证：认知负荷（整合周期）触发"""
     router = MemoryRouter(db_dir=TEST_DIR, distill_threshold=3)
+    await router.wait_until_ready()
     
     print("\n[AUDIT: Cognitive Load]")
     # 连续发送 3 条消息，触发一个周期

@@ -21,3 +21,5 @@
 
 9. **English Everywhere**: Design documents, source code, inline comments, commit messages, and test output labels must all be written in English.
 
+10. **Deterministic Test Integrity**: Always sanitize the environment before executing tests. This includes reaping orphaned server processes, clearing network ports, and resetting temporary data to ensure 100% reproducible results.
+

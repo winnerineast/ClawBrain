@@ -24,6 +24,7 @@ async def test_p22_wm_state_written_after_ingest(tmp_path):
     """There should be corresponding records in ChromaDB wm_col after ingest"""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
     await router.ingest(
         {"messages": [{"role": "user", "content": "hello persistence test"}]},
         context_id="session-A"
@@ -47,6 +48,7 @@ async def test_p22_exact_activation_restored_after_restart(tmp_path):
     """The activation value of WM after restart should be exactly the same as before restart"""
     clear_chroma_clients()
     router1 = MemoryRouter(db_dir=str(tmp_path))
+    await router1.wait_until_ready()
     await router1.ingest(
         {"messages": [{"role": "user", "content": "topic ALPHA project detail"}]},
         context_id="persist-session"
@@ -66,6 +68,7 @@ async def test_p22_exact_activation_restored_after_restart(tmp_path):
     # Simulate restart
     clear_chroma_clients()
     router2 = MemoryRouter(db_dir=str(tmp_path))
+    await router2.wait_until_ready()
     wm_after = router2._get_wm("persist-session").items
     after_state = {it.trace_id: round(it.activation, 4) for it in wm_after}
 
@@ -83,6 +86,7 @@ async def test_p22_multi_session_snapshots_isolated(tmp_path):
     """wm_state rows of different sessions do not pollute each other"""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice working on PROJECT-A"}]},
         context_id="alice"
@@ -116,6 +120,7 @@ async def test_p22_clear_wm_state(tmp_path):
     """clear_wm_state should delete all wm_state rows for the specified session"""
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
+    await router.wait_until_ready()
     await router.ingest(
         {"messages": [{"role": "user", "content": "content to be cleared"}]},
         context_id="clear-session"
@@ -140,6 +145,7 @@ async def test_p22_snapshot_takes_priority_over_traces_rebuild(tmp_path):
     """_hydrate does not take the traces rebuild path when a snapshot exists; fall back to traces rebuild when no snapshot exists"""
     clear_chroma_clients()
     router1 = MemoryRouter(db_dir=str(tmp_path))
+    await router1.wait_until_ready()
     await router1.ingest(
         {"messages": [{"role": "user", "content": "snapshot priority test CANARY"}]},
         context_id="snap-test"
@@ -152,6 +158,7 @@ async def test_p22_snapshot_takes_priority_over_traces_rebuild(tmp_path):
     # Restart — should take snapshot path
     clear_chroma_clients()
     router2 = MemoryRouter(db_dir=str(tmp_path))
+    await router2.wait_until_ready()
     wm_contents = router2._get_wm("snap-test").get_active_contents()
     has_canary = any("CANARY" in c for c in wm_contents)
 
@@ -164,6 +171,7 @@ async def test_p22_snapshot_takes_priority_over_traces_rebuild(tmp_path):
     router2.hippo.clear_wm_state("snap-test")
     clear_chroma_clients()
     router3 = MemoryRouter(db_dir=str(tmp_path))
+    await router3.wait_until_ready()
     wm_fallback = router3._get_wm("snap-test").get_active_contents()
     has_canary_fallback = any("CANARY" in c for c in wm_fallback)
 

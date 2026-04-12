@@ -80,21 +80,38 @@ python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435
 
 ## 🔌 集成与使用
 
-### 选项 1：透明 HTTP 代理 (推荐)
+ClawBrain 是一个通用的记忆中枢。您可以通过以下三种主要方式将其集成到任何 AI 智能体中：
+
+### 选项 1：透明 HTTP 代理 (零配置)
 将您智能体的 API `baseUrl` 指向 ClawBrain（端口 11435）。ClawBrain 将拦截请求，增强记忆，并转发给真实的 LLM 后端。
 
-**OpenClaw Provider 配置示例：**
+**OpenClaw / OpenAI 兼容配置示例：**
 ```json
-"ollama": {
-  "baseUrl": "http://127.0.0.1:11435",
-  "apiKey": "optional"
+{
+  "baseUrl": "http://127.0.0.1:11435/v1",
+  "apiKey": "your-key"
 }
 ```
 
-### 选项 2：原生 OpenClaw 插件
-ClawBrain 也可以作为原生的 Context Engine 插件运行：
+### 选项 2：标准 MCP 协议 (Model Context Protocol)
+ClawBrain 支持行业标准的 MCP 协议，适用于 Claude Desktop、Cursor 等现代智能体。
+
+*   **远程模式 (SSE)**：连接至 `http://127.0.0.1:11435/mcp/sse`
+*   **本地模式 (Stdio)**：在智能体配置中添加：
+    ```bash
+    command: "python3",
+    args: ["-m", "src.mcp_server"]
+    ```
+
+### 选项 3：可脚本化的 CLI 工具
+使用 `src/cli.py` 工具从脚本或轻量级智能体直接访问记忆。
+
 ```bash
-openclaw plugins install -l ./packages/openclaw
+# 存入事实
+python3 src/cli.py ingest "项目密码是 ALPHA"
+
+# 查询上下文
+python3 src/cli.py query "密码"
 ```
 
 ### 🔐 会话隔离

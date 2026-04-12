@@ -50,6 +50,7 @@ async def test_memory_router_ingest_resilience():
     """Verify L1/L2 dual activity after MemoryRouter ingestion"""
     if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
     router = MemoryRouter(db_dir=TEST_DIR)
+    await router.wait_until_ready()
     
     payload = {"context_id": "resilience", "messages": [{"role": "user", "content": "Keep this alive"}]}
     

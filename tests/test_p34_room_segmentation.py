@@ -25,6 +25,7 @@ async def test_p34_room_auto_segmentation(tmp_path):
     
     # 显式配置真实模型
     router = MemoryRouter(db_dir=test_dir, distill_model="qwen2.5:latest")
+    await router.wait_until_ready()
     session_id = "segment-test"
     
     # Turn 1: Database topic
@@ -61,6 +62,7 @@ async def test_p34_room_prioritized_search(tmp_path):
     clear_chroma_clients()
     test_dir = str(tmp_path)
     router = MemoryRouter(db_dir=test_dir)
+    await router.wait_until_ready()
     session_id = "search-test"
     
     # Manually plant traces in different rooms

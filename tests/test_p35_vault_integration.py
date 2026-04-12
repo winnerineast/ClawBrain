@@ -39,6 +39,7 @@ async def test_p35_vault_change_detection_matrix(tmp_path):
     # 2. Initialize Router with AUTO-SCAN DISABLED to ensure order
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
     router = MemoryRouter(db_dir=str(db_dir), enable_room_detection=False, enable_auto_scan=False)
+    await router.wait_until_ready()
     
     # TC_ZERO: Initial Scan (Manual)
     stats = await router.vault_indexer.scan()
@@ -84,6 +85,7 @@ async def test_p35_vault_retrieval_priority(tmp_path):
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
     # Disable auto-scan to control indexing time
     router = MemoryRouter(db_dir=str(db_dir), enable_room_detection=False, enable_auto_scan=False)
+    await router.wait_until_ready()
     await router.vault_indexer.scan()
     
     # Query

@@ -80,21 +80,38 @@ python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435
 
 ## 🔌 Integration & Usage
 
-### Choice 1: Transparent HTTP Relay (Recommended)
+ClawBrain is a universal memory hub. You can integrate it with any AI agent using three primary methods:
+
+### Choice 1: Transparent HTTP Relay (Zero-Config)
 Point your agent's API `baseUrl` to ClawBrain (port 11435). ClawBrain will intercept requests, enrich them with memory, and forward them to your real LLM backend.
 
-**Example OpenClaw Provider Config:**
+**OpenClaw / OpenAI-Compatible Config:**
 ```json
-"ollama": {
-  "baseUrl": "http://127.0.0.1:11435",
-  "apiKey": "optional"
+{
+  "baseUrl": "http://127.0.0.1:11435/v1",
+  "apiKey": "your-key"
 }
 ```
 
-### Choice 2: Native OpenClaw Plugin
-ClawBrain can also run as a native Context Engine plugin.
+### Choice 2: Model Context Protocol (MCP)
+ClawBrain supports the industry-standard MCP for modern agents (Claude Desktop, Cursor, etc.).
+
+*   **Remote (SSE)**: Connect to `http://127.0.0.1:11435/mcp/sse`
+*   **Local (Stdio)**: Add to your agent's config:
+    ```bash
+    command: "python3",
+    args: ["-m", "src.mcp_server"]
+    ```
+
+### Choice 3: Scriptable CLI
+Use the `src/cli.py` utility for direct memory access from scripts or lightweight agents.
+
 ```bash
-openclaw plugins install -l ./packages/openclaw
+# Ingest a fact
+python3 src/cli.py ingest "The project password is ALPHA"
+
+# Query for context
+python3 src/cli.py query "password"
 ```
 
 ### 🔐 Session Isolation

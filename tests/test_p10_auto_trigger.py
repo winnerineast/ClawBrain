@@ -32,6 +32,9 @@ async def test_p10_auto_distill_trigger_audit(tmp_path):
     router = MemoryRouter(db_dir=test_dir, distill_threshold=50, 
                           distill_model="qwen2.5:latest", enable_room_detection=False)
     
+    # Phase 36: Synchronize with background initialization
+    await router.wait_until_ready()
+    
     threshold = router.distill_threshold
     session_id = "marathon_audit"
     print(f"\n[MARATHON TRIGGER TEST] Pumping {threshold} messages into session: {session_id}...")
