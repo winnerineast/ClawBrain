@@ -195,10 +195,12 @@ class MemoryRouter:
             # 3. Persistence (P22)
             self.hippo.save_wm_state(context_id, wm.items)
             
-            # 4. Signal Analysis
-            signals = self.decomposer.decompose(search_text)
-            for s in signals:
-                wm.boost_by_signal(s)
+            # 4. Signal Analysis (P1.8)
+            # Simplification: Use extract_core_intent to identify focus
+            core_intent = self.decomposer.extract_core_intent(payload)
+            if core_intent:
+                # Potential for future signal-based boosting
+                pass
             
             # 5. Incremental Counter
             self._trace_counters[context_id] = self._trace_counters.get(context_id, 0) + 1
@@ -242,17 +244,18 @@ class MemoryRouter:
         try:
             async with self._get_session_lock(session_id):
                 wm = self._get_wm(session_id)
-                # Use Hippo to fetch raw historical content for LLM
+                # Fetch full trace objects for LLM distillation
                 recent = self.hippo.get_recent_traces(limit=20, context_id=session_id)
                 raw_history = []
                 for r in reversed(recent):
-                    content = self.hippo.get_content(r["trace_id"])
-                    if content: raw_history.append(content)
+                    # Get the full dictionary payload (containing stimulus/reaction)
+                    trace_obj = self.hippo.get_full_payload(r["trace_id"])
+                    if trace_obj: raw_history.append(trace_obj)
             
             if not raw_history: return
             
             logger.info(f"[DISTILL] Starting distillation for session: {session_id}")
-            new_summary = await self.neo.distill(raw_history, session_id)
+            new_summary = await self.neo.distill(session_id, raw_history)
             
             if new_summary:
                 async with self._get_session_lock(session_id):
@@ -285,8 +288,8 @@ class MemoryRouter:
             working_contents = wm.get_active_contents()
             
             # L2 Retrieval (Favor current room)
-            # hippo.search returns List[str] (IDs), limit is handled by slicing
-            l2_ids = self.hippo.search(query, context_id=context_id, room_id=current_room)
+            # hippo.search(query, context_id, room_id) returns List[str] (IDs)
+            l2_ids = self.hippo.search(query, context_id, current_room)
             l2_contents = [self.hippo.get_content(tid) for tid in l2_ids[:5]]
             l2_contents = [c for c in l2_contents if c]
 
@@ -311,7 +314,7 @@ class MemoryRouter:
 
             # 1. Neocortex (L3)
             if l3_summary:
-                try_add_section("DISTILLED KNOWLEDGE (L3)", [l3_summary])
+                try_add_section("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary])
             
             # 2. Vault (External)
             if vault_results:

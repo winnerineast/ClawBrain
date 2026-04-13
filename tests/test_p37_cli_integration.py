@@ -17,7 +17,7 @@ def server_instance():
         import shutil
         shutil.rmtree(db_dir)
     os.makedirs(db_dir, exist_ok=True)
-    
+
     env = os.environ.copy()
     env["CLAWBRAIN_DB_DIR"] = db_dir
     # Use the controlled test vault fixture
@@ -25,20 +25,23 @@ def server_instance():
     env["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
     env["PYTHONPATH"] = "."
     
+    import sys
     process = subprocess.Popen(
-        ["venv/bin/python", "-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", str(port)],
+        [sys.executable, "-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", str(port)],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    
+
     # Wait for server AND cognitive engine to be ready
     start_time = time.time()
     while time.time() - start_time < 60:
         if process.poll() is not None:
             stdout, stderr = process.communicate()
-            print(f"Server Crashed! STDOUT: {stdout.decode()}")
-            print(f"Server Crashed! STDERR: {stderr.decode()}")
+            st_out = stdout.decode() if stdout else "None"
+            st_err = stderr.decode() if stderr else "None"
+            print(f"Server Crashed! STDOUT: {st_out}")
+            print(f"Server Crashed! STDERR: {st_err}")
             pytest.fail("CLI Test Server crashed during startup")
             
         try:

@@ -268,6 +268,16 @@ class Hippocampus:
         # Fallback to document (might be intent or raw_content depending on version)
         return res["documents"][0]
 
+    def get_full_payload(self, trace_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve the complete original payload (stimulus/reaction)."""
+        content_str = self.get_content(trace_id)
+        if not content_str:
+            return None
+        try:
+            return json.loads(content_str)
+        except Exception:
+            return None
+
     def get_recent_traces(self, limit: int, context_id: str = None) -> List[Dict[str, Any]]:
         """Phase 33: Filter and sort by timestamp in Python."""
         where = {"context_id": context_id} if context_id else None

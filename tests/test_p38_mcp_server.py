@@ -6,6 +6,7 @@ import time
 import json
 import httpx
 import asyncio
+import sys
 from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 
@@ -18,21 +19,21 @@ def mcp_server_instance():
         import shutil
         shutil.rmtree(db_dir)
     os.makedirs(db_dir, exist_ok=True)
-    
+
     env = os.environ.copy()
     env["CLAWBRAIN_DB_DIR"] = db_dir
     # Use the controlled test vault fixture
     env["CLAWBRAIN_VAULT_PATH"] = os.path.join(os.getcwd(), "tests/fixtures/test_vault")
     env["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
     env["PYTHONPATH"] = "."
-    
+
     process = subprocess.Popen(
-        ["venv/bin/python", "-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", str(port)],
+        [sys.executable, "-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", str(port)],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    
+
     # Wait for server AND cognitive engine to be ready
     start_time = time.time()
     while time.time() - start_time < 60:

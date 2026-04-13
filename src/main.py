@@ -159,7 +159,10 @@ async def get_memory_state(session_id: str, request: Request):
     return {
         "session_id": session_id,
         "wm_count": len(wm.items),
-        "recent_facts": [item.content for item in wm.items[-5:]]
+        "recent_facts": [item.content for item in wm.items[-5:]],
+        "neocortex_summary": mr.neo.get_summary(session_id),
+        "working_memory_count": len(wm.items),
+        "working_memory_preview": [item.content for item in wm.items[-3:]]
     }
 
 @app.delete("/v1/memory/{session_id}")
@@ -271,10 +274,10 @@ async def gateway_relay(path: str, request: Request):
     target_url = f"{provider_config.base_url}/{path.lstrip('/')}"
     
     # 3. Context Enrichment (Semantic Recall)
-    query = DialectTranslator.extract_query(body, input_protocol)
+    query = DialectTranslator.extract_query(input_protocol, body)
     context = await mr.get_combined_context(session_id, query)
     
-    enriched_body = DialectTranslator.inject_context(body, context, input_protocol)
+    enriched_body = DialectTranslator.inject_context(input_protocol, body, context)
     
     # 4. Header Preparation
     upstream_headers = prepare_upstream_headers(request.headers, provider_config, target_protocol)
@@ -293,7 +296,7 @@ async def gateway_relay(path: str, request: Request):
             final_json = resp.json()
             
             # Passive Archival (Solidification)
-            pipeline.post_turn_solidification(final_json, input_protocol, session_id, mr, body)
+            await pipeline.post_turn_solidification(final_json, input_protocol, session_id, mr, body)
             
             return final_json
             

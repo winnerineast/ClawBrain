@@ -1,0 +1,82 @@
+INFO:     Started server process [10033]
+INFO:     Waiting for application startup.
+[2026-04-13 08:21:46] [GATEWAY.MEMORY.ROUTER] [INFO] [ROUTER] Initializing with db_dir=tests/data/cli_test_db
+[2026-04-13 08:21:46] [GATEWAY] [INFO] [INIT] Cognitive plane fully stabilized. State: READY
+INFO:     Application startup complete.
+[2026-04-13 08:21:46] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Establishing long-term memory engine...
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO] Initializing Hippocampus with db_dir=tests/data/cli_test_db
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO] Ensuring directories exist: tests/data/cli_test_db, tests/data/cli_test_db/blobs
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO] Connecting to ChromaDB at tests/data/cli_test_db/chroma...
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO] Getting/Creating collections: traces, wm_state
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO] ChromaDB collections ready.
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO] Running startup cleanup...
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Starting...
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] TTL Days: 30, Cutoff: 1773447706.942571
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for dirty data (timestamp=0.0)...
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for expired data (timestamp < 1773447706.942571)...
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for orphan blobs...
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Finished.
+[2026-04-13 08:21:46] [GATEWAY.MEMORY] [INFO] [HIPPO] Initialization complete.
+[2026-04-13 08:21:46] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Indexing Vault: /home/nvidia/ClawBrain/tests/fixtures/test_vault
+[2026-04-13 08:21:46] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Hydrating working memory...
+[2026-04-13 08:21:46] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Intelligence layer fully stabilized.
+[2026-04-13 08:21:46] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: standard.md
+INFO:     Uvicorn running on http://127.0.0.1:11436 (Press CTRL+C to quit)
+[2026-04-13 08:21:47] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: README.md
+[2026-04-13 08:21:47] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Vault Pulse: Indexed 2 files.
+INFO:     127.0.0.1:52956 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52968 - "GET /v1/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52982 - "POST /v1/ingest HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 420, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/fastapi/applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nvidia/ClawBrain/venv/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nvidia/ClawBrain/src/main.py", line 193, in ingest_memory
+    trace_id = await mr.ingest(stimulus, context_id=session_id, sync_distill=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nvidia/ClawBrain/src/memory/router.py", line 199, in ingest
+    signals = self.decomposer.decompose(search_text)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'SignalDecomposer' object has no attribute 'decompose'
+INFO:     Shutting down
