@@ -1,8 +1,7 @@
 venv/
 __pycache__/
 .env
-tests/data/**/*.db
-tests/data/**/blobs/
-data/*.db
-packages/openclaw/node_modules/
-packages/openclaw/dist/
+*.log
+tests/data/
+tests/cache/
+data/
