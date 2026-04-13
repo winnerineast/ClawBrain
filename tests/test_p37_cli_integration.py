@@ -18,17 +18,21 @@ def server_instance():
         shutil.rmtree(db_dir)
     os.makedirs(db_dir, exist_ok=True)
 
-    env = os.environ.copy()
-    env["CLAWBRAIN_DB_DIR"] = db_dir
-    # Use the controlled test vault fixture
-    env["CLAWBRAIN_VAULT_PATH"] = os.path.join(os.getcwd(), "tests/fixtures/test_vault")
-    env["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
-    env["PYTHONPATH"] = "."
+    # Find project root relative to this test file
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    uvicorn_path = os.path.join(project_root, "venv/bin/uvicorn")
     
-    import sys
+    env = os.environ.copy()
+    env["CLAWBRAIN_DB_DIR"] = os.path.join(project_root, db_dir)
+    # Use the controlled test vault fixture
+    env["CLAWBRAIN_VAULT_PATH"] = os.path.join(project_root, "tests/fixtures/test_vault")
+    env["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
+    env["PYTHONPATH"] = project_root
+    
     process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", str(port)],
+        [uvicorn_path, "src.main:app", "--host", "127.0.0.1", "--port", str(port)],
         env=env,
+        cwd=project_root,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
@@ -62,11 +66,17 @@ def server_instance():
     process.terminate()
 
 def run_cli(command, base_url):
+    # Find project root relative to this test file
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    python_path = os.path.join(project_root, "venv/bin/python")
+    cli_path = os.path.join(project_root, "src/cli.py")
+    
     env = os.environ.copy()
     env["CLAWBRAIN_URL"] = base_url
     result = subprocess.run(
-        ["venv/bin/python", "src/cli.py"] + command,
+        [python_path, cli_path] + command,
         env=env,
+        cwd=project_root,
         capture_output=True,
         text=True
     )

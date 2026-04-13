@@ -147,7 +147,8 @@ class Hippocampus:
     def save_trace(self, trace_id: str, payload: Dict[str, Any],
                    search_text: str = "", threshold: int = None,
                    context_id: str = "default",
-                   room_id: str = "general") -> Dict[str, Any]:
+                   room_id: str = "general",
+                   state: str = "COMMITTED") -> Dict[str, Any]:
         content_json = json.dumps(payload)
         content_bytes = content_json.encode('utf-8')
         content_size = len(content_bytes)
@@ -169,6 +170,11 @@ class Hippocampus:
 
         now = time.time()
         
+        # Extract is_complete from reaction if available
+        is_complete = True
+        if payload and isinstance(payload, dict) and "reaction" in payload and payload["reaction"]:
+            is_complete = payload["reaction"].get("is_complete", True)
+        
         # Phase 33/34: ChromaDB Storage with Room support
         metadata = {
             "timestamp": now,
@@ -179,6 +185,8 @@ class Hippocampus:
             "is_blob": 1 if is_blob else 0,
             "blob_path": blob_path,
             "checksum": checksum,
+            "is_complete": 1 if is_complete else 0,
+            "state": state,
             "raw_content": raw_content # Store full JSON in metadata for fast hydration
         }
         
@@ -186,7 +194,7 @@ class Hippocampus:
         # for semantic precision.
         document = search_text if search_text else raw_content
         
-        self.traces_col.add(
+        self.traces_col.upsert(
             ids=[trace_id],
             documents=[document],
             metadatas=[metadata]

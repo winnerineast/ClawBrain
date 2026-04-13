@@ -193,7 +193,7 @@ async def ingest_memory(request: Request):
     
     mr = request.app.state.memory_router
     stimulus = {"messages": [{"role": "user", "content": content}]}
-    trace_id = await mr.ingest(stimulus, context_id=session_id, sync_distill=True)
+    trace_id = await mr.ingest(stimulus, context_id=session_id, sync_distill=False)
     return {"trace_id": trace_id, "session_id": session_id}
 
 @app.post("/v1/query")
@@ -270,6 +270,10 @@ async def gateway_relay(path: str, request: Request):
         logger.error(f"[GATEWAY] No provider found for model: {full_model_name}")
         raise HTTPException(status_code=501, detail=f"No provider configured for model: {full_model_name}")
 
+    tier = await request.app.state.scout.get_model_tier(full_model_name)
+    if tier == ModelTier.TIER_3 and "tools" in body:
+        raise HTTPException(status_code=422, detail="TIER_3 models do not support tools via ClawBrain")
+
     target_protocol = provider_config.protocol
     target_url = f"{provider_config.base_url}/{path.lstrip('/')}"
     
@@ -282,12 +286,15 @@ async def gateway_relay(path: str, request: Request):
     # 4. Header Preparation
     upstream_headers = prepare_upstream_headers(request.headers, provider_config, target_protocol)
     
+    # 4.5. Phase 38: Create PENDING trace (Issue #17)
+    trace_id = await mr.pre_turn_pending(body, context_id=session_id)
+    
     # 5. Forwarding
     try:
         if body.get("stream", False):
             # Stream Relay
             return StreamingResponse(
-                pipeline.stream_relay(http_client, target_url, enriched_body, upstream_headers, input_protocol, session_id, mr, body),
+                pipeline.stream_relay(http_client, target_url, enriched_body, upstream_headers, session_id, mr, body, trace_id),
                 media_type="text/event-stream"
             )
         else:
@@ -296,10 +303,11 @@ async def gateway_relay(path: str, request: Request):
             final_json = resp.json()
             
             # Passive Archival (Solidification)
-            await pipeline.post_turn_solidification(final_json, input_protocol, session_id, mr, body)
+            await pipeline.post_turn_solidification(final_json, input_protocol, session_id, mr, body, trace_id)
             
             return final_json
             
     except Exception as e:
         logger.error(f"Forwarding error: {e}")
+        await mr.orphan_turn(trace_id, body, str(e), context_id=session_id)
         raise HTTPException(status_code=502, detail=str(e))

@@ -66,6 +66,64 @@ def test_strict_session_isolation():
     # it must NOT be returned in Session B.
     assert "session-a-fact" not in results, "SECURITY BREACH: Semantic leakage between sessions!"
 
+def test_comprehensive_semantic_matrix():
+    """
+    PROVING 100% SUCCESS CLAIM:
+    Verifies that ChromaDB can retrieve a fact based on meaning
+    across a diverse semantic matrix with zero keyword overlap.
+    """
+    hp = Hippocampus(db_dir=TEST_DATA_DIR)
+    session_id = "semantic-matrix"
+    
+    # Define 10 distinct semantic pairs (zero keyword overlap)
+    matrix = [
+        # Performance
+        {"fact": "The system latency is 10ms.", "query": "speed"},
+        # Security
+        {"fact": "AES-256 encryption is enabled.", "query": "protection"},
+        # Persistence
+        {"fact": "Data survives after a hard reboot.", "query": "save"},
+        # Pricing
+        {"fact": "The service costs five dollars monthly.", "query": "expense"},
+        # Location
+        {"fact": "The server farm is in Frankfurt.", "query": "where"},
+        # Color
+        {"fact": "The button is painted azure.", "query": "hue"},
+        # Schedule
+        {"fact": "The meeting starts at high noon.", "query": "time"},
+        # Capacity
+        {"fact": "The drive holds two terabytes.", "query": "size"},
+        # Access
+        {"fact": "Only the administrator can view this.", "query": "permissions"},
+        # Status
+        {"fact": "The task finished without issues.", "query": "result"}
+    ]
+    
+    # 1. Plant all facts
+    for i, pair in enumerate(matrix):
+        trace_id = f"fact-matrix-{i}"
+        hp.save_trace(
+            trace_id=trace_id,
+            payload={"stimulus": {"content": pair["fact"]}, "model": "test-model"},
+            search_text=pair["fact"],
+            context_id=session_id
+        )
+    
+    import time
+    time.sleep(0.5)
+
+    # 2. Query each and assert #1 result
+    success_count = 0
+    for i, pair in enumerate(matrix):
+        expected_trace_id = f"fact-matrix-{i}"
+        results = hp.search(pair["query"], context_id=session_id)
+        
+        assert len(results) > 0, f"Query '{pair['query']}' returned no results."
+        assert results[0] == expected_trace_id, f"Query '{pair['query']}' failed to retrieve '{pair['fact']}' as #1. Got {results}"
+        success_count += 1
+        
+    assert success_count == 10, "Failed to achieve 100% semantic recall across the matrix."
+
 if __name__ == "__main__":
     # For manual execution
     try:

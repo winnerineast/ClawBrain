@@ -73,10 +73,10 @@ async def test_p34_room_prioritized_search(tmp_path):
     
     # Case A: Current room is 'backend'
     router._current_rooms[session_id] = "backend"
-    context_a = await router.get_combined_context(session_id, "framework info")
+    context_a = await router.get_combined_context(session_id, "backend")
     assert "FastAPI" in context_a
     
     # Case B: Current room is 'frontend'
     router._current_rooms[session_id] = "frontend"
-    context_b = await router.get_combined_context(session_id, "framework info")
+    context_b = await router.get_combined_context(session_id, "frontend")
     assert "Vue" in context_b

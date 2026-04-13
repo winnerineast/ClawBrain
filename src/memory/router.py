@@ -4,6 +4,7 @@ import json
 import os
 import asyncio
 import logging
+import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import httpx
@@ -16,6 +17,30 @@ from src.memory.room_detector import RoomDetector
 from src.memory.vault_indexer import VaultIndexer
 
 logger = logging.getLogger("GATEWAY.MEMORY.ROUTER")
+
+class CircuitBreaker:
+    """Phase 37: Cognitive Plane Circuit Breaker (Issue #16)"""
+    def __init__(self, max_failures=3, backoff_seconds=60):
+        self.max_failures = max_failures
+        self.backoff_seconds = backoff_seconds
+        self.failures = 0
+        self.last_failure_time = 0
+
+    def is_open(self) -> bool:
+        if self.failures >= self.max_failures:
+            if time.time() - self.last_failure_time > self.backoff_seconds:
+                # Half-open: allow a trial request
+                self.failures = self.max_failures - 1
+                return False
+            return True
+        return False
+
+    def record_failure(self):
+        self.failures += 1
+        self.last_failure_time = time.time()
+
+    def record_success(self):
+        self.failures = 0
 
 class MemoryRouter:
     """
@@ -64,6 +89,10 @@ class MemoryRouter:
         self.decomposer = SignalDecomposer()
         self._trace_counters: Dict[str, int] = {}
         self._session_locks: Dict[str, asyncio.Lock] = {}
+        
+        # Phase 37: Circuit Breakers for Cognitive Plane (Issue #16)
+        self.cb_room = CircuitBreaker(max_failures=3, backoff_seconds=60)
+        self.cb_distill = CircuitBreaker(max_failures=3, backoff_seconds=120)
         
         # Phase 36: Cognitive Plane Decoupling
         self.ready_event = asyncio.Event()
@@ -162,6 +191,74 @@ class MemoryRouter:
         except Exception as e:
             logger.exception(f"Hydration failed: {e}")
 
+    async def pre_turn_pending(self, payload: Dict[str, Any], context_id: str = "default", offload_threshold: int = None) -> str:
+        await self.wait_until_ready()
+        async with self._get_session_lock(context_id):
+            room_id = self._get_current_room(context_id)
+            trace_id = str(uuid.uuid4())
+            search_text = payload.get("messages", [{}])[-1].get("content", "")
+            
+            self.hippo.save_trace(
+                trace_id=trace_id,
+                payload={"stimulus": payload, "reaction": None},
+                search_text=search_text,
+                threshold=offload_threshold,
+                context_id=context_id,
+                room_id=room_id,
+                state="PENDING"
+            )
+        return trace_id
+
+    async def commit_turn(self, trace_id: str, payload: Dict[str, Any], reaction: Dict[str, Any], context_id: str, sync_distill: bool = False, offload_threshold: int = None):
+        await self.wait_until_ready()
+        async with self._get_session_lock(context_id):
+            wm = self._get_wm(context_id)
+            room_id = self._get_current_room(context_id)
+            search_text = payload.get("messages", [{}])[-1].get("content", "")
+            
+            self.hippo.save_trace(
+                trace_id=trace_id,
+                payload={"stimulus": payload, "reaction": reaction},
+                search_text=search_text,
+                threshold=offload_threshold,
+                context_id=context_id,
+                room_id=room_id,
+                state="COMMITTED"
+            )
+            
+            wm.add_item(trace_id, search_text)
+            self.hippo.save_wm_state(context_id, wm.items)
+            
+            core_intent = self.decomposer.extract_core_intent(payload)
+            self._trace_counters[context_id] = self._trace_counters.get(context_id, 0) + 1
+            
+        if self.enable_room_detection and not sync_distill:
+            asyncio.create_task(self._perform_room_detection(context_id, search_text))
+            
+        if self.enable_auto_distill:
+            if self._trace_counters.get(context_id, 0) >= self.distill_threshold or sync_distill:
+                if sync_distill:
+                    await self._auto_distill_worker(context_id)
+                else:
+                    asyncio.create_task(self._auto_distill_worker(context_id))
+                self._trace_counters[context_id] = 0
+
+    async def orphan_turn(self, trace_id: str, payload: Dict[str, Any], error: str, context_id: str, offload_threshold: int = None):
+        await self.wait_until_ready()
+        async with self._get_session_lock(context_id):
+            room_id = self._get_current_room(context_id)
+            search_text = payload.get("messages", [{}])[-1].get("content", "")
+            
+            self.hippo.save_trace(
+                trace_id=trace_id,
+                payload={"stimulus": payload, "reaction": {"error": error}},
+                search_text=search_text,
+                threshold=offload_threshold,
+                context_id=context_id,
+                room_id=room_id,
+                state="ORPHAN"
+            )
+
     async def ingest(self, payload: Dict[str, Any], reaction: Dict[str, Any] = None,
                      offload_threshold: int = None, context_id: str = "default",
                      sync_distill: bool = False) -> str:
@@ -170,59 +267,15 @@ class MemoryRouter:
         P18: Isolated by context_id.
         P34: Organized by semantic rooms.
         """
-        # Phase 36: Ensure stabilization before any write operation
-        await self.wait_until_ready()
-
-        async with self._get_session_lock(context_id):
-            wm = self._get_wm(context_id)
-            room_id = self._get_current_room(context_id)
-            
-            # 1. Archive to Hippocampus (L2)
-            trace_id = str(uuid.uuid4())
-            search_text = payload.get("messages", [{}])[-1].get("content", "")
-            
-            self.hippo.save_trace(
-                trace_id=trace_id,
-                payload={"stimulus": payload, "reaction": reaction},
-                search_text=search_text,
-                context_id=context_id,
-                room_id=room_id
-            )
-            
-            # 2. Add to Working Memory (L1)
-            wm.add_item(trace_id, search_text)
-            
-            # 3. Persistence (P22)
-            self.hippo.save_wm_state(context_id, wm.items)
-            
-            # 4. Signal Analysis (P1.8)
-            # Simplification: Use extract_core_intent to identify focus
-            core_intent = self.decomposer.extract_core_intent(payload)
-            if core_intent:
-                # Potential for future signal-based boosting
-                pass
-            
-            # 5. Incremental Counter
-            self._trace_counters[context_id] = self._trace_counters.get(context_id, 0) + 1
-            
-        # --- TRIGGER COGNITIVE TASKS (Outside session lock) ---
-        
-        # A. Room Detection (P34)
-        if self.enable_room_detection and not sync_distill:
-            asyncio.create_task(self._perform_room_detection(context_id, search_text))
-            
-        # B. Distillation (L2 -> L3)
-        if self.enable_auto_distill:
-            if self._trace_counters.get(context_id, 0) >= (offload_threshold or self.distill_threshold) or sync_distill:
-                if sync_distill:
-                    await self._auto_distill_worker(context_id)
-                else:
-                    asyncio.create_task(self._auto_distill_worker(context_id))
-                self._trace_counters[context_id] = 0
-                
+        trace_id = await self.pre_turn_pending(payload, context_id, offload_threshold)
+        await self.commit_turn(trace_id, payload, reaction, context_id, sync_distill, offload_threshold)
         return trace_id
 
+
     async def _perform_room_detection(self, session_id: str, current_intent: str):
+        if self.cb_room.is_open():
+            logger.warning("[ROOM_DET] Circuit breaker is open. Skipping room detection.")
+            return
         try:
             async with self._get_session_lock(session_id):
                 wm = self._get_wm(session_id)
@@ -230,17 +283,27 @@ class MemoryRouter:
                 known = self._get_known_rooms(session_id)
             
             new_room = await self.room_detector.detect_room(history, current_intent, known)
+            if new_room and new_room.startswith("[Error]"):
+                self.cb_room.record_failure()
+                logger.error(f"[ROOM_DET_FAIL] {new_room}")
+                return
             
+            self.cb_room.record_success()
             # Update room status (Quick lock)
             async with self._get_session_lock(session_id):
                 if new_room:
                     self._current_rooms[session_id] = new_room
                     if session_id not in self._known_rooms: self._known_rooms[session_id] = {"general"}
                     self._known_rooms[session_id].add(new_room)
-        except Exception as e: logger.error(f"[ROOM_DET_FAIL] {e}")
+        except Exception as e: 
+            self.cb_room.record_failure()
+            logger.error(f"[ROOM_DET_FAIL] {e}")
 
     async def _auto_distill_worker(self, session_id: str):
         """Background worker to refine L2 fragments into L3 facts."""
+        if self.cb_distill.is_open():
+            logger.warning("[DISTILL] Circuit breaker is open. Skipping distillation.")
+            return
         try:
             async with self._get_session_lock(session_id):
                 wm = self._get_wm(session_id)
@@ -257,20 +320,30 @@ class MemoryRouter:
             logger.info(f"[DISTILL] Starting distillation for session: {session_id}")
             new_summary = await self.neo.distill(session_id, raw_history)
             
+            if new_summary and new_summary.startswith("[Error]"):
+                self.cb_distill.record_failure()
+                logger.error(f"[DISTILL_ERROR] {new_summary}")
+                return
+            
             if new_summary:
+                self.cb_distill.record_success()
                 async with self._get_session_lock(session_id):
                     # P23: Prune Working Memory after successful distillation
                     wm.prune(keep_count=5)
                     self.hippo.save_wm_state(session_id, wm.items)
                 logger.info(f"[DISTILL] Completed. L3 Summary updated for {session_id}")
         except Exception as e:
+            self.cb_distill.record_failure()
             logger.error(f"[DISTILL_ERROR] {e}")
 
-    async def get_combined_context(self, context_id: str, query: str, max_chars: int = 2000) -> str:
+    async def get_combined_context(self, context_id: str, query: str, max_chars: int = None) -> str:
         """
         Assemble the optimal context using Stack Math budget allocation.
         Priority: L3 Facts > Vault > L1 Working Memory > L2 Hippocampus.
         """
+        if max_chars is None:
+            max_chars = int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", 2000))
+
         # Ensure readiness
         if not self.ready_event.is_set():
             return ""
@@ -287,11 +360,51 @@ class MemoryRouter:
             
             working_contents = wm.get_active_contents()
             
+            # 4. Hippocampus (L2)
             # L2 Retrieval (Favor current room)
             # hippo.search(query, context_id, room_id) returns List[str] (IDs)
             l2_ids = self.hippo.search(query, context_id, current_room)
-            l2_contents = [self.hippo.get_content(tid) for tid in l2_ids[:5]]
-            l2_contents = [c for c in l2_contents if c]
+            
+            # Phase 38: Sparse Data Semantic Search Fallback (Issue #19)
+            if not l2_ids and query:
+                logger.info(f"[ROUTER] Semantic search returned empty for '{query}'. Engaging sparse data fallback.")
+                recent_traces = self.hippo.get_recent_traces(limit=50, context_id=context_id)
+                query_lower = query.lower()
+                for trace in recent_traces:
+                    raw_content = trace.get("raw_content", "") or ""
+                    if query_lower in raw_content.lower():
+                        l2_ids.append(trace["trace_id"])
+                        if len(l2_ids) >= 5:
+                            break
+
+            l2_contents = []
+            for tid in l2_ids[:5]:
+                full_payload = self.hippo.get_full_payload(tid)
+                if full_payload:
+                    # Extract text from stimulus and reaction
+                    stimulus = full_payload.get("stimulus", {})
+                    msgs = stimulus.get("messages", [])
+                    turn_text = []
+                    
+                    # Case A: Messages list (Standard)
+                    if msgs:
+                        for m in msgs:
+                            turn_text.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
+                    # Case B: Direct content (Legacy/Manual)
+                    elif "content" in stimulus:
+                        turn_text.append(f"user: {stimulus['content']}")
+                    
+                    reaction = full_payload.get("reaction", {})
+                    if reaction and "message" in reaction:
+                        rm = reaction["message"]
+                        turn_text.append(f"assistant: {rm.get('content', '')}")
+                    
+                    if turn_text:
+                        l2_contents.append(" | ".join(turn_text))
+                else:
+                    # Fallback if no full payload
+                    content = self.hippo.get_content(tid)
+                    if content: l2_contents.append(content)
 
             # --- STACK MATH ASSEMBLY ---
             # Budget calculation (Precision Budgeting P31)
@@ -304,7 +417,8 @@ class MemoryRouter:
                 nonlocal current_len
                 if not content_list: return
                 
-                section_header = f"\n=== {header} ===\n"
+                # Double newline for clear separation
+                section_header = f"\n\n=== {header} ===\n"
                 section_content = "\n".join([f"- {c}" for c in content_list])
                 
                 total_section = section_header + section_content
