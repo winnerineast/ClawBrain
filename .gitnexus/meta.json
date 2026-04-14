@@ -1,0 +1,13 @@
+{
+  "repoPath": "/home/nvidia/ClawBrain",
+  "lastCommit": "8e679f23425d131a902641063592bc2fbbe41a6b",
+  "indexedAt": "2026-04-14T01:43:58.695Z",
+  "stats": {
+    "files": 169,
+    "nodes": 1039,
+    "edges": 2376,
+    "communities": 44,
+    "processes": 72,
+    "embeddings": 0
+  }
+}
