@@ -127,67 +127,47 @@ ClawBrain functions as a neural orchestrator, managing the lifecycle of informat
 ```mermaid
 flowchart LR
     %% Professional Color Palette
-    classDef capture_node stroke:#27ae60,stroke-width:2px,fill:#f1f9f5,color:#1b5e20
-    classDef cognitive_node stroke:#2980b9,stroke-width:2px,fill:#f0f7fc,color:#0d47a1
-    classDef storage_node stroke:#7f8c8d,stroke-width:1px,fill:#ffffff,color:#2c3e50
-    classDef vault_node stroke:#f39c12,stroke-width:2px,fill:#fffef0,color:#7e5109
+    classDef interface_node stroke:#27ae60,stroke-width:2px,fill:#f1f9f5,color:#1b5e20
+    classDef gateway_node stroke:#e67e22,stroke-width:2px,fill:#fef5e7,color:#d35400
+    classDef core_node stroke:#2980b9,stroke-width:2px,fill:#f0f7fc,color:#0d47a1
+    classDef memory_node stroke:#7f8c8d,stroke-width:1px,fill:#ffffff,color:#2c3e50
 
-    %% 1. Horizontal Layout
-    subgraph Frontend [Agentic Frontend]
+    subgraph Ingress [Interfaces]
         direction TB
-        User((💻 User / CLI))
+        API[main.py: HTTP Relay]:::interface_node
+        MCP[mcp_server.py: MCP SSE]:::interface_node
+        CLI[cli.py: Admin CLI]:::interface_node
     end
 
-    subgraph ClawBrain [ClawBrain Neural Engine]
+    subgraph Gateway [Protocol Gateway]
         direction TB
-        
-        subgraph RelayPlane [Relay Plane: High-Speed Traffic]
-            direction LR
-            Ingest[📥 Memory Gateway]:::capture_node
-            Assemble[🧠 Context Synthesizer]:::cognitive_node
-        end
-
-        subgraph MemoryPlane [Cognitive Plane: Knowledge Evolution]
-            direction LR
-            L1[[🧠 L1: Attention]]:::storage_node
-            L2[(📚 L2: Episodes)]:::storage_node
-            L3[💎 L3: Semantic Facts]:::storage_node
-        end
-
-        subgraph KnowledgePlane [Knowledge Bridge]
-            direction LR
-            Ext[(🗂️ Ext: Vault Index)]:::storage_node
-        end
-
-        %% Structural Alignment (Invisible)
-        RelayPlane ~~~ MemoryPlane ~~~ KnowledgePlane
+        Detector[detector.py: Detect]:::gateway_node
+        Translator[translator.py: Translate]:::gateway_node
     end
 
-    subgraph Backend [Backend Intelligence]
+    subgraph Intelligence [Core Intelligence]
         direction TB
-        LLM((🤖 LLM Brain))
+        Pipeline[pipeline.py: Pipeline]:::core_node
+        Router[router.py: Router]:::core_node
     end
 
-    Vault[(📝 Obsidian Vault)]:::vault_node
+    subgraph Storage [Memory Planes]
+        direction TB
+        L1[[working.py: L1]]:::memory_node
+        L2[(storage.py: L2)]:::memory_node
+        L3[neocortex.py: L3]:::memory_node
+        Ext[(vault_indexer.py: Ext)]:::memory_node
+    end
 
-    %% --- FLOW 1: MEMORY CAPTURE (GREEN) ---
-    User -- "1. Interaction" --> Ingest
-    LLM -- "2. Response" --> Ingest
-    Ingest -- "Real-time" --> L1
-    Ingest -- "Archival" --> L2
-    Vault -- "3. Scan" --> Ext
-
-    %% --- FLOW 2: COGNITIVE OPTIMIZATION (BLUE) ---
-    L2 -- "Distillation" --> L3
-    L3 -- "Priority 1" --> Assemble
-    Ext -- "Priority 2" --> Assemble
-    L1 -- "Priority 3" --> Assemble
-    L2 -- "Priority 4" --> Assemble
-    Assemble -- "4. Optimized Context" --> LLM
+    Ingress --> Detector
+    Detector --> Translator
+    Translator --> Pipeline
+    Pipeline <--> Router
+    Router <--> Storage
+    Pipeline <--> LLM((🤖 Upstream LLM))
 
     %% Professional Styling for Links
-    linkStyle 0,1,2,3,4 stroke:#27ae60,stroke-width:3px,color:#27ae60
-    linkStyle 5,6,7,8,9,10 stroke:#2980b9,stroke-width:3px,color:#2980b9
+    linkStyle 0,1,2,3,4,5 stroke:#2980b9,stroke-width:3px,color:#2980b9
 ```
 
 ### Layer Details
@@ -223,6 +203,16 @@ Ensure system stability by running our unmocked, resource-aware regression suite
 # Reaps orphaned processes, resets GPU resources, and runs 91 tests
 ./run_regression.sh
 ```
+
+---
+
+## 🏗️ GitNexus Code Intelligence
+
+This repository is indexed by [GitNexus](https://github.com/abhigyanpatwari/GitNexus), providing a high-fidelity knowledge graph of the codebase for AI agents.
+
+- **Status**: 🟢 Fully Indexed (1,039 symbols, 2,376 relationships)
+- **Features**: Semantic navigation, impact analysis, and automated execution flow tracing.
+- **Usage**: If you are using an AI assistant (like Claude Code or Cursor), refer to [AGENTS.md](./AGENTS.md) or [CLAUDE.md](./CLAUDE.md) for specialized GitNexus instructions.
 
 ---
 <p align="right">Built with 🦞 by the ClawBrain Team.</p>
