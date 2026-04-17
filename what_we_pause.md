@@ -1,24 +1,26 @@
-# Task Summary: Universal Hub Transformation (v2.0) - COMPLETE
+# 🦞 ClawBrain: Active Issues & Paused Tasks (April 17, 2026)
 
-## 1. Accomplishments
-*   **✅ Architectural Decoupling**: Relay Plane and Cognitive Plane are fully separated. Independent background pulses manage memory hydration, vault indexing, and distillation.
-*   **✅ Professional CLI**: `src/cli.py` is fully functional and verified via integration tests. Supports ingest, query, and status monitoring.
-*   **✅ MCP Dual-Mode**:
-    *   **integrated (SSE)**: Standardized remote interface mounted as a raw ASGI application.
-    *   **standalone (Stdio)**: Implemented "Thin Client" logic ensuring Single Storage Ownership.
-*   **✅ State Machine & Self-Sync**: Implemented `EngineState` (`INITIALIZING` -> `READY`) with `wait_until_ready()` guards. Ingestion now automatically waits for the engine to stabilize.
-*   **✅ Cognitive Acceleration**: `prepare_env.py` supports fast snapshots, reducing test preparation time to milliseconds.
-*   **✅ Context Integrity**: Refactored L2 context assembly to extract plain text from JSON payloads, ensuring token-efficient and readable memories.
-*   **✅ Bug Fixes**:
-    *   Fixed `ModuleNotFoundError` in integration tests via robust project root resolution.
-    *   Fixed `TypeError` in `Hippocampus.search` and `Neocortex.distill` argument signatures.
-    *   Fixed `AttributeError` in `SignalDecomposer` method calls.
-    *   Resolved Issue #15 (SSE Parity), #16 (Circuit Breaker), #17 (Interaction State Machine), #18 (Stress Test), #19 (Sparse Fallback), and #20 (Temporal Mocking).
+## 🛑 Critical Issues Found During Benchmark
 
-## 2. Final Verification
-*   **100% Pass Rate**: All 86 regression tests (including core logic, CLI, MCP, and performance stress tests) passed in a real-world unmocked environment.
-*   **Release Candidate**: ClawBrain v2.0 is confirmed stable and professional.
+### 1. Tier 1 Isolation Failures (Data Leaking)
+*   **The Problem**: The Tier 1 benchmark identified **5 total Isolation Failures** across the `isolation`, `neocortex`, and `recall_dist` dimensions.
+*   **Observation**: Data from one `session_id` is leaking into the prompt additions of unrelated sessions.
+*   **Action Required**: Audit `src/memory/storage.py` (ChromaDB `where` filters) and `src/memory/router.py` to ensure every retrieval strictly enforces the `context_id` boundary.
 
-## 3. Post-Release Debt (Future Roadmap)
-*   Flattened Entity Registry (flattened knowledge tracking).
-*   Automatic Cross-Session Fact Reconciliation.
+### 2. Multi-Fact Synthesis Gap
+*   **The Problem**: Multi-fact recall score is currently **0.0%**.
+*   **Observation**: The system successfully retrieves individual facts but fails to synthesize them when a query requires multiple historical pieces of context to answer.
+*   **Action Required**: Refine the `assemble` logic in `src/memory/router.py` to better structure and "link" multiple retrieved facts for the LLM.
+
+### 3. Tier 2 Benchmark Blocker (OpenClaw Profiles)
+*   **Status**: **PAUSED**.
+*   **The Problem**: The current profile directory name `.openclaw-benchmark-on` is rejected by OpenClaw as an invalid profile ID (`[openclaw] Invalid --profile (use letters, numbers, "_", "-" only)`).
+*   **Action Required**: Refactor `benchmark/src/profiles.py` to use alpha-numeric profile names (e.g., `bm_on`, `bm_off`) and ensure the configuration files are correctly linked.
+
+### 4. High-Distance Latency (ReadTimeout)
+*   **The Problem**: Observed `ReadTimeout` errors in benchmark cases with 400+ noise turns.
+*   **Observation**: System latency increases exponentially with history depth.
+*   **Action Required**: Investigate indexing performance and query optimization in the Hippocampus layer.
+
+---
+*This file tracks active blockers and findings from the April 17, 2026 benchmark run. Resume here for the next phase.*
