@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PLUGIN_DIST = Path(__file__).parent.parent.parent / "packages" / "openclaw" / "clawbrain"
+PLUGIN_DIST = Path(__file__).parent.parent.parent / "packages" / "openclaw-pkg" / "dist"
 HOME = Path.home()
 MAIN_CONFIG = HOME / ".openclaw" / "openclaw.json"
 
@@ -35,9 +35,6 @@ def _make_config_on(base: dict) -> dict:
     plugins = cfg.setdefault("plugins", {})
     plugins.setdefault("slots", {})["contextEngine"] = "clawbrain"
     plugins.setdefault("entries", {})["clawbrain"] = {"enabled": True}
-    plugins.setdefault("load", {}).setdefault("paths", [])
-    if str(PLUGIN_DIST) not in plugins["load"]["paths"]:
-        plugins["load"]["paths"].append(str(PLUGIN_DIST))
     return cfg
 
 
@@ -57,18 +54,28 @@ def _write_config(profile_dir: Path, config: dict) -> None:
         json.dump(config, f, indent=2)
     print(f"  Written: {config_path}")
 
+    # Modern OpenClaw integration: install the local plugin into this profile
+    # Use the absolute path to ensure OpenClaw can find it from anywhere
+    plugin_root = PLUGIN_DIST.parent
+    try:
+        subprocess.run(
+            ["openclaw", "--profile", profile_dir.name, "plugins", "install", "-l", str(plugin_root)],
+            check=True, capture_output=True, text=True
+        )
+        print(f"  Installed local plugin: {plugin_root}")
+    except subprocess.CalledProcessError as e:
+        print(f"  Warning: Could not install plugin to {profile_dir.name}: {e.stderr}")
+
 
 def setup_profiles(force: bool = False) -> None:
     if not MAIN_CONFIG.exists():
         print(f"ERROR: Main config not found at {MAIN_CONFIG}")
         sys.exit(1)
 
-    # Build plugin dist if missing
+    # Verify plugin dist exists (already built if using setup_profiles)
     if not PLUGIN_DIST.exists():
-        print(f"Plugin dist not found at {PLUGIN_DIST}. Building...")
-        pkg_dir = PLUGIN_DIST.parent.parent
-        subprocess.run(["npm", "run", "build"], cwd=str(pkg_dir), check=True)
-        print("  Plugin built.")
+        print(f"ERROR: Plugin dist not found at {PLUGIN_DIST}. Please build it first.")
+        sys.exit(1)
 
     base = _load_main_config()
 

@@ -12,6 +12,19 @@ ClawBrain 是专为 AI 智能体（特别是 [OpenClaw](https://github.com/openc
 
 ---
 
+## 📊 认知基准测试 (Tier 1 结果)
+
+ClawBrain 的有效性通过与标准无状态 AI 对比的 **“认知增量” (Cognitive Delta)** 进行量化评估。
+
+*   **超长距离召回**：在 500+ 轮对话后，事实召回率提升了 **+70.2%**。
+*   **语义事实留存**：长期记忆提纯 (Neocortex) 成功率达 **53.3%**。
+*   **零样本噪声鲁棒性**：在海量技术干扰中提取关键事实的能力提升了 **40.9%**。
+
+> [!TIP]
+> 在 [benchmark/BASELINE.md](./benchmark/BASELINE.md) 中查看完整的技术分析报告。
+
+---
+
 ---
 
 ## 💎 ClawBrain 的优势：真实数据验证

@@ -23,3 +23,5 @@
 
 10. **Deterministic Test Integrity**: Always sanitize the environment before executing tests. This includes reaping orphaned server processes, clearing network ports, and resetting temporary data to ensure 100% reproducible results.
 
+11. **Virtual Environment Strictness**: All Python-based operations, including diagnostics, server execution, and benchmark runs, MUST be performed using the project's virtual environment (`~/ClawBrain/venv`). Never use system-wide Python for project-specific tasks to avoid dependency conflicts.
+
