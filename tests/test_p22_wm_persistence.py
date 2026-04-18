@@ -27,7 +27,7 @@ async def test_p22_wm_state_written_after_ingest(tmp_path):
     await router.wait_until_ready()
     await router.ingest(
         {"messages": [{"role": "user", "content": "hello persistence test"}]},
-        context_id="session-A"
+        session_id="session-A"
     )
 
     # Check ChromaDB
@@ -51,11 +51,11 @@ async def test_p22_exact_activation_restored_after_restart(tmp_path):
     await router1.wait_until_ready()
     await router1.ingest(
         {"messages": [{"role": "user", "content": "topic ALPHA project detail"}]},
-        context_id="persist-session"
+        session_id="persist-session"
     )
     await router1.ingest(
         {"messages": [{"role": "user", "content": "unrelated item XYZ"}]},
-        context_id="persist-session"
+        session_id="persist-session"
     )
 
     # Get WM state (activation + trace_ids) before restart
@@ -89,11 +89,11 @@ async def test_p22_multi_session_snapshots_isolated(tmp_path):
     await router.wait_until_ready()
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice working on PROJECT-A"}]},
-        context_id="alice"
+        session_id="alice"
     )
     await router.ingest(
         {"messages": [{"role": "user", "content": "Bob working on PROJECT-B"}]},
-        context_id="bob"
+        session_id="bob"
     )
 
     alice_res = router.hippo.wm_col.get(where={"session_id": "alice"})
@@ -123,7 +123,7 @@ async def test_p22_clear_wm_state(tmp_path):
     await router.wait_until_ready()
     await router.ingest(
         {"messages": [{"role": "user", "content": "content to be cleared"}]},
-        context_id="clear-session"
+        session_id="clear-session"
     )
 
     # Confirm write
@@ -148,7 +148,7 @@ async def test_p22_snapshot_takes_priority_over_traces_rebuild(tmp_path):
     await router1.wait_until_ready()
     await router1.ingest(
         {"messages": [{"role": "user", "content": "snapshot priority test CANARY"}]},
-        context_id="snap-test"
+        session_id="snap-test"
     )
 
     # Verify snapshot exists

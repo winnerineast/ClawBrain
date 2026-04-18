@@ -110,3 +110,53 @@ def test_p17_health_check_version():
         visual_audit("Health Check Version", "version should be 1.42", "1.42", data.get("version"))
         assert resp.status_code == 200
         assert data["version"] == "1.42"
+
+def test_p17_management_sessions_and_traces(tmp_path):
+    """GET /v1/management/sessions and /traces are fully functional"""
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
+
+    with TestClient(app) as client:
+        # 1. Ingest some data to create a session
+        ingest_payload = {
+            "session_id": "sid_123",
+            "content": "Secret password is XYZ"
+        }
+        client.post("/v1/ingest", json=ingest_payload)
+        
+        # 2. Test Session Discovery
+        resp = client.get("/v1/management/sessions")
+        data = resp.json()
+        assert resp.status_code == 200
+        assert "sid_123" in data["sessions"]
+        visual_audit("MGMT: Sessions", "Session sid_123 should be discovered", True, "sid_123" in data["sessions"])
+
+        # 3. Test Trace Inspection
+        resp = client.get("/v1/management/traces/sid_123?limit=10")
+        data = resp.json()
+        assert resp.status_code == 200
+        assert len(data["traces"]) >= 1
+        assert "XYZ" in data["traces"][0]["raw_content"]
+        visual_audit("MGMT: Traces", "Trace should contain XYZ", True, "XYZ" in data["traces"][0]["raw_content"])
+
+def test_p17_internal_assemble_v1_v2(tmp_path):
+    """POST /internal/assemble correctly injects memory (Mission Critical)"""
+    clear_chroma_clients()
+    os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
+
+    with TestClient(app) as client:
+        # 1. Plant a fact
+        client.post("/v1/ingest", json={"session_id": "plugin_test", "content": "The codebase is written in Rust."})
+        
+        # 2. Simulate Plugin Assemble Call
+        assemble_payload = {
+            "session_id": "plugin_test",
+            "current_focus": "What language?",
+            "token_budget": 500
+        }
+        resp = client.post("/internal/assemble", json=assemble_payload)
+        data = resp.json()
+        
+        assert resp.status_code == 200
+        assert "Rust" in data["system_prompt_addition"]
+        visual_audit("PLUGIN: Assemble", "Injected prompt should contain Rust", True, "Rust" in data["system_prompt_addition"])

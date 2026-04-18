@@ -36,9 +36,9 @@ Fully implement ClawBrain Gateway protocol adaptation for major LLM providers. B
   - Attempt JSON parsing: Ollama format reads `message.content`; OpenAI SSE format reads `choices[0].delta.content`.
 - **After stream ends**: Join `collected_content` into a full string and call `memory_router.ingest` with the real reaction. Fall back to `[Streamed]` if the list is empty.
 
-### 2.6 context_id Full-path Propagation (P18)
-- **Background**: `main.py` extracted `context_id` from the header but did not pass it to `memory_router.ingest()`, causing all records to be written to the `"default"` session.
-- **Fix**: Pass `context_id=context_id` explicitly in both the non-streaming and streaming `ingest` call sites.
+### 2.6 session_id Full-path Propagation (P18)
+- **Background**: `main.py` extracted `session_id` from the header but did not pass it to `memory_router.ingest()`, causing all records to be written to the `"default"` session.
+- **Fix**: Pass `session_id=session_id` explicitly in both the non-streaming and streaming `ingest` call sites.
 
 ### 2.7 Secure Header Forwarding (P27 - Issue #1)
 - **Goal**: Prevent leakage of internal session metadata and inappropriate authentication credentials to upstream LLM providers.

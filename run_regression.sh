@@ -6,7 +6,14 @@ set -e
 echo "🚀 Starting ClawBrain Regression Suite"
 echo "========================================"
 
-# 1. Sanitize Environment
+# 0. Activate Virtual Environment (Rule 11)
+source venv/bin/activate
+
+# 1. Sanitize Environment (Rule 10: Deterministic Integrity)
+echo "[CLEANUP] Reaping orphaned server and test processes..."
+ps aux | grep -E "uvicorn|pytest" | grep -v grep | awk '{print $2}' | xargs kill -9 || true
+sleep 1
+
 PYTHONPATH=. python3 tests/prepare_env.py
 
 # 2. Execute Tests

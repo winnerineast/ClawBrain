@@ -35,7 +35,7 @@ async def test_temporal_distillation_logic(tmp_path):
     for i, turn in enumerate(noisy_turns):
         with patch('time.time') as mock_time:
             mock_time.return_value = base_time + (i * 600) # One turn every 10 mins
-            await router.ingest({"messages": [{"role": "user", "content": turn}]}, context_id=session_id)
+            await router.ingest({"messages": [{"role": "user", "content": turn}]}, session_id=session_id)
             
     # The 5th turn should have triggered distillation (threshold=5)
     # Since it's async, we poll for the summary (using REAL time)

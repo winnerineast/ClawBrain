@@ -23,7 +23,7 @@ def test_semantic_recall_vs_keyword():
         trace_id="fact-001",
         payload={"stimulus": {"content": fact}, "model": "test-model"},
         search_text=fact,
-        context_id=session_id
+        session_id=session_id
     )
     
     # 2. Query using DIFFERENT words but SAME meaning
@@ -31,7 +31,7 @@ def test_semantic_recall_vs_keyword():
     # "address" is not in the fact
     query = "What is the database address?"
     
-    results = hp.search(query, context_id=session_id)
+    results = hp.search(query, session_id=session_id)
     
     print(f"\n[SEMANTIC TEST] Query: '{query}'")
     print(f"[SEMANTIC TEST] Fact:  '{fact}'")
@@ -53,11 +53,11 @@ def test_strict_session_isolation():
         trace_id="session-a-fact",
         payload={"stimulus": {"content": "The secret key is 'ALICE-123'"}, "model": "test-model"},
         search_text="The secret key is 'ALICE-123'",
-        context_id="session-alice"
+        session_id="session-alice"
     )
     
     # Query from Session B for something similar
-    results = hp.search("What is the secret key?", context_id="session-bob")
+    results = hp.search("What is the secret key?", session_id="session-bob")
     
     print(f"\n[ISOLATION TEST] Query from Session Bob: 'What is the secret key?'")
     print(f"[ISOLATION TEST] Results: {results}")
@@ -106,7 +106,7 @@ def test_comprehensive_semantic_matrix():
             trace_id=trace_id,
             payload={"stimulus": {"content": pair["fact"]}, "model": "test-model"},
             search_text=pair["fact"],
-            context_id=session_id
+            session_id=session_id
         )
     
     import time
@@ -116,7 +116,7 @@ def test_comprehensive_semantic_matrix():
     success_count = 0
     for i, pair in enumerate(matrix):
         expected_trace_id = f"fact-matrix-{i}"
-        results = hp.search(pair["query"], context_id=session_id)
+        results = hp.search(pair["query"], session_id=session_id)
         
         assert len(results) > 0, f"Query '{pair['query']}' returned no results."
         assert results[0] == expected_trace_id, f"Query '{pair['query']}' failed to retrieve '{pair['fact']}' as #1. Got {results}"

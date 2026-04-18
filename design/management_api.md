@@ -45,7 +45,7 @@ Serves a static HTML single-page application.
 
 ### 2.2 Functional logic
 - **Session Discovery**: Uses `Hippocampus.get_all_session_ids()`.
-- **Trace Fetching**: Uses `Hippocampus.get_recent_traces(limit, context_id)`.
+- **Trace Fetching**: Uses `Hippocampus.get_recent_traces(limit, session_id)`.
 - **Injection Cache**: `MemoryRouter` maintains an in-memory dictionary `_last_injections` capturing the `enriched_body` during relay.
 
 ### 2.3 Dashboard UI (Single-File SPA)

@@ -47,7 +47,7 @@ async def test_phase_30_plain_text_hippocampus(tmp_path):
             {"role": "user", "content": "Tell me about Python."},
             {"role": "assistant", "content": msg_content}
         ]
-    }, context_id="session_l2")
+    }, session_id="session_l2")
     
     context = await router.get_combined_context("session_l2", "Python")
     
@@ -71,7 +71,7 @@ async def test_combined_layers_formatting(tmp_path):
     # L2
     await router.ingest({
         "messages": [{"role": "user", "content": "L2 Memory Content"}]
-    }, context_id="session_multi")
+    }, session_id="session_multi")
     
     # L1 (already updated by ingest above)
     
@@ -107,10 +107,10 @@ async def test_phase_31_priority_order(tmp_path):
     # 2. Add L1 Content via ingest - ~50 chars
     await router.ingest({
         "messages": [{"role": "user", "content": "Active conversational turn content."}]
-    }, context_id="session_priority")
+    }, session_id="session_priority")
     
     # 3. Add a different L2 trace that matches focus - ~50 chars
-    router.hippo.save_trace("tid_old", {"stimulus": {"messages": [{"role": "user", "content": "Old historical snippet content."}]}}, search_text="priority_focus", context_id="session_priority")
+    router.hippo.save_trace("tid_old", {"stimulus": {"messages": [{"role": "user", "content": "Old historical snippet content."}]}}, search_text="priority_focus", session_id="session_priority")
     
     context = await router.get_combined_context("session_priority", "priority_focus")
     

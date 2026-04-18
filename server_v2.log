@@ -1,0 +1,306 @@
+INFO:     Started server process [3779031]
+INFO:     Waiting for application startup.
+[2026-04-18 23:11:24] [GATEWAY.MEMORY.ROUTER] [INFO] [ROUTER] Initializing with db_dir=/home/nvidia/ClawBrain/data
+[2026-04-18 23:11:24] [GATEWAY] [INFO] [INIT] Cognitive plane fully stabilized. State: READY
+INFO:     Application startup complete.
+[2026-04-18 23:11:24] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Establishing long-term memory engine...
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO] Initializing Hippocampus with db_dir=/home/nvidia/ClawBrain/data
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO] Ensuring directories exist: /home/nvidia/ClawBrain/data, /home/nvidia/ClawBrain/data/blobs
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO] Connecting to ChromaDB at /home/nvidia/ClawBrain/data/chroma...
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO] Getting/Creating collections: traces, wm_state
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO] ChromaDB collections ready (traces, wm_state, entities).
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO] Running startup cleanup...
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Starting...
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] TTL Days: 30, Cutoff: 1773933084.1048584
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for dirty data (timestamp=0.0)...
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for expired data (timestamp < 1773933084.1048584)...
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for orphan blobs...
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Finished.
+[2026-04-18 23:11:24] [GATEWAY.MEMORY] [INFO] [HIPPO] Initialization complete.
+[2026-04-18 23:11:24] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Indexing Vault: /home/nvidia/uncleclaw56drive/obsidian
+[2026-04-18 23:11:24] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Hydrating working memory...
+[2026-04-18 23:11:24] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Intelligence layer fully stabilized.
+INFO:     Uvicorn running on http://0.0.0.0:11435 (Press CTRL+C to quit)
+[2026-04-18 23:11:47] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:11:47] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58160 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:11:47] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:11:47] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58162 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:11:47] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:11:47] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58160 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:11:56] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:11:56] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:37686 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:11:56] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:11:56] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:37700 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:11:59] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:11:59] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:37686 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+INFO:     127.0.0.1:36196 - "GET /dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36196 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36196 - "GET /favicon.ico HTTP/1.1" 405 Method Not Allowed
+[2026-04-18 23:12:20] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:12:20] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:56804 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:12:20] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:12:20] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:56820 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:12:20] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:12:20] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:56804 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:12:31] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:12:31] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:45184 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:12:31] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:12:31] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:45186 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:12:35] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:12:35] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:45184 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:12:35] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:12:35] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:45186 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:12:39] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:12:39] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:50712 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+INFO:     127.0.0.1:36206 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+[2026-04-18 23:13:00] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:13:00] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:34760 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:00] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:13:00] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:34766 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:00] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:13:00] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:34760 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:07] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:13:07] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:60024 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:07] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:13:07] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:60028 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:10] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:13:10] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:60024 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:10] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:13:10] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:60028 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:14] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:13:14] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:60024 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:34] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:13:34] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:50962 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:34] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:13:34] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:50968 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:34] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:13:34] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:50962 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:37] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:13:37] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:50962 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:58] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:13:58] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58168 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:58] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:13:58] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58170 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:13:58] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:13:58] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58168 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:04] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:14:04] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58178 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:04] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:14:04] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58186 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:08] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:14:08] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:58178 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:29] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:14:29] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:36474 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:29] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:14:29] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:36484 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:29] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:14:29] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:36474 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:34] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:14:34] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:36500 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:34] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:14:34] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:36514 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:36] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:14:36] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:36500 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:36] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:14:36] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:36514 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:14:39] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:14:39] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:36500 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:00] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:00] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:40618 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:00] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:00] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:40630 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:00] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:00] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:40618 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:07] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:07] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:54946 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:07] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:07] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:54952 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:13] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:13] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:54966 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:13] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:13] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:54982 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:17] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:17] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:54966 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:17] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:17] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:54982 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:20] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:20] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:54966 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:42] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:42] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:49458 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:42] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:42] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:49466 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:42] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:42] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:49458 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:46] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:46] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:35926 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:46] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:46] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:35942 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:51] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:51] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:35944 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:51] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:15:51] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:35946 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:15:54] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:15:54] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:35944 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:15] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:16:15] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:37312 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:15] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:16:15] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:37328 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:15] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:16:15] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:37312 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:22] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:16:22] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:37334 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:22] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:16:22] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:37348 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:27] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:16:27] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:59656 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:27] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:16:27] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:59668 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:29] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:16:29] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:59656 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:53] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:16:53] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33654 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:53] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:16:53] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33666 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:53] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:16:53] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33654 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:59] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:16:59] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:52138 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:16:59] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:16:59] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:52150 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:02] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:17:02] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:52138 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:02] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:17:02] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:52150 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:05] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:17:05] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:52138 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:27] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:17:27] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:53920 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:27] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:17:27] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:53924 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:27] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:17:27] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:53920 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:31] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:17:31] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:53938 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:31] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:17:31] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:53954 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:35] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:17:35] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:53938 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:57] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:17:57] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33406 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:57] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:17:57] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33420 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:17:57] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:17:57] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33406 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:01] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:18:01] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33434 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:01] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:18:01] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33438 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:03] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:18:03] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:33434 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:28] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:18:28] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:55496 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:28] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:18:28] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:55510 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:28] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:18:28] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:55496 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:34] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:18:34] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:55522 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:34] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:18:34] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:55528 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:38] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/after-turn
+[2026-04-18 23:18:38] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:55522 - "POST /internal/after-turn HTTP/1.1" 501 Not Implemented
+[2026-04-18 23:18:38] [GATEWAY] [INFO] [GATEWAY] Incoming request | session=default path=internal/assemble
+[2026-04-18 23:18:38] [GATEWAY] [ERROR] [GATEWAY] No provider found for model: 
+INFO:     127.0.0.1:55528 - "POST /internal/assemble HTTP/1.1" 501 Not Implemented

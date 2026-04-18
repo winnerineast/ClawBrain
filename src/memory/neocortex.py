@@ -1,4 +1,4 @@
-# Generated from design/memory_neocortex.md v1.2 / design/management_api.md v1.0
+# Generated from design/memory_neocortex.md v1.2 / GEMINI.md Rule 12
 import sqlite3
 import chromadb
 import httpx
@@ -9,14 +9,16 @@ from typing import List, Dict, Any, Optional
 from src.memory.storage import get_chroma_client
 
 class Neocortex:
+    """
+    ClawBrain Semantic Distillation Engine.
+    Rule 12: Unified session_id terminology enforced.
+    """
     def __init__(self, db_dir: str = None, distill_url: str = None, distill_model: str = None, 
                  distill_provider: str = None, client: httpx.AsyncClient = None):
         if db_dir is None:
-            # Dynamic default path for portability (Issue-003)
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             db_dir = os.path.join(base_dir, "data")
             
-        # §2.1: Ensure storage directory exists
         self.db_dir = Path(db_dir)
         self.db_dir.mkdir(parents=True, exist_ok=True)
         
@@ -25,25 +27,18 @@ class Neocortex:
         self.client = get_chroma_client(self.chroma_path)
         self.summary_col = self.client.get_or_create_collection(name="summaries")
         
-        # Legacy DB path for migration period
+        # Legacy DB path
         self.db_path = self.db_dir / "hippocampus.db"
         
-        # §2.1 & ISSUE-004: Dynamic Distillation Config
+        # Distillation Config
         self.distill_url = os.getenv("CLAWBRAIN_DISTILL_URL", distill_url or "http://127.0.0.1:11434")
         self.distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", distill_model or "gemma4:e4b")
         self.distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER", distill_provider or "ollama")
         self.api_key = os.getenv("CLAWBRAIN_DISTILL_API_KEY", "")
         
-        # Phase 34: Shared internal client
         self.http_client = client
-        
-        self._init_db()
 
-    def _init_db(self):
-        """Legacy initialization. Deprecated in favor of ChromaDB."""
-        pass
-
-    async def distill(self, context_id: str, traces: List[Dict[str, Any]]) -> str:
+    async def distill(self, session_id: str, traces: List[Dict[str, Any]]) -> str:
         """§2.2: Async distillation logic with recursive knowledge merging (Phase 40)."""
         corpus = []
         for t in traces:
@@ -53,7 +48,7 @@ class Neocortex:
                 corpus.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
         
         full_text = "\n".join(corpus)
-        existing_summary = self.get_summary(context_id) or "(No existing summary)"
+        existing_summary = self.get_summary(session_id) or "(No existing summary)"
         
         # Phase 40: Recursive Summarization Instruction
         instruction = (
@@ -80,26 +75,22 @@ class Neocortex:
                   f"--- EXISTING SUMMARY ---\n{existing_summary}\n\n"
                   f"--- NEW DIALOGUE TO DISTILL ---\n{full_text}")
         
-        # 2. Dispatch by provider
         try:
             headers = {}
             if self.api_key:
                 headers["Authorization"] = f"Bearer {self.api_key}"
 
-            # Phase 34: Use Cognitive Plane client
-            # Use provided client or fallback to temporary one if not available
             if self.http_client:
-                return await self._dispatch_request(self.http_client, headers, prompt, context_id)
+                return await self._dispatch_request(self.http_client, headers, prompt, session_id)
             else:
                 async with httpx.AsyncClient(timeout=90.0) as client:
-                    return await self._dispatch_request(client, headers, prompt, context_id)
+                    return await self._dispatch_request(client, headers, prompt, session_id)
                 
         except Exception as e:
             return f"[Error] Distillation connection error: {str(e)}"
 
-    async def _dispatch_request(self, client: httpx.AsyncClient, headers: Dict, prompt: str, context_id: str) -> str:
+    async def _dispatch_request(self, client: httpx.AsyncClient, headers: Dict, prompt: str, session_id: str) -> str:
         if self.distill_provider == "ollama":
-            # Ollama specific protocol
             resp = await client.post(f"{self.distill_url}/api/generate", headers=headers, json={
                 "model": self.distill_model,
                 "prompt": prompt,
@@ -109,7 +100,6 @@ class Neocortex:
                 return f"[Error] Ollama Distillation failed ({resp.status_code}): {resp.text}"
             summary = resp.json().get("response", "")
         else:
-            # Default to OpenAI-compatible Chat Completion protocol (OMLX, LM Studio, Cloud)
             resp = await client.post(f"{self.distill_url}/chat/completions", headers=headers, json={
                 "model": self.distill_model,
                 "messages": [
@@ -123,21 +113,20 @@ class Neocortex:
             summary = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
 
         if summary:
-            self._save_summary(context_id, summary)
+            self._save_summary(session_id, summary)
             return summary
         return "[Error] Empty summary returned from provider."
 
-    def _save_summary(self, context_id: str, summary: str):
+    def _save_summary(self, session_id: str, summary: str):
         """Phase 33: Summary persistence in ChromaDB."""
         self.summary_col.upsert(
-            ids=[context_id],
+            ids=[session_id],
             documents=[summary],
             metadatas=[{"last_updated": time.time()}]
         )
 
-    def get_summary(self, context_id: str) -> Optional[str]:
-        # Phase 33: Fetch from ChromaDB
-        res = self.summary_col.get(ids=[context_id])
+    def get_summary(self, session_id: str) -> Optional[str]:
+        res = self.summary_col.get(ids=[session_id])
         if res and res["documents"]:
             return res["documents"][0]
             
@@ -145,12 +134,12 @@ class Neocortex:
         if os.path.exists(self.db_path):
             try:
                 with sqlite3.connect(self.db_path) as conn:
-                    cursor = conn.execute("SELECT summary_text FROM neocortex_summaries WHERE context_id = ?", (context_id,))
+                    cursor = conn.execute("SELECT summary_text FROM neocortex_summaries WHERE context_id = ?", (session_id,))
                     row = cursor.fetchone()
                     return row[0] if row else None
             except Exception: pass
         return None
 
-    def clear_summary(self, context_id: str):
-        """P17 Management API: Clear Neocortex summary for a specific session."""
-        self.summary_col.delete(ids=[context_id])
+    def clear_summary(self, session_id: str):
+        """P17 Management API: Clear Neocortex summary."""
+        self.summary_col.delete(ids=[session_id])

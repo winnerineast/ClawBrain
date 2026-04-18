@@ -30,9 +30,9 @@ def test_p20_dirty_data_purged_on_init(tmp_path):
         ids=["dirty-1", "dirty-2", "clean-1"],
         documents=['{"dirty": true}', '{"dirty": true}', '{"clean": true}'],
         metadatas=[
-            {"timestamp": 0.0, "context_id": "default"},
-            {"timestamp": 0.0, "context_id": "default"},
-            {"timestamp": time.time(), "context_id": "default"}
+            {"timestamp": 0.0, "session_id": "default"},
+            {"timestamp": 0.0, "session_id": "default"},
+            {"timestamp": time.time(), "session_id": "default"}
         ]
     )
 
@@ -69,8 +69,8 @@ def test_p20_ttl_expired_traces_purged(tmp_path):
         ids=["expired-1", "fresh-1"],
         documents=['{"old": true}', '{"new": true}'],
         metadatas=[
-            {"timestamp": three_days_ago, "context_id": "default"},
-            {"timestamp": time.time(), "context_id": "default"}
+            {"timestamp": three_days_ago, "session_id": "default"},
+            {"timestamp": time.time(), "session_id": "default"}
         ]
     )
 
@@ -101,7 +101,7 @@ def test_p20_ttl_zero_disables_expiry(tmp_path):
     hp.traces_col.add(
         ids=["old-no-ttl"],
         documents=['{"ancient": true}'],
-        metadatas=[{"timestamp": old_ts, "context_id": "default"}]
+        metadatas=[{"timestamp": old_ts, "session_id": "default"}]
     )
 
     clear_chroma_clients()
@@ -124,7 +124,7 @@ def test_p20_orphan_blobs_deleted(tmp_path):
     hp = Hippocampus(db_dir=str(tmp_path))
 
     # Write a "real" blob trace
-    hp.save_trace("real-blob", {"data": "x" * 1024}, threshold=1, context_id="s1")
+    hp.save_trace("real-blob", {"data": "x" * 1024}, threshold=1, session_id="s1")
 
     # Manually write an orphan blob file
     orphan_path = hp.blob_dir / "orphan-abc123.json"

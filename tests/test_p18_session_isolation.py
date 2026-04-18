@@ -24,12 +24,12 @@ def test_p18_hippo_search_session_isolation(tmp_path):
     clear_chroma_clients()
     hp = Hippocampus(db_dir=str(tmp_path))
 
-    hp.save_trace("alice-1", {"x": 1}, search_text="project ALPHA secret key",    context_id="alice")
-    hp.save_trace("bob-1",   {"x": 2}, search_text="project BETA confidential",    context_id="bob")
-    hp.save_trace("alice-2", {"x": 3}, search_text="ALPHA deployment config",      context_id="alice")
+    hp.save_trace("alice-1", {"x": 1}, search_text="project ALPHA secret key",    session_id="alice")
+    hp.save_trace("bob-1",   {"x": 2}, search_text="project BETA confidential",    session_id="bob")
+    hp.save_trace("alice-2", {"x": 3}, search_text="ALPHA deployment config",      session_id="alice")
 
-    alice_results = hp.search("ALPHA", context_id="alice")
-    bob_results   = hp.search("ALPHA", context_id="bob")
+    alice_results = hp.search("ALPHA", session_id="alice")
+    bob_results   = hp.search("ALPHA", session_id="bob")
 
     visual_audit("Hippo Search: Alice sees ALPHA",
                  "alice should get her own ALPHA traces",
@@ -43,18 +43,18 @@ def test_p18_hippo_search_session_isolation(tmp_path):
     assert all(r in ["alice-1", "alice-2"] for r in alice_results)
     assert all("alice" not in r for r in bob_results)
 
-def test_p18_hippo_save_context_id_persisted(tmp_path):
-    """context_id is correctly written to ChromaDB"""
+def test_p18_hippo_save_session_id_persisted(tmp_path):
+    """session_id is correctly written to ChromaDB"""
     clear_chroma_clients()
     hp = Hippocampus(db_dir=str(tmp_path))
-    hp.save_trace("trace-x", {"msg": "hello"}, search_text="hello world", context_id="session-99")
+    hp.save_trace("trace-x", {"msg": "hello"}, search_text="hello world", session_id="session-99")
 
     res = hp.traces_col.get(ids=["trace-x"])
     meta = res["metadatas"][0] if res["metadatas"] else {}
-    persisted_cid = meta.get("context_id")
+    persisted_cid = meta.get("session_id")
 
-    visual_audit("Hippo Persist context_id",
-                 "context_id should be 'session-99' in ChromaDB",
+    visual_audit("Hippo Persist session_id",
+                 "session_id should be 'session-99' in ChromaDB",
                  "session-99", persisted_cid)
     assert persisted_cid == "session-99"
 
@@ -62,12 +62,12 @@ def test_p18_hippo_get_recent_traces_filtered(tmp_path):
     """get_recent_traces filters by session"""
     clear_chroma_clients()
     hp = Hippocampus(db_dir=str(tmp_path))
-    hp.save_trace("s1-t1", {"x": 1}, context_id="session-A")
-    hp.save_trace("s1-t2", {"x": 2}, context_id="session-A")
-    hp.save_trace("s2-t1", {"x": 3}, context_id="session-B")
+    hp.save_trace("s1-t1", {"x": 1}, session_id="session-A")
+    hp.save_trace("s1-t2", {"x": 2}, session_id="session-A")
+    hp.save_trace("s2-t1", {"x": 3}, session_id="session-B")
 
-    a_traces = hp.get_recent_traces(limit=10, context_id="session-A")
-    b_traces = hp.get_recent_traces(limit=10, context_id="session-B")
+    a_traces = hp.get_recent_traces(limit=10, session_id="session-A")
+    b_traces = hp.get_recent_traces(limit=10, session_id="session-B")
     all_traces = hp.get_recent_traces(limit=10)
 
     visual_audit("get_recent_traces: session-A count", "should be 2", 2, len(a_traces))
@@ -89,11 +89,11 @@ async def test_p18_wm_session_isolation(tmp_path):
 
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice content UNIQUE-ALICE"}]},
-        context_id="alice"
+        session_id="alice"
     )
     await router.ingest(
         {"messages": [{"role": "user", "content": "Bob content UNIQUE-BOB"}]},
-        context_id="bob"
+        session_id="bob"
     )
 
     alice_wm = router._get_wm("alice").get_active_contents()
@@ -123,11 +123,11 @@ async def test_p18_get_combined_context_isolated(tmp_path):
 
     await router.ingest(
         {"messages": [{"role": "user", "content": "Alice secret ALPHA-TOKEN"}]},
-        context_id="alice"
+        session_id="alice"
     )
     await router.ingest(
         {"messages": [{"role": "user", "content": "Bob secret BETA-TOKEN"}]},
-        context_id="bob"
+        session_id="bob"
     )
 
     alice_ctx = await router.get_combined_context("alice", "ALPHA-TOKEN")
@@ -154,11 +154,11 @@ async def test_p18_hydrate_per_session(tmp_path):
     await router1.wait_until_ready()
     await router1.ingest(
         {"messages": [{"role": "user", "content": "Hydrate ALICE persist test"}]},
-        context_id="hydrate-alice"
+        session_id="hydrate-alice"
     )
     await router1.ingest(
         {"messages": [{"role": "user", "content": "Hydrate BOB persist test"}]},
-        context_id="hydrate-bob"
+        session_id="hydrate-bob"
     )
 
     # Simulation of restart: reset connections, then reload from SAME tmp_path

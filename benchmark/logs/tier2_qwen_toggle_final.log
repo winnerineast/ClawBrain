@@ -1,0 +1,138 @@
+Loaded 30 cases for Tier 2 Toggle Run
+  Installing ClawBrain plugin (ON mode)...
+    Plugin installed and authorized.
+
+--- Starting Tier 2 ON Segment ---
+  [1/30] fact_evol_tech_003_00 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [2/30] fact_evol_tech_007_01 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [3/30] fact_evol_tech_025_02 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [4/30] isolation_00 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [5/30] isolation_01 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [6/30] isolation_02 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [7/30] isolation_03 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [8/30] isolation_04 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [9/30] isolation_05 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [10/30] isolation_06 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [11/30] isolation_07 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [12/30] isolation_08 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [13/30] isolation_09 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [14/30] isolation_10 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [15/30] isolation_11 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [16/30] isolation_12 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [17/30] isolation_13 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [18/30] isolation_14 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [19/30] isolation_15 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [20/30] isolation_16 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [21/30] isolation_17 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [22/30] isolation_18 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [23/30] isolation_19 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [24/30] multi_fact_2_coding_style_00 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [25/30] multi_fact_2_secrets_01 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [26/30] multi_fact_2_architecture_02 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [27/30] multi_fact_2_monitoring_03 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [28/30] multi_fact_2_database_04 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [29/30] multi_fact_2_architecture_05 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [30/30] multi_fact_2_search_06 (ON)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  Uninstalling ClawBrain plugin (OFF mode)...
+    Plugin uninstalled. Baseline restored.
+
+--- Starting Tier 2 OFF Segment ---
+  [1/30] fact_evol_tech_003_00 (OFF)... ERROR: openclaw exited 1: Exit 1
+  [2/30] fact_evol_tech_007_01 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [3/30] fact_evol_tech_025_02 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [4/30] isolation_00 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [5/30] isolation_01 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [6/30] isolation_02 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [7/30] isolation_03 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [8/30] isolation_04 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [9/30] isolation_05 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [10/30] isolation_06 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [11/30] isolation_07 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [12/30] isolation_08 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [13/30] isolation_09 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [14/30] isolation_10 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [15/30] isolation_11 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [16/30] isolation_12 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [17/30] isolation_13 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [18/30] isolation_14 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [19/30] isolation_15 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [20/30] isolation_16 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [21/30] isolation_17 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [22/30] isolation_18 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [23/30] isolation_19 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [24/30] multi_fact_2_coding_style_00 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [25/30] multi_fact_2_secrets_01 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [26/30] multi_fact_2_architecture_02 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [27/30] multi_fact_2_monitoring_03 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [28/30] multi_fact_2_database_04 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [29/30] multi_fact_2_architecture_05 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+  [30/30] multi_fact_2_search_06 (OFF)... ERROR: Failed to parse JSON: Expecting value: line 1 column 1 (char 0)
+STDOUT: 
+Traceback (most recent call last):
+  File "/home/nvidia/ClawBrain/benchmark/run_benchmark.py", line 142, in <module>
+    main()
+  File "/home/nvidia/ClawBrain/benchmark/run_benchmark.py", line 135, in main
+    if args.command == "run": cmd_run(args)
+                              ^^^^^^^^^^^^^
+  File "/home/nvidia/ClawBrain/benchmark/run_benchmark.py", line 86, in cmd_run
+    from runner_direct import RunResult # Reuse the dataclass
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ImportError: cannot import name 'RunResult' from 'runner_direct' (/home/nvidia/ClawBrain/benchmark/src/runner_direct.py)

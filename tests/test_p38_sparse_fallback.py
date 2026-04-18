@@ -20,7 +20,7 @@ async def test_sparse_fallback_logic(tmp_path):
     fact_content = "The ultra-secret-code is MAGENTA-OWL-42"
     
     # 1. Ingest fact
-    await router.ingest({"messages": [{"role": "user", "content": fact_content}]}, context_id=session_id)
+    await router.ingest({"messages": [{"role": "user", "content": fact_content}]}, session_id=session_id)
     
     # 2. Query with a keyword that might fail semantic similarity in a cold start
     # but should definitely hit the fallback substring match.

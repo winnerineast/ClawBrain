@@ -20,7 +20,7 @@ Enable **hot-reload** of the ClawBrain provider registry via environment variabl
   Merged into `self.known_no_prefix_models` at startup. On parse failure, silently skip.
 
 ### 2.3 Session Isolation Warning
-- When a request carries no `x-clawbrain-session` header and `context_id` falls back to `"default"`, the gateway must log:
+- When a request carries no `x-clawbrain-session` header and `session_id` falls back to `"default"`, the gateway must log:
   `[SESSION] No session header — using 'default'. Set 'x-clawbrain-session' for isolation.`
 - This is a warning log only; the request is not blocked.
 

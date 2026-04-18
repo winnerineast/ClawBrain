@@ -12,13 +12,13 @@ Implement the **ClawBrain Neocortex** engine from scratch. This engine is respon
   - `distill_model`: Model name for distillation.
   - `distill_provider`: Protocol type (`ollama` or `openai-compatible`).
 - **Storage table (`neocortex_summaries`)**:
-  - `context_id` (TEXT PRIMARY KEY)
+  - `session_id` (TEXT PRIMARY KEY)
   - `summary_text` (TEXT)
   - `last_updated` (REAL)
   - `hebbian_weight` (REAL DEFAULT 1.0)
 
 ### 2.2 Semantic Distillation Engine
-- **Method signature**: `async def distill(context_id: str, traces: List[Dict[str, Any]]) -> str`
+- **Method signature**: `async def distill(session_id: str, traces: List[Dict[str, Any]]) -> str`
 - **Config priority**:
   1. URL: Env `CLAWBRAIN_DISTILL_URL` -> Constructor `distill_url`.
   2. Model: Env `CLAWBRAIN_DISTILL_MODEL` -> Constructor `distill_model`.
@@ -34,7 +34,7 @@ Implement the **ClawBrain Neocortex** engine from scratch. This engine is respon
   4. Upsert result into `neocortex_summaries`.
 
 ### 2.3 Memory Recall Interface
-- **Method signature**: `def get_summary(context_id: str) -> Optional[str]`
+- **Method signature**: `def get_summary(session_id: str) -> Optional[str]`
 - Reads and returns the latest summary for the given session from SQLite.
 
 ## 3. Test Specification (High-Fidelity TDD)

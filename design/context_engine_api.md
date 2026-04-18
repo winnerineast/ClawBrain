@@ -36,7 +36,7 @@ OpenClaw calls the following four hooks on every registered context engine:
 **Behaviour**:
 - If `is_heartbeat` is true, skip archival (heartbeat messages carry no semantic content).
 - Extract `intent` via `SignalDecomposer`.
-- Call `hippo.save_trace(trace_id, payload, search_text=intent, context_id=session_id)`.
+- Call `hippo.save_trace(trace_id, payload, search_text=intent, session_id=session_id)`.
 - Update Working Memory via `_get_wm(session_id).add_item(trace_id, intent)`.
 - Call `hippo.save_wm_state(session_id, wm.items)`.
 - Increment distillation counter; spawn `_auto_distill_worker` if threshold reached.
@@ -75,7 +75,7 @@ OpenClaw calls the following four hooks on every registered context engine:
 
 **Behaviour**:
 - **Phase 29 (Blocking Compact)**: This endpoint must **await** `neo.distill` before returning to ensure distillation is complete for benchmarking.
-- Fetch recent traces: `hippo.get_recent_traces(limit=distill_threshold, context_id=session_id)`.
+- Fetch recent traces: `hippo.get_recent_traces(limit=distill_threshold, session_id=session_id)`.
 - **Await** `neo.distill(session_id, traces)` to consolidate episodic fragments.
 - Evict Working Memory items older than `CLAWBRAIN_WM_COMPACT_KEEP_RECENT` (default: 5).
 - Persist pruned snapshot via `hippo.save_wm_state`.
@@ -99,7 +99,7 @@ OpenClaw calls the following four hooks on every registered context engine:
 
 **Behaviour**:
 - **Mandatory Validation**: If `new_messages` is an empty list, the handler **must emit a `logger.error`** (e.g., `[INT_AFTER_TURN] Error: No new messages received for turn.`) to ensure protocol visibility.
-- **Ingestion**: Iterate through `new_messages`. Identify "User -> Assistant" pairs. Call `mr.ingest(user_payload, reaction=assistant_payload, context_id=session_id)` to archive the turn into Hippocampus.
+- **Ingestion**: Iterate through `new_messages`. Identify "User -> Assistant" pairs. Call `mr.ingest(user_payload, reaction=assistant_payload, session_id=session_id)` to archive the turn into Hippocampus.
 - **State Persistence**: Call `hippo.save_wm_state(session_id, wm.items)` to persist the current Working Memory state.
 - **Distillation Trigger**: Increment the internal distillation counter and spawn the worker if threshold is reached.
 

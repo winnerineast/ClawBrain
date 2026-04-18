@@ -52,7 +52,7 @@ async def test_memory_router_ingest_resilience():
     router = MemoryRouter(db_dir=TEST_DIR)
     await router.wait_until_ready()
     
-    payload = {"context_id": "resilience", "messages": [{"role": "user", "content": "Keep this alive"}]}
+    payload = {"session_id": "resilience", "messages": [{"role": "user", "content": "Keep this alive"}]}
     
     # 1. Ingest
     tid = await router.ingest(payload)

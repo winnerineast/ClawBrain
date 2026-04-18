@@ -1,0 +1,150 @@
+INFO:     Started server process [3443986]
+INFO:     Waiting for application startup.
+[2026-04-18 22:29:27] [GATEWAY.MEMORY.ROUTER] [INFO] [ROUTER] Initializing with db_dir=/home/nvidia/ClawBrain/data
+[2026-04-18 22:29:27] [GATEWAY] [INFO] [INIT] Cognitive plane fully stabilized. State: READY
+INFO:     Application startup complete.
+[2026-04-18 22:29:27] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Establishing long-term memory engine...
+[2026-04-18 22:29:27] [GATEWAY.MEMORY] [INFO] [HIPPO] Initializing Hippocampus with db_dir=/home/nvidia/ClawBrain/data
+[2026-04-18 22:29:27] [GATEWAY.MEMORY] [INFO] [HIPPO] Ensuring directories exist: /home/nvidia/ClawBrain/data, /home/nvidia/ClawBrain/data/blobs
+[2026-04-18 22:29:27] [GATEWAY.MEMORY] [INFO] [HIPPO] Connecting to ChromaDB at /home/nvidia/ClawBrain/data/chroma...
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO] Getting/Creating collections: traces, wm_state
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO] ChromaDB collections ready (traces, wm_state, entities).
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO] Running startup cleanup...
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Starting...
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] TTL Days: 30, Cutoff: 1773930568.6846254
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for dirty data (timestamp=0.0)...
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for expired data (timestamp < 1773930568.6846254)...
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Checking for orphan blobs...
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO.CLEANUP] Finished.
+[2026-04-18 22:29:28] [GATEWAY.MEMORY] [INFO] [HIPPO] Initialization complete.
+[2026-04-18 22:29:28] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Indexing Vault: /home/nvidia/uncleclaw56drive/obsidian
+[2026-04-18 22:29:28] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Hydrating working memory...
+[2026-04-18 22:29:28] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Intelligence layer fully stabilized.
+[2026-04-18 22:29:32] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: COTS/Strategy Kit RTS Engine  游戏工具.md
+INFO:     Uvicorn running on http://0.0.0.0:11435 (Press CTRL+C to quit)
+[2026-04-18 22:29:35] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: COTS/基于YOLOv13的汽车零件分割系统（Python源码+数据集+Pyside6界面）.md
+[2026-04-18 22:29:38] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/FreedomIntelligenceOpenClaw-Medical-Skills The largest open-source medical AI skills library for OpenClaw🦞.md
+[2026-04-18 22:29:44] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/Harness 工程就是控制论.md
+INFO:     127.0.0.1:59010 - "GET /dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47130 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+[2026-04-18 22:29:44] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/How to write SKILLs.md
+[2026-04-18 22:29:45] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/OpenClaw 安全工程实践：构建一个六层 Prompt Injection 防御体系.md
+INFO:     127.0.0.1:47130 - "GET /favicon.ico HTTP/1.1" 405 Method Not Allowed
+[2026-04-18 22:29:46] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/OpenClaw 进阶配置指南：身份 + 记忆 + Skills + 子Agent + 定时任务（从能用到好用）.md
+[2026-04-18 22:29:48] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/OpenClaw主动监控，不等你问.md
+[2026-04-18 22:29:49] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/OpenClaw无缝接入强化学习！中科大开源Claw-R1，实现部署即训练.md
+[2026-04-18 22:29:51] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/Qwen 家族论文全盘点：从初代 Qwen 到 Qwen3.5，26 篇技术报告深度回顾.md
+[2026-04-18 22:29:53] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/Untitled.md
+INFO:     127.0.0.1:47138 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+[2026-04-18 22:29:54] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/给 OpenClaw Agent Team 装上记忆——踩了19天坑，终于搞明白了.md
+INFO:     127.0.0.1:47138 - "GET /dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47138 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+[2026-04-18 22:29:55] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/让你的Token减少、并发相应更快的神器——oMLX（仅苹果M系列芯片可用）.md
+INFO:     127.0.0.1:47138 - "GET /favicon.ico HTTP/1.1" 405 Method Not Allowed
+[2026-04-18 22:29:57] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Clippings/麻省理工科技评论-谷歌发布史上最高分辨率大脑连接图，可覆盖果蝇大脑的三分之一.md
+[2026-04-18 22:29:59] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: GTM/做“市场洞察”的好方法（含如何找数据）.md
+[2026-04-18 22:30:00] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: LiLing Daily/2026-02-17.md
+[2026-04-18 22:30:01] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: LiLing Daily/2026-02-18.md
+[2026-04-18 22:30:03] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: LiLing Daily/2026-02-24.md
+[2026-04-18 22:30:04] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: LiLing Daily/AI_WORKSTATION_GUIDE.md
+[2026-04-18 22:30:05] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: LiLing Daily/Hermes.md
+[2026-04-18 22:30:07] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: LiLing Daily/Openclaw Installation Notes.md
+[2026-04-18 22:30:17] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: LiLing Daily/Openclaw source code deployment.md
+[2026-04-18 22:30:25] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Models/GELab-Zero-4B-preview - 一个比AutoGLM更小的GUI模型，仅4B参数，附实测和部署教程.md
+[2026-04-18 22:30:27] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Models/OCR 界的“超级小钢炮”！LightOnOCR-2-1B 发布：1B 参数，千页成本不到 7 分钱！.md
+[2026-04-18 22:30:29] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Models/神操作，用 Claude-Opus-4.5 蒸馏 GLM-4.7-Flash，消费级显卡轻松部署.md
+[2026-04-18 22:30:30] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Models/阿里开源Wan2.2视频生成全家桶.md
+[2026-04-18 22:30:32] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/ACE-Step1.5.md
+[2026-04-18 22:30:35] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/AIGC Panel - 开源 AI 数字人系统.md
+[2026-04-18 22:30:36] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/AI视频翻译配音工具，100种语言双向翻译，一键部署全流程，可以生抖音，小红书，哔哩哔哩，视频号，TikTok，Youtube等形态的内容成适配.md
+[2026-04-18 22:30:38] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Agent-service-toolkit Full toolkit for running an AI agent service built with LangGraph, FastAPI and Streamlit.md
+[2026-04-18 22:30:39] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/AgentCPM-Report - 本地也能玩DeepResearch.md
+[2026-04-18 22:30:41] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/AgenticSeek - Fully Local Manus AI. No APIs, No $200 monthly bills. Enjoy an autonomous agent that thinks, browses the web, and code for the sole cost of electricity.md
+[2026-04-18 22:30:43] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/AutoFigure让AI一键画出Nature级别的论文插图，告别PPT地狱.md
+[2026-04-18 22:30:44] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Awesome-AI-Agents A collection of autonomous agents 🤖️ powered by LLM.md
+[2026-04-18 22:30:46] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/CannerWrenAI ⚡️ GenBI (Generative BI) queries any database in natural language, generates accurate SQL (Text-to-SQL), charts (Text-to-Chart), and AI-powered business intelligence in seconds.md
+[2026-04-18 22:30:47] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/ChatDev 2.0 - Dev All through LLM-powered Multi-Agent Collaboration.md
+[2026-04-18 22:30:49] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Chroma-corechroma Open-source search and retrieval database for AI applications.md
+[2026-04-18 22:30:51] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Cocoindex Data transformation framework for AI. Ultra performant, with incremental processing.  🌟 Star if you like it!.md
+[2026-04-18 22:30:53] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/ColPali - The code used to train and run inference with the ColVision models, e.g. ColPali, ColQwen2, and ColSmol.md
+[2026-04-18 22:30:55] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/DeepAudit：人人拥有的 AI 黑客战队，让漏.md
+[2026-04-18 22:30:57] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/EmotiVoice 😊 a Multi-Voice and Prompt-Controlled TTS Engine.md
+[2026-04-18 22:30:58] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/GraphRAG WorkBench - Microsoft GraphRAG 生成的交互式 3D 可视化知识图谱.md
+[2026-04-18 22:31:00] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Graphiti - Build Real-Time Knowledge Graphs for AI Agents.md
+[2026-04-18 22:31:01] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/HKUDSLightRAG EMNLP2025 LightRAG Simple and Fast Retrieval-Augmented Generation.md
+[2026-04-18 22:31:05] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Handy-完全本地的语音识别工具.md
+[2026-04-18 22:31:06] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Heretic  - A minimalist Python tool to remove censorship from any language model.md
+[2026-04-18 22:31:08] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/HomuraTLLM4VKG LLM4VKG Leveraging Large Language Models for Virtual Knowledge Graph Construction.md
+[2026-04-18 22:31:12] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Hyperbrowser - Chrome for Agent.md
+[2026-04-18 22:31:31] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/IBM docling Get your documents ready for gen AI.md
+INFO:     127.0.0.1:48460 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+[2026-04-18 22:31:47] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Marker Convert PDF to markdown + JSON quickly with high accuracy.md
+INFO:     127.0.0.1:48460 - "GET /dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48460 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48466 - "GET /favicon.ico HTTP/1.1" 405 Method Not Allowed
+[2026-04-18 22:31:51] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Myolotrain是一个可视化管理yolo视觉模型训练的系统.md
+[2026-04-18 22:31:52] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/OBLITERATUS obliterate the chains that bind you.md
+[2026-04-18 22:31:54] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/OPIK：让你的LLM应用从看起来行进化到生产级可靠.md
+[2026-04-18 22:31:55] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Office-Word-MCP-Server A Model Context Protocol (MCP) server for creating, reading, and manipulating Microsoft Word documents. This server enables AI assistants to work with Word documents through a standardized interface, providing rich document.md
+[2026-04-18 22:31:57] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/OpenClaw 只是个 Demo,搭配 LobeHub 才是完整产品.md
+[2026-04-18 22:31:58] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/OpenClaw之后的Claw家族大盘点：Nanobot、PicoClaw、IronClaw等.md
+[2026-04-18 22:32:00] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/OpenCode - The open source coding agent.md
+[2026-04-18 22:32:01] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/OpenHands - 🙌 OpenHands AI-Driven Development.md
+[2026-04-18 22:32:03] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/OpenViking is an open-source context database designed specifically for AI Agents. OpenViking unifies the management of context (memory, resources, and skills) that Agents need through a file system paradigm, enabling hierarchical context delive.md
+[2026-04-18 22:32:04] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/PageIndex Document Index for Vectorless, Reasoning-based RAG.md
+[2026-04-18 22:32:06] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/PaperBanana：AI科研人员画图终于不用头疼了.md
+[2026-04-18 22:32:09] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/PhoneDriver Android Phone Control With Qwen3-VL.md
+[2026-04-18 22:32:29] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Pinchtab - Agent Browser.md
+[2026-04-18 22:32:45] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Project_Golem A 3D interface for visualizing RAG (Retrieval-Augmented Generation) memory structures in real-time.md
+INFO:     127.0.0.1:36030 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36040 - "GET /dashboard HTTP/1.1" 200 OK
+[2026-04-18 22:32:47] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Remotion 🎥      Make videos programmatically with React.md
+INFO:     127.0.0.1:36040 - "GET /v1/management/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36030 - "GET /favicon.ico HTTP/1.1" 405 Method Not Allowed
+[2026-04-18 22:32:48] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Roboflow - 算机视觉工程平台.md
+[2026-04-18 22:32:49] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Rust 版 OpenClaw 来了！单文件、零依赖、强沙箱、自带“故障转移”！.md
+[2026-04-18 22:32:50] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Second-brain-ai-assistant-course Learn to build your Second Brain AI assistant with LLMs, agents, RAG, fine-tuning, LLMOps and AI systems techniques.md
+[2026-04-18 22:32:52] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Semchunk A fast, lightweight and easy-to-use Python library for splitting text into semantically meaningful chunks.md
+[2026-04-18 22:32:53] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/TARS - 字节开源桌面自动化Agent.md
+[2026-04-18 22:32:55] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Toonflow 是一款 AI 短剧漫剧工具，能够利用 AI 技术将小说自动转化为剧本，并结合 AI 生成的图片和视频，实现高效的短剧创作.md
+[2026-04-18 22:32:57] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/TrendRadar ⭐AI-driven public opinion & trend monitor with multi-platform aggregation, RSS, and smart alerts. AI 舆情监控助手与热点筛选工具.md
+[2026-04-18 22:33:00] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/TurboDiffusion - 100–200× Acceleration for Video Diffusion Models.md
+[2026-04-18 22:33:02] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/UltraRAG 3.0开源：拒绝盲盒，让推理逻辑像素级可视.md
+[2026-04-18 22:33:03] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/Uncensored-AI Fully automatic censorship removal for language models.md
+[2026-04-18 22:33:05] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/VideoPipe - A cross-platform video structuring (video analysis) framework. If you find it helpful, please give it a star )  跨平台的视频结构化（视频分析）框架.md
+[2026-04-18 22:33:07] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/WeKonra RAG framework.md
+[2026-04-18 22:33:10] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/YOLO Anything - AI训练平台开源.md
+[2026-04-18 22:33:29] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/awesome-open-source-flutter-apps A curated list of awesome open source Flutter apps.md
+[2026-04-18 22:33:46] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/gcc-video-conf - AI驱动的视频会议APP开源：有AI，有APP，完全开源，可以私有化部署，可以二开.md
+[2026-04-18 22:33:48] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/microsoft Mnemis Official Repostory of Mnemis Dual-Route Retrieval on Hierarchical Graphs for Long-Term LLM Memory.md
+[2026-04-18 22:33:49] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/microsoftVibeVoice Open-Source Frontier Voice AI.md
+[2026-04-18 22:33:51] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/从零开始构建Mini vLLM：深入理解大模型推理优化.md
+[2026-04-18 22:33:53] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/企业级RAG引擎 - R2R SoTA production-ready AI retrieval system. Agentic Retrieval-Augmented Generation (RAG) with a RESTful API.md
+[2026-04-18 22:33:55] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: OpenSource/本地fine tune千问模型.md
+[2026-04-18 22:33:57] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/AI 真正的战场是做核心系统的“摩擦层连接器”.md
+[2026-04-18 22:33:58] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/Agent 的护城河：强龙不压地头蛇.md
+[2026-04-18 22:34:00] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/Agentic_Design_Patterns Agentic Design Patterns A Hands-On Guide to Building Intelligent Systems by Antonio Gulli.md
+[2026-04-18 22:34:00] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/OpenViking and pi-mono.md
+[2026-04-18 22:34:01] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/The Smol Training Playbook - a Hugging Face Space by HuggingFaceTB.md
+[2026-04-18 22:34:01] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/上下文图谱：大模型环境下的知识图谱架构的革命性演进.md
+[2026-04-18 22:34:01] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/从 ReAct 到 Ralph Loop：AI Agent 的持续迭代范式.md
+[2026-04-18 22:34:02] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/大模型自主化部署与集成实施方案——大模型本地部署流程.md
+[2026-04-18 22:34:02] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/本地开发闭环了 Ollama+GLM4.7+Claude Code.md
+[2026-04-18 22:34:02] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/谷歌 Cloud AI 总监 14 年血泪复盘：AI 时代工程师不可替代的 5 类能力，代码反而排在最后.md
+[2026-04-18 22:34:03] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: POV/过去50年最重要的统计学思想是什么？.md
+[2026-04-18 22:34:04] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Palantir/Palantir官方深度解析本体 Ontology系统及知识图谱、大模型：企业自主决策的核心AI引擎.md
+[2026-04-18 22:34:05] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Palantir/基于本体数据库AbutionGraph开发RAG系统，太有意思啦！.md
+[2026-04-18 22:34:06] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/Agentic Reasoning for Large Language Models.md
+[2026-04-18 22:34:06] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/Data Darwinism Part I Unlocking the Value of Scientific Data for Pre-training.md
+[2026-04-18 22:34:07] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/FlowSteer 8B小模型全自动构建执行agent复杂工作流！.md
+[2026-04-18 22:34:07] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/Graph-O1：基于蒙特卡洛树搜索与强化学习的文本属性图推理框架.md
+[2026-04-18 22:34:07] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/Relink：动态构建查询导向的知识图谱推理框架，新一代 GraphRAG.md
+[2026-04-18 22:34:07] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/Video models are zero-shot learners and reasoners.md
+[2026-04-18 22:34:08] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/从优化到推理：Transformer 贝叶斯本质的几何 + 动力学全景解析.md
+[2026-04-18 22:34:08] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/别再让大模型“想太多”！谷歌用“深度思考Token”精准衡量推理质量.md
+[2026-04-18 22:34:09] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Papers/推理模型自己是否知道何时应该停止思考.md
+[2026-04-18 22:34:28] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Startups/Ex-Palantir founders close $12M round to bring AI overhaul to legacy ERP systems — TFN.md
+[2026-04-18 22:34:45] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Startups/SAP 的“学费”：三次战略误判与毒打.md
+[2026-04-18 22:34:45] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: Startups/离开半年，48 岁前 GitHub CEO 携开源 AI 开发者平台和老东家打擂.md
+[2026-04-18 22:34:46] [GATEWAY.MEMORY.VAULT] [INFO] [VAULT] Indexing: 有趣的收藏/YouTube-宏观洞察-对伊战争推演.md
+[2026-04-18 22:34:46] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Vault Pulse: Indexed 111 files.

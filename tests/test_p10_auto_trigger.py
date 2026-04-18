@@ -42,7 +42,7 @@ async def test_p10_auto_distill_trigger_audit(tmp_path):
     for i in range(threshold):
         await router.ingest({
             "messages": [{"role": "user", "content": f"Fact #{i}: The system component {i} is verified."}]
-        }, context_id=session_id, sync_distill=False)
+        }, session_id=session_id, sync_distill=False)
     
     # ── 关键变更：无限轮询 ──
     print("Ingestion complete. Waiting for Neocortex summary (NC_DIST) to appear...")

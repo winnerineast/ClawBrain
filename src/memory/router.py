@@ -164,13 +164,13 @@ class MemoryRouter:
             self._session_locks[sid] = asyncio.Lock()
         return self._session_locks[sid]
 
-    def _get_wm(self, context_id: str) -> WorkingMemory:
-        if context_id not in self._wm_sessions:
+    def _get_wm(self, session_id: str) -> WorkingMemory:
+        if session_id not in self._wm_sessions:
             wm = WorkingMemory()
-            self._wm_sessions[context_id] = wm
+            self._wm_sessions[session_id] = wm
             # Phase 33: Lazy on-demand hydration for this specific session
             try:
-                snapshot = self.hippo.load_wm_state(context_id)
+                snapshot = self.hippo.load_wm_state(session_id)
                 if snapshot:
                     for row in snapshot:
                         item = WorkingMemoryItem(trace_id=row["trace_id"], content=row["content"], timestamp=row["timestamp"])
@@ -178,7 +178,7 @@ class MemoryRouter:
                         wm.items.append(item)
                 else:
                     # Fallback to recent traces
-                    recent = self.hippo.get_recent_traces(limit=15, context_id=context_id)
+                    recent = self.hippo.get_recent_traces(limit=15, session_id=session_id)
                     for row in reversed(recent):
                         content_json = row.get("raw_content") or self.hippo.get_content(row["trace_id"])
                         if content_json:
@@ -189,17 +189,17 @@ class MemoryRouter:
                                     wm.items.append(WorkingMemoryItem(trace_id=row["trace_id"], content=content, timestamp=row["timestamp"]))
                             except: pass
             except Exception as e:
-                logger.error(f"[ROUTER] Lazy hydration failed for {context_id}: {e}")
-        return self._wm_sessions[context_id]
+                logger.error(f"[ROUTER] Lazy hydration failed for {session_id}: {e}")
+        return self._wm_sessions[session_id]
 
     def _hydrate(self):
         """Phase 33: Removed global hydration in favor of lazy session-specific loading."""
         pass
 
-    async def pre_turn_pending(self, payload: Dict[str, Any], context_id: str = "default", offload_threshold: int = None) -> str:
+    async def pre_turn_pending(self, payload: Dict[str, Any], session_id: str = "default", offload_threshold: int = None) -> str:
         await self.wait_until_ready()
-        async with self._get_session_lock(context_id):
-            room_id = self._get_current_room(context_id)
+        async with self._get_session_lock(session_id):
+            room_id = self._get_current_room(session_id)
             trace_id = str(uuid.uuid4())
             search_text = payload.get("messages", [{}])[-1].get("content", "")
             
@@ -207,73 +207,67 @@ class MemoryRouter:
                 trace_id=trace_id,
                 payload={"stimulus": payload, "reaction": None},
                 search_text=search_text,
-                threshold=offload_threshold,
-                context_id=context_id,
-                room_id=room_id,
-                state="PENDING"
+                session_id=session_id,
+                room_id=room_id
             )
         return trace_id
 
-    async def commit_turn(self, trace_id: str, payload: Dict[str, Any], reaction: Dict[str, Any], context_id: str, sync_distill: bool = False, offload_threshold: int = None):
+    async def commit_turn(self, trace_id: str, payload: Dict[str, Any], reaction: Dict[str, Any], session_id: str, sync_distill: bool = False, offload_threshold: int = None):
         await self.wait_until_ready()
-        async with self._get_session_lock(context_id):
-            wm = self._get_wm(context_id)
-            room_id = self._get_current_room(context_id)
+        async with self._get_session_lock(session_id):
+            wm = self._get_wm(session_id)
+            room_id = self._get_current_room(session_id)
             search_text = payload.get("messages", [{}])[-1].get("content", "")
             
             self.hippo.save_trace(
                 trace_id=trace_id,
                 payload={"stimulus": payload, "reaction": reaction},
                 search_text=search_text,
-                threshold=offload_threshold,
-                context_id=context_id,
-                room_id=room_id,
-                state="COMMITTED"
+                session_id=session_id,
+                room_id=room_id
             )
             
-            wm.add_item(trace_id, search_text)
-            self.hippo.save_wm_state(context_id, wm.items)
+            wm.add_item(WorkingMemoryItem(trace_id=trace_id, content=search_text))
+            self.hippo.save_wm_state(session_id, wm.items)
             
             core_intent = self.decomposer.extract_core_intent(payload)
-            self._trace_counters[context_id] = self._trace_counters.get(context_id, 0) + 1
+            self._trace_counters[session_id] = self._trace_counters.get(session_id, 0) + 1
             
         if self.enable_room_detection and not sync_distill:
-            asyncio.create_task(self._perform_room_detection(context_id, search_text))
+            asyncio.create_task(self._perform_room_detection(session_id, search_text))
             
         if self.enable_auto_distill:
-            if self._trace_counters.get(context_id, 0) >= self.distill_threshold or sync_distill:
+            if self._trace_counters.get(session_id, 0) >= 10 or sync_distill: # Using hardcoded 10 for now
                 if sync_distill:
-                    await self._auto_distill_worker(context_id)
+                    await self._auto_distill_worker(session_id)
                 else:
-                    asyncio.create_task(self._auto_distill_worker(context_id))
-                self._trace_counters[context_id] = 0
+                    asyncio.create_task(self._auto_distill_worker(session_id))
+                self._trace_counters[session_id] = 0
 
-    async def orphan_turn(self, trace_id: str, payload: Dict[str, Any], error: str, context_id: str, offload_threshold: int = None):
+    async def orphan_turn(self, trace_id: str, payload: Dict[str, Any], error: str, session_id: str, offload_threshold: int = None):
         await self.wait_until_ready()
-        async with self._get_session_lock(context_id):
-            room_id = self._get_current_room(context_id)
+        async with self._get_session_lock(session_id):
+            room_id = self._get_current_room(session_id)
             search_text = payload.get("messages", [{}])[-1].get("content", "")
             
             self.hippo.save_trace(
                 trace_id=trace_id,
                 payload={"stimulus": payload, "reaction": {"error": error}},
                 search_text=search_text,
-                threshold=offload_threshold,
-                context_id=context_id,
-                room_id=room_id,
-                state="ORPHAN"
+                session_id=session_id,
+                room_id=room_id
             )
 
     async def ingest(self, payload: Dict[str, Any], reaction: Dict[str, Any] = None,
-                     offload_threshold: int = None, context_id: str = "default",
+                     offload_threshold: int = None, session_id: str = "default",
                      sync_distill: bool = False) -> str:
         """
         Ingest a user stimulus and optionally an assistant reaction.
-        P18: Isolated by context_id.
+        P18: Isolated by session_id.
         P34: Organized by semantic rooms.
         """
-        trace_id = await self.pre_turn_pending(payload, context_id, offload_threshold)
-        await self.commit_turn(trace_id, payload, reaction, context_id, sync_distill, offload_threshold)
+        trace_id = await self.pre_turn_pending(payload, session_id, offload_threshold)
+        await self.commit_turn(trace_id, payload, reaction, session_id, sync_distill, offload_threshold)
         return trace_id
 
 
@@ -341,39 +335,36 @@ class MemoryRouter:
             self.cb_distill.record_failure()
             logger.error(f"[DISTILL_ERROR] {e}")
 
-    async def get_combined_context(self, context_id: str, query: str, max_chars: int = None) -> str:
+    async def get_combined_context(self, session_id: str, query: str, max_chars: int = None) -> str:
         """
         Assemble the optimal context using Stack Math budget allocation.
-        Priority: L3 Facts > Vault > L1 Working Memory > L2 Hippocampus.
+        Priority: Entities > L3 Facts > Vault > L1 Working Memory > L2 Hippocampus.
         """
         if max_chars is None:
             max_chars = int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", 2000))
 
-        # Ensure readiness
-        if not self.ready_event.is_set():
-            return ""
+        await self.wait_until_ready()
+        async with self._get_session_lock(session_id):
+            wm = self._get_wm(session_id)
+            current_room = self._get_current_room(session_id)
 
-        async with self._get_session_lock(context_id):
-            wm = self._get_wm(context_id)
-            current_room = self._get_current_room(context_id)
-            
             # Layer retrieval
-            l3_summary = self.neo.get_summary(context_id) or ""
+            l3_summary = self.neo.get_summary(session_id) or ""
             vault_results = []
             if self.vault_indexer:
                 vault_results = self.vault_indexer.search(query, limit=3)
-            
+
             working_contents = wm.get_active_contents()
-            
+
             # 4. Hippocampus (L2)
             # L2 Retrieval (Favor current room)
-            # hippo.search(query, context_id, room_id) returns List[str] (IDs)
-            l2_ids = self.hippo.search(query, context_id, current_room)
-            
+            # hippo.search(query, session_id, room_id) returns List[str] (IDs)
+            l2_ids = self.hippo.search(query, session_id, current_room)
+
             # Phase 38: Sparse Data Semantic Search Fallback (Issue #19)
             if not l2_ids and query:
                 logger.info(f"[ROUTER] Semantic search returned empty for '{query}'. Engaging sparse data fallback.")
-                recent_traces = self.hippo.get_recent_traces(limit=50, context_id=context_id)
+                recent_traces = self.hippo.get_recent_traces(limit=50, session_id=session_id)
                 query_lower = query.lower()
                 for trace in recent_traces:
                     raw_content = trace.get("raw_content", "") or ""
@@ -386,34 +377,34 @@ class MemoryRouter:
             for tid in l2_ids[:5]:
                 full_payload = self.hippo.get_full_payload(tid)
                 if full_payload:
-                    # Extract text from stimulus and reaction
                     stimulus = full_payload.get("stimulus", {})
+                    # Phase 47: Robust content extraction from full payload
                     msgs = stimulus.get("messages", [])
                     turn_text = []
-                    
-                    # Case A: Messages list (Standard)
                     if msgs:
                         for m in msgs:
                             turn_text.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
-                    # Case B: Direct content (Legacy/Manual)
-                    elif "content" in stimulus:
-                        turn_text.append(f"user: {stimulus['content']}")
-                    
+
                     reaction = full_payload.get("reaction", {})
                     if reaction and "message" in reaction:
                         rm = reaction["message"]
                         turn_text.append(f"assistant: {rm.get('content', '')}")
-                    
+
                     if turn_text:
                         l2_contents.append(" | ".join(turn_text))
                 else:
-                    # Fallback if no full payload
+                    # Fallback to simple content
                     content = self.hippo.get_content(tid)
                     if content: l2_contents.append(content)
-
+            # --- ENTITY LOOKUP (Phase 50) ---
+            # Extract potential entities from current query (Basic noun extraction)
+            potential_entities = re.findall(r'\b[A-Z][a-z0-9]+\b|\b[a-z0-9]+\.[a-z0-9]+\b', query or "")
+            entity_facts = []
+            if potential_entities:
+                entity_facts = self.hippo.get_facts_for_entities(session_id, list(set(potential_entities)))
             # --- STACK MATH ASSEMBLY ---
             # Budget calculation (Precision Budgeting P31)
-            # Allocation Order: L3 > Vault > L1 > L2
+            # Allocation Order: Entities > L3 > Vault > L1 > L2
             
             output_parts = []
             current_len = 0
@@ -430,6 +421,11 @@ class MemoryRouter:
                 if current_len + len(total_section) <= (max_chars - 100): # 100 for wrapper/coupling
                     output_parts.append(total_section)
                     current_len += len(total_section)
+
+            # 0. Entity Registry (New Priority #1)
+            if entity_facts:
+                fact_strings = [f"{f['entity']} > {f['key']}: {f['value']}" for f in entity_facts]
+                try_add_section("ENTITY REGISTRY (VERIFIED FACTS)", fact_strings)
 
             # 1. Neocortex (L3)
             if l3_summary:
@@ -484,6 +480,45 @@ class MemoryRouter:
             wrapped = "[CLAWBRAIN MEMORY]" + "".join(output_parts) + coupling + "\n[END CLAWBRAIN MEMORY]"
             return wrapped
 
+    async def _auto_distill_worker(self, session_id: str):
+        """Background worker to perform recursive summarization (Phase 40)."""
+        if self.cb_distill.is_open:
+            return
+        
+        try:
+            # Fetch last 50 traces for this specific session
+            recent = self.hippo.get_recent_traces(limit=50, session_id=session_id)
+            if not recent:
+                return
+            
+            # Extract full payloads
+            full_traces = []
+            for t in recent:
+                p = self.hippo.get_full_payload(t["trace_id"])
+                if p: full_traces.append(p)
+            
+            if not full_traces:
+                return
+
+            logger.info(f"[DISTILL] Triggering distillation for session: {session_id}")
+            summary = await self.neo.distill(session_id, full_traces)
+            
+            if summary and not summary.startswith("[Error]"):
+                self.cb_distill.record_success()
+                logger.info(f"[DISTILL] Completed. L3 Summary updated for {session_id}")
+            else:
+                logger.warning(f"[DISTILL] Provider returned error: {summary}")
+                self.cb_distill.record_failure()
+                
+        except Exception as e:
+            logger.exception(f"Auto-distill failed for {session_id}: {e}")
+            self.cb_distill.record_failure()
+
+    async def distill_session(self, session_id: str) -> str:
+        """Manually trigger and return the latest summary."""
+        await self._auto_distill_worker(session_id)
+        return self.neo.get_summary(session_id)
+
     async def _vault_scan_loop(self):
         """Independent rhythmic driver for Knowledge Bridge."""
         if not self.vault_indexer: return
@@ -495,3 +530,13 @@ class MemoryRouter:
             except Exception as e:
                 logger.error(f"[VAULT_SCAN_ERROR] {e}")
             await asyncio.sleep(300) # Every 5 minutes
+
+    async def aclose(self):
+        """Phase 45: Graceful resource release (v1.2)."""
+        logger.info("[ROUTER] Closing memory engine connections...")
+        if hasattr(self, "internal_client"):
+            await self.internal_client.aclose()
+        # ChromaDB persistent client handles its own cleanup, 
+        # but we could add more explicit clearing here if needed.
+        from src.memory.storage import clear_chroma_clients
+        clear_chroma_clients()

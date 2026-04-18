@@ -1,7 +1,2 @@
-venv/
-__pycache__/
-.env
-*.log
-tests/data/
-tests/cache/
 data/
+*.sqlite3

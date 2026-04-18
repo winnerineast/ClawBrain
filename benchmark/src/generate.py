@@ -78,7 +78,9 @@ def gen_recall_distance(
     for dist in distances:
         for i in range(per_distance):
             fact = next(fact_cycle)
-            query = rng.choice(fact["recall_queries"])
+            query_obj = rng.choice(fact["recall_queries"])
+            query = query_obj["query"]
+            expected = query_obj["expected_output"]
 
             raw_turns: list[dict] = []
             raw_turns.append({
@@ -108,7 +110,8 @@ def gen_recall_distance(
                 "session_id": f"bm-{test_id}",
                 "conversation": build_conversation(raw_turns),
                 "evaluation": {
-                    "must_contain": fact["must_contain"],
+                    "expected_output": expected,
+                    "must_contain": [expected] + fact["must_contain"],
                     "must_not_contain": fact["must_not_contain"],
                     "type": "pattern_match",
                 },
@@ -127,7 +130,10 @@ def gen_fact_evolution(
     cases = []
 
     for i, fact in enumerate(updatable[:per_case]):
-        query = rng.choice(fact["recall_queries"])
+        query_obj = rng.choice(fact["recall_queries"])
+        query = query_obj["query"]
+        expected = fact.get("expected_update_output", "updated")
+
         raw_turns: list[dict] = []
 
         # Plant original fact
@@ -164,20 +170,6 @@ def gen_fact_evolution(
             "expected_facts": [fact["fact_id"]],
         })
 
-        # Phase 32 (ISSUE-005): Robust token extraction for must_contain
-        # Prefer technical identifiers (contains . : - or digits) over common words
-        stop_words = {"the", "and", "with", "for", "that", "this", "from", "have", "has", "had", "will", "would", "what", "when", "where", "which", "your", "their", "they", "them", "then", "than", "there", "were", "been", "much", "some", "very", "many", "just", "like", "into", "onto", "upon", "about", "above", "below", "under", "over"}
-        tokens = [t.strip(",.!?\"'") for t in fact["update_message"].split()]
-
-        tech_tokens = [t for t in tokens if (any(c in t for c in ".:-/\\") or any(c.isdigit() for c in t)) and len(t) > 1 and t.lower() not in stop_words]
-
-        if tech_tokens:
-            # Take the most specific one (longest technical identifier)
-            update_token = max(tech_tokens, key=len)
-        else:
-            # Fallback to longest non-common word
-            valid_tokens = [t for t in tokens if t.lower() not in stop_words and len(t) >= 3]
-            update_token = max(valid_tokens, key=len) if valid_tokens else (tokens[-1] if tokens else "update")
         test_id = f"fact_evol_{fact['fact_id']}_{i:02d}"
         cases.append({
             "test_id": test_id,
@@ -186,11 +178,11 @@ def gen_fact_evolution(
             "session_id": f"bm-{test_id}",
             "conversation": build_conversation(raw_turns),
             "evaluation": {
-                # Must contain something from the update (not just original)
-                "must_contain": [update_token],
-                "must_not_contain": [],
+                "expected_output": expected,
+                "must_contain": [expected],
+                "must_not_contain": [query_obj["expected_output"]], # Original value should NOT be there
                 "type": "pattern_match",
-                "note": f"Should reflect updated value: {update_token}",
+                "note": f"Should reflect updated value: {expected}",
             },
         })
     return cases
@@ -212,7 +204,11 @@ def gen_session_isolation(
     fact_pairs = list(zip(shuffled_facts[::2], shuffled_facts[1::2]))[:num_pairs]
 
     for i, (fact_a, fact_b) in enumerate(fact_pairs):
-        query_b = rng.choice(fact_b["recall_queries"])
+        query_obj_b = rng.choice(fact_b["recall_queries"])
+        query_b = query_obj_b["query"]
+        expected_b = query_obj_b["expected_output"]
+        
+        expected_a = rng.choice(fact_a["recall_queries"])["expected_output"]
 
         # Session A conversation
         session_a = f"bm-iso-{i:02d}-a"
@@ -261,9 +257,10 @@ def gen_session_isolation(
             "conversation_setup": build_conversation(raw_a),   # ingested into session_a
             "conversation": build_conversation(raw_b),          # ingested + queried in session_b
             "evaluation": {
-                "must_contain": fact_b["must_contain"],
+                "expected_output": expected_b,
+                "must_contain": [expected_b],
                 # Session A's facts must NEVER appear in session B's addition
-                "must_not_contain": fact_a["must_contain"],
+                "must_not_contain": [expected_a] + fact_a["must_contain"],
                 "type": "isolation",
                 "note": "Cross-session leakage test — must_not_contain is a hard failure",
             },
@@ -285,7 +282,10 @@ def gen_noise_robustness(
     for noise_n in noise_sizes:
         for i in range(per_size):
             fact = next(fact_cycle)
-            query = rng.choice(fact["recall_queries"])
+            query_obj = rng.choice(fact["recall_queries"])
+            query = query_obj["query"]
+            expected = query_obj["expected_output"]
+
             raw_turns: list[dict] = []
 
             # Fact planted early
@@ -315,7 +315,8 @@ def gen_noise_robustness(
                 "session_id": f"bm-{test_id}",
                 "conversation": build_conversation(raw_turns),
                 "evaluation": {
-                    "must_contain": fact["must_contain"],
+                    "expected_output": expected,
+                    "must_contain": [expected],
                     "must_not_contain": fact["must_not_contain"],
                     "type": "pattern_match",
                 },
@@ -361,8 +362,8 @@ def gen_multi_fact(
 
             # Synthesized query asking for all facts from the category
             combined_query = (
-                f"Give me a complete summary of all the {cat.replace('_', ' ')} "
-                "configuration and settings you know about."
+                f"List all the {cat.replace('_', ' ')} configuration values "
+                "one by one. Reply concisely with only the list of values."
             )
             raw_turns.append({
                 "role": "user",
@@ -372,9 +373,7 @@ def gen_multi_fact(
             })
 
             # All must_contain patterns from all selected facts
-            all_must_contain = []
-            for f in selected_facts:
-                all_must_contain.extend(f["must_contain"])
+            all_expected = [rng.choice(f["recall_queries"])["expected_output"] for f in selected_facts]
 
             test_id = f"multi_fact_{combo_size}_{cat}_{i:02d}"
             cases.append({
@@ -388,7 +387,8 @@ def gen_multi_fact(
                 "session_id": f"bm-{test_id}",
                 "conversation": build_conversation(raw_turns),
                 "evaluation": {
-                    "must_contain": all_must_contain[:6],   # cap at 6 patterns to avoid over-constraint
+                    "expected_output": ", ".join(all_expected),
+                    "must_contain": all_expected,
                     "must_not_contain": [],
                     "type": "pattern_match",
                 },
@@ -423,7 +423,9 @@ def gen_neocortex(
 
         # Pick one fact to query after compaction
         probe_fact = rng.choice(selected_facts)
-        probe_query = rng.choice(probe_fact["recall_queries"])
+        query_obj = rng.choice(probe_fact["recall_queries"])
+        probe_query = query_obj["query"]
+        expected = query_obj["expected_output"]
 
         raw_turns.append({
             "role": "user",
@@ -444,7 +446,8 @@ def gen_neocortex(
             "session_id": f"bm-{test_id}",
             "conversation": build_conversation(raw_turns),
             "evaluation": {
-                "must_contain": probe_fact["must_contain"],
+                "expected_output": expected,
+                "must_contain": [expected],
                 "must_not_contain": probe_fact["must_not_contain"],
                 "type": "pattern_match",
                 "note": "Runner must call /internal/compact before /internal/assemble",

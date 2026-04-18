@@ -30,7 +30,7 @@ async def test_p34_room_auto_segmentation(tmp_path):
     
     # Turn 1: Database topic
     print("\n[ROOM TEST] Turn 1: Database optimization...")
-    await router.ingest({"messages": [{"role": "user", "content": "How to create an index in Postgres?"}]}, context_id=session_id)
+    await router.ingest({"messages": [{"role": "user", "content": "How to create an index in Postgres?"}]}, session_id=session_id)
     
     # ── 关键变更：轮询直到 Room 变化 ──
     print("Waiting for LLM to detect topic shift (Room change)...")
@@ -48,9 +48,9 @@ async def test_p34_room_auto_segmentation(tmp_path):
 
     # Turn 2: Should now be saved in the new room
     print("[ROOM TEST] Turn 2: Saving in detected room...")
-    await router.ingest({"messages": [{"role": "user", "content": "Another DB query"}]}, context_id=session_id)
+    await router.ingest({"messages": [{"role": "user", "content": "Another DB query"}]}, session_id=session_id)
     
-    recent = router.hippo.get_recent_traces(limit=10, context_id=session_id)
+    recent = router.hippo.get_recent_traces(limit=10, session_id=session_id)
     rooms = [t["room_id"] for t in recent]
     print(f"[ROOM AUDIT] Captured rooms in Hippo: {rooms}")
     
@@ -67,9 +67,9 @@ async def test_p34_room_prioritized_search(tmp_path):
     
     # Manually plant traces in different rooms
     router.hippo.save_trace("t1", {"stimulus": {"content": "FastAPI is for Python"}}, 
-                            search_text="backend info", context_id=session_id, room_id="backend")
+                            search_text="backend info", session_id=session_id, room_id="backend")
     router.hippo.save_trace("t2", {"stimulus": {"content": "Vue is for JS"}}, 
-                            search_text="frontend info", context_id=session_id, room_id="frontend")
+                            search_text="frontend info", session_id=session_id, room_id="frontend")
     
     # Case A: Current room is 'backend'
     router._current_rooms[session_id] = "backend"

@@ -25,3 +25,5 @@
 
 11. **Virtual Environment Strictness**: All Python-based operations, including diagnostics, server execution, and benchmark runs, MUST be performed using the project's virtual environment (`~/ClawBrain/venv`). Never use system-wide Python for project-specific tasks to avoid dependency conflicts.
 
+12. **Unified Identity Terminology**: To avoid semantic ambiguity and NameErrors, the project MUST use `session_id` exclusively to identify independent memory contexts. The legacy term `context_id` is deprecated and prohibited in design documents, internal logic, storage keys, and API parameters. Refactor all layers to use `session_id` as the canonical identifier.
+

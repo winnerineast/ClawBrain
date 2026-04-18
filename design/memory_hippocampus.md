@@ -9,11 +9,11 @@ Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This 
 - Default directory: `db_dir`, with a `blobs/` subdirectory for oversized files.
 - **ChromaDB persistence**: `db_dir/chroma/`.
 - **Collections**:
-  - `traces`: Stores episodic archive. Documents are the `search_text` (intent) or `raw_content`. Metadata includes `timestamp`, `model`, `is_blob`, `blob_path`, `checksum`, and `context_id`.
+  - `traces`: Stores episodic archive. Documents are the `search_text` (intent) or `raw_content`. Metadata includes `timestamp`, `model`, `is_blob`, `blob_path`, `checksum`, and `session_id`.
   - `wm_state`: Stores L1 working memory snapshot persistence.
 
 ### 2.2 Dynamic Tiered Storage (save_trace)
-- **Method signature**: `save_trace(trace_id, payload, search_text="", threshold=None, context_id="default")`
+- **Method signature**: `save_trace(trace_id, payload, search_text="", threshold=None, session_id="default")`
 - Serialise `payload` to JSON, compute byte length.
 - **SHA-256 checksum**: Compute the SHA-256 hash of the raw UTF-8 bytes.
 - **Offload logic**:
@@ -23,18 +23,18 @@ Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This 
 
 ### 2.3 Semantic Vector Search (Phase 33)
 - **Background**: Replaces legacy SQLite FTS5 with semantic recall.
-- **Method signature**: `search(query: str, context_id: str = "default") -> List[str]`
+- **Method signature**: `search(query: str, session_id: str = "default") -> List[str]`
 - **Implementation**:
-  `traces_col.query(query_texts=[query], n_results=10, where={"context_id": context_id})`
+  `traces_col.query(query_texts=[query], n_results=10, where={"session_id": session_id})`
 - Returns a list of `trace_id`s (from `results["ids"][0]`).
 
 ### 2.4 Data Retrieval Interfaces
 - **`get_content(trace_id: str) -> Optional[str]`**: Retrieve from ChromaDB document or blob file.
-- **`get_recent_traces(limit: int, context_id: str = None) -> List[Dict]`**: Retrieve from ChromaDB, filtered by `context_id`, and sorted by `timestamp` in Python.
-- **`get_all_session_ids() -> List[str]`**: Scans ChromaDB metadatas for unique `context_id` values.
+- **`get_recent_traces(limit: int, session_id: str = None) -> List[Dict]`**: Retrieve from ChromaDB, filtered by `session_id`, and sorted by `timestamp` in Python.
+- **`get_all_session_ids() -> List[str]`**: Scans ChromaDB metadatas for unique `session_id` values.
 
 ### 2.5 Session Isolation (P18)
-- Strict isolation enforced via ChromaDB's `where={"context_id": context_id}` filter on all query/get operations.
+- Strict isolation enforced via ChromaDB's `where={"session_id": session_id}` filter on all query/get operations.
 
 ### 2.6 TTL Auto-Cleanup & Dirty Data Purge (P20)
 - **Cleanup strategy**:

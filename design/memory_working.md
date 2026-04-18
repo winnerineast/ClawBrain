@@ -30,7 +30,7 @@ After every `add_item` call:
 - **Background**: WorkingMemory is purely in-memory. `_hydrate` reconstructed WM from Hippocampus traces, losing exact `activation` values and original `timestamps` — attention state reset on every restart.
 - **Solution**: Add a `wm_state` table to `hippocampus.db`; persist a snapshot after every `ingest`.
 - **Schema**: `wm_state(session_id TEXT, trace_id TEXT, content TEXT, activation REAL, timestamp REAL, PRIMARY KEY (session_id, trace_id))`
-- **Write timing**: After `_get_wm(ctx).add_item(...)` in `MemoryRouter.ingest()`, call `hippo.save_wm_state(context_id, wm.items)` — overwrites the full snapshot for that session (DELETE then INSERT).
+- **Write timing**: After `_get_wm(ctx).add_item(...)` in `MemoryRouter.ingest()`, call `hippo.save_wm_state(session_id, wm.items)` — overwrites the full snapshot for that session (DELETE then INSERT).
 - **Read timing**: `_hydrate()` first calls `hippo.load_wm_state(session)` for an exact restore (preserves `activation` + `timestamp`); falls back to the old traces-rebuild path only if no snapshot exists.
 - **Cleanup coupling**: `DELETE /v1/memory/{session_id}` also clears the corresponding `wm_state` rows; TTL cleanup clears expired sessions' `wm_state` as well.
 - **New `Hippocampus` methods**:

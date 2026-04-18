@@ -1,0 +1,39 @@
+Loaded 30 test cases
+
+============================================================
+  TIER 2 — OpenClaw CLI (requires local LLM + server)
+============================================================
+Running 30 cases (Total target: 30)...
+  [1/30] fact_evol_tech_003_00 ...     [Turn 1] Sending message... Done (48.9s)
+    [Turn 2] Sending message... Done (38.2s)
+    [Turn 3] Sending message... Done (57.1s)
+    [Turn 4] Sending message... Done (81.0s)
+    [Turn 5] Sending message... Done (11.8s)
+ON=0% OFF=0% Δ=+0%
+  [2/30] fact_evol_tech_007_01 ...     [Turn 1] Sending message... Done (37.4s)
+    [Turn 2] Sending message... Done (96.0s)
+    [Turn 3] Sending message... Done (17.5s)
+ON=0% OFF=0% Δ=+0%
+  [3/30] fact_evol_tech_025_02 ...     [Turn 1] Sending message... Done (26.6s)
+    [Turn 2] Sending message... Done (54.3s)
+    [Turn 3] Sending message... Done (67.8s)
+    [Turn 4] Sending message... Done (75.2s)
+    [Turn 5] Sending message... Done (53.9s)
+    [Turn 6] Sending message... Done (64.4s)
+    [Turn 7] Sending message... Done (90.9s)
+    [Turn 8] Sending message... Done (44.0s)
+    [Turn 9] Sending message... Done (107.1s)
+    [Turn 10] Sending message... Done (44.5s)
+    [Turn 11] Sending message... Done (56.2s)
+    [Turn 12] Sending message... Done (58.3s)
+    [Turn 13] Sending message... Done (62.7s)
+    [Turn 14] Sending message... Done (60.9s)
+    [Turn 15] Sending message... Done (57.4s)
+    [Turn 16] Sending message... Done (46.3s)
+    [Turn 17] Sending message... Done (63.9s)
+    [Turn 18] Sending message... Done (17.7s)
+ON=0% OFF=0% Δ=+0%
+  [4/30] isolation_00 ...     [Turn 1] Sending message... Done (54.9s)
+    [Turn 2] Sending message... Done (48.5s)
+    [Turn 3] Sending message... Done (79.5s)
+    [Turn 4] Sending message... 

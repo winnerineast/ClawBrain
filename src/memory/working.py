@@ -24,13 +24,26 @@ class WorkingMemory:
     def __init__(self):
         self.items: List[WorkingMemoryItem] = []
 
-    def add_item(self, trace_id: str, content: str):
+    def add_item(self, *args, **kwargs):
+        """
+        Supports:
+          1. add_item(WorkingMemoryItem(...))
+          2. add_item(trace_id, content) [Legacy]
+        """
+        if len(args) == 1 and isinstance(args[0], WorkingMemoryItem):
+            item = args[0]
+        elif len(args) == 2:
+            item = WorkingMemoryItem(trace_id=args[0], content=args[1])
+        elif "item" in kwargs:
+            item = kwargs["item"]
+        else:
+            raise TypeError("WorkingMemory.add_item() expects either a WorkingMemoryItem or (id, content)")
+
         # 1. Initial Injection
-        new_item = WorkingMemoryItem(trace_id, content)
-        self.items.append(new_item)
+        self.items.append(item)
         
-        # 2. Refresh all activation values
-        self._refresh_activations(content)
+        # 2. Refresh all activation values using the content of the new item
+        self._refresh_activations(item.content)
         
         # 3. Perform cleanup according to Spec 2.3
         self._cleanup()
