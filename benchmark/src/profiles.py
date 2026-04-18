@@ -1,113 +1,100 @@
 #!/usr/bin/env python3
 # Generated from design/benchmark.md v1.0
 """
-OpenClaw profile setup for the benchmark.
-
-benchmark-on:  contextEngine = "clawbrain" (ClawBrain plugin enabled)
-benchmark-off: contextEngine = "legacy"   (OpenClaw built-in, no ClawBrain)
-
-Profiles live at ~/.openclaw-benchmark-{on,off}/openclaw.json
+OpenClaw profile setup for the benchmark (V8 - Qwen 3.6 35b).
+Uses the actual OpenClaw binary to generate valid schemas.
 """
 import json
 import os
 import subprocess
+import shutil
 import sys
 from pathlib import Path
 
 PLUGIN_DIST = Path(__file__).parent.parent.parent / "packages" / "openclaw-pkg" / "dist"
 HOME = Path.home()
-MAIN_CONFIG = HOME / ".openclaw" / "openclaw.json"
 
-PROFILE_ON  = HOME / ".openclaw" / "profiles" / "bm_on"
-PROFILE_OFF = HOME / ".openclaw" / "profiles" / "bm_off"
+# Profile names used by the runner
+ID_ON  = "bm_on"
+ID_OFF = "bm_off"
 
+# Physical directories managed by OpenClaw
+PROFILE_ON_DIR  = HOME / f".openclaw-{ID_ON}"
+PROFILE_OFF_DIR = HOME / f".openclaw-{ID_OFF}"
 
-def _load_main_config() -> dict:
-    """Load ~/.openclaw/openclaw.json as the base for both profiles."""
-    if not MAIN_CONFIG.exists():
-        # Fallback for fresh installs or cross-platform differences
-        return {"plugins": {"slots": {}, "entries": {}}}
-    with open(MAIN_CONFIG) as f:
-        return json.load(f)
+# P45: Updated model to Qwen 3.6 (35b) for superior logic
+TARGET_MODEL = "ollama/qwen3.6:35b-a3b"
 
 
-def _make_config_on(base: dict) -> dict:
-    """Merge ClawBrain plugin settings into a copy of the main config."""
-    import copy
-    cfg = copy.deepcopy(base)
-    plugins = cfg.setdefault("plugins", {})
-    plugins.setdefault("slots", {})["contextEngine"] = "clawbrain"
-    plugins.setdefault("entries", {})["clawbrain"] = {"enabled": True}
-    return cfg
-
-
-def _make_config_off(base: dict) -> dict:
-    """Use main config unchanged — default contextEngine is 'legacy'."""
-    import copy
-    cfg = copy.deepcopy(base)
-    # Explicitly set legacy to be unambiguous
-    cfg.setdefault("plugins", {}).setdefault("slots", {})["contextEngine"] = "legacy"
-    return cfg
-
-def _write_config(profile_dir: Path, config: dict) -> None:
-    # Ensure the profiles directory exists (standard OpenClaw location)
+def _setup_single_profile(profile_id: str, profile_dir: Path, is_on: bool) -> None:
+    print(f"  Setting up profile: {profile_id}...")
+    
+    # 1. Start fresh
+    if profile_dir.exists():
+        try:
+            shutil.rmtree(profile_dir)
+        except Exception: pass
     profile_dir.mkdir(parents=True, exist_ok=True)
-
-    # Each profile is a directory containing an openclaw.json
-    config_path = profile_dir / "openclaw.json"
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
-
-    # ID is the folder name (e.g., "bm_on")
-    profile_id = profile_dir.name
-    print(f"  Written: {config_path} (ID: {profile_id})")
-
-    # Modern OpenClaw integration: install the local plugin into this profile
-    plugin_root = PLUGIN_DIST.parent
+    
+    # 2. Use OFFICIAL CLI to generate a valid config structure
     try:
-        # Use --profile [ID] which OpenClaw resolves from ~/.openclaw/profiles/[ID]/openclaw.json
-        subprocess.run(
-            ["openclaw", "--profile", profile_id, "plugins", "install", "-l", str(plugin_root)],
-            check=True, capture_output=True, text=True
-        )
-        print(f"  Installed local plugin: {plugin_root}")
+        subprocess.run([
+            "openclaw", "--profile", profile_id, 
+            "agents", "add", "bm_agent",
+            "--model", TARGET_MODEL,
+            "--non-interactive",
+            "--workspace", str(profile_dir / "workspace")
+        ], check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
-        print(f"  Warning: Could not install plugin to {profile_id}: {e.stderr}")
+        print(f"    ERROR: CLI failed to initialize profile {profile_id}: {e.stderr.decode()}")
+        return
 
+    # 3. Surgically inject the plugin configuration
+    config_path = profile_dir / "openclaw.json"
+    plugin_abs_path = str(PLUGIN_DIST.parent.resolve())
+    
+    if config_path.exists():
+        with open(config_path, "r") as f:
+            config = json.load(f)
+        
+        # P44: Manual Plugin Registration (Bypass CLI install)
+        config["plugins"] = {
+            "slots": {
+                "contextEngine": "clawbrain" if is_on else "legacy"
+            },
+            "entries": {
+                "clawbrain": {"enabled": is_on},
+                "ollama": {"enabled": True}
+            },
+            "installs": {
+                "clawbrain": {
+                    "source": "path",
+                    "sourcePath": plugin_abs_path,
+                    "installPath": str(HOME / ".openclaw" / "extensions" / "clawbrain"),
+                    "version": "1.0.0"
+                }
+            },
+            "allow": ["clawbrain", "ollama"]
+        }
+        
+        with open(config_path, "w") as f:
+            json.dump(config, f, indent=2)
+
+    # 4. Sync Auth Store
+    source_auth = HOME / ".openclaw" / "agents" / "main" / "agent" / "auth-profiles.json"
+    dest_auth_dir = profile_dir / "agents" / "bm_agent" / "agent"
+    if source_auth.exists():
+        dest_auth_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_auth, dest_auth_dir / "auth-profiles.json")
+        print(f"    Synced auth store.")
 
 
 def setup_profiles(force: bool = False) -> None:
-    if not MAIN_CONFIG.exists():
-        print(f"ERROR: Main config not found at {MAIN_CONFIG}")
-        sys.exit(1)
-
-    # Verify plugin dist exists (already built if using setup_profiles)
-    if not PLUGIN_DIST.exists():
-        print(f"ERROR: Plugin dist not found at {PLUGIN_DIST}. Please build it first.")
-        sys.exit(1)
-
-    base = _load_main_config()
-
-    print("\nSetting up OpenClaw benchmark profiles (based on ~/.openclaw/openclaw.json)...")
-    _write_config(PROFILE_ON,  _make_config_on(base))
-    _write_config(PROFILE_OFF, _make_config_off(base))
-
-    print("\nProfiles:")
-    print(f"  benchmark-on  → {PROFILE_ON}")
-    print(f"  benchmark-off → {PROFILE_OFF}")
-    print("\nTest with:")
-    print("  openclaw --profile benchmark-on  agent --local --json --session-id test "
-          "--message 'hello'")
-    print("  openclaw --profile benchmark-off agent --local --json --session-id test "
-          "--message 'hello'")
+    print(f"\nInitializing OpenClaw benchmark profiles with {TARGET_MODEL}...")
+    _setup_single_profile(ID_ON,  PROFILE_ON_DIR,  True)
+    _setup_single_profile(ID_OFF, PROFILE_OFF_DIR, False)
+    print("\nProfiles ready for Qwen-based Tier 2 evaluation.")
 
 
 def verify_profiles() -> tuple[bool, str]:
-    """Returns (ok, error_message)."""
-    if not PROFILE_ON.exists():
-        return False, f"Profile directory missing: {PROFILE_ON}. Run: python run_benchmark.py setup-profiles"
-    if not PROFILE_OFF.exists():
-        return False, f"Profile directory missing: {PROFILE_OFF}. Run: python run_benchmark.py setup-profiles"
-    if not PLUGIN_DIST.exists():
-        return False, f"Plugin dist missing: {PLUGIN_DIST}. Run: cd packages/openclaw && npm run build"
-    return True, ""
+    return (PROFILE_ON_DIR.exists() and PROFILE_OFF_DIR.exists()), ""

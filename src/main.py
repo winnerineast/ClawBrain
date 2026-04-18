@@ -21,6 +21,7 @@ from src.pipeline import Pipeline
 from src.models import Message
 from mcp.server.sse import SseServerTransport
 from src.mcp_server import create_mcp_server
+from src.utils.dashboard_tpl import DASHBOARD_HTML
 
 logging.basicConfig(
     level=logging.INFO,
@@ -180,6 +181,25 @@ async def trigger_manual_distill(session_id: str, request: Request):
     mr = request.app.state.memory_router
     asyncio.create_task(mr._auto_distill_worker(session_id))
     return {"status": "distillation_triggered", "session_id": session_id}
+
+@app.get("/v1/management/sessions")
+async def list_sessions(request: Request):
+    check_ready(request.app)
+    mr = request.app.state.memory_router
+    sids = mr.hippo.get_all_session_ids()
+    return {"sessions": sids, "total": len(sids)}
+
+@app.get("/v1/management/traces/{session_id}")
+async def get_traces(session_id: str, request: Request, limit: int = 50):
+    check_ready(request.app)
+    mr = request.app.state.memory_router
+    traces = mr.hippo.get_recent_traces(limit=limit, context_id=session_id)
+    return {"session_id": session_id, "traces": traces}
+
+@app.get("/dashboard")
+async def serve_dashboard():
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=DASHBOARD_HTML)
 
 @app.post("/v1/ingest")
 async def ingest_memory(request: Request):

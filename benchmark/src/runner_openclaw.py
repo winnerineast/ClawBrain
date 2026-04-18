@@ -8,7 +8,7 @@ Each message is sent via:
   openclaw --profile benchmark-{on|off} agent --local --json
             --session-id <id> --message <content>
 
-The model's response text is evaluated against must_contain patterns.
+The model's response text is evaluated against ground truth.
 """
 import json
 import re
@@ -32,15 +32,16 @@ def _run_turn(
     """
     Send one message via openclaw agent --local --json.
     Returns (response_text, latency_ms).
-    Raises on non-zero exit or JSON parse failure.
     """
     print(f"    [Turn {turn_num}] Sending message... ", end="", flush=True)
+    # P44: EXPLICITLY specify agent to ensure it uses Ollama (model is pre-bound to agent)
     cmd = [
         OPENCLAW_BIN,
         "--profile", profile,
         "agent",
         "--local",
         "--json",
+        "--agent", "bm_agent",
         "--session-id", session_id,
         "--message", message,
     ]
@@ -54,7 +55,6 @@ def _run_turn(
     latency_ms = (time.monotonic() - t0) * 1000
     print(f"Done ({latency_ms/1000:.1f}s)")
 
-    # openclaw writes JSON output to stderr; stdout is always empty
     output = proc.stderr
 
     if proc.returncode != 0:
@@ -66,12 +66,9 @@ def _run_turn(
     ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
     clean = ansi_escape.sub('', output)
     
-    # openclaw might output multiple JSON objects or logs before the final response.
-    # The JSON can be multi-line. We look for a balanced JSON object containing "payloads".
     data = None
     
     def extract_json_objects(text):
-        """Find all potential JSON objects in a string by balancing braces."""
         objs = []
         stack = []
         start = -1
@@ -98,7 +95,7 @@ def _run_turn(
             continue
             
     if data is None:
-        raise ValueError(f"No valid response JSON with 'payloads' found in stderr. Clean output tail: {clean[-1000:]}")
+        raise ValueError(f"No valid response JSON found in stderr.")
 
     payloads = data.get("payloads", [])
     text = " ".join(p.get("text", "") for p in payloads if p.get("text"))
@@ -110,11 +107,6 @@ def _run_conversation(
     session_id: str,
     conversation: list[dict],
 ) -> tuple[str, float]:
-    """
-    Play through all turns. Returns (recall_response_text, latency_ms).
-    Only user turns are sent (assistant turns are the model's output).
-    Returns the response to the first is_recall_query turn.
-    """
     recall_text = ""
     recall_latency = 0.0
 
@@ -124,7 +116,7 @@ def _run_conversation(
         if turn.get("is_recall_query"):
             recall_text = text
             recall_latency = lat
-            break  # stop after recall query
+            break
 
     return recall_text, recall_latency
 
@@ -139,37 +131,32 @@ def run_case(case: dict) -> CaseResult:
         test_id=test_id,
         dimension=case["dimension"],
         session_id=case["session_id"],
-        must_contain=evaluation["must_contain"],
-        must_not_contain=evaluation["must_not_contain"],
-        eval_type=evaluation["type"],
+        expected_output=evaluation.get("expected_output", ""),
+        must_contain=evaluation.get("must_contain", []),
+        must_not_contain=evaluation.get("must_not_contain", []),
+        eval_type=evaluation.get("type", "exact_match"),
     )
 
     try:
         # ── ClawBrain ON ───────────────────────────────────────────────────
-        # Setup session (if isolation test)
         if "session_id_setup" in case and "conversation_setup" in case:
             setup_session_on = case["session_id_setup"] + "-t2-on"
             setup_user_turns = [t for t in case["conversation_setup"] if t["role"] == "user"]
-            print(f"\n    [Setup ON] session={setup_session_on}")
             for i, turn in enumerate(setup_user_turns):
-                _run_turn("benchmark-on", setup_session_on, turn["content"], turn_num=i+1)
+                _run_turn("bm_on", setup_session_on, turn["content"], turn_num=i+1)
 
-        print(f"\n    [Run ON] profile=benchmark-on session={session_on}")
         resp_on, lat_on = _run_conversation(
-            "benchmark-on", session_on, case["conversation"]
+            "bm_on", session_on, case["conversation"]
         )
         result.response_on = resp_on
         result.latency_ms_t2 = lat_on
 
-        # ── ClawBrain OFF (legacy engine) ─────────────────────────────────
-        print(f"\n    [Run OFF] profile=benchmark-off session={session_off}")
+        # ── ClawBrain OFF ──────────────────────────────────────────────────
         resp_off, _ = _run_conversation(
-            "benchmark-off", session_off, case["conversation"]
+            "bm_off", session_off, case["conversation"]
         )
         result.response_off = resp_off
 
-    except subprocess.TimeoutExpired:
-        result.error = f"Timeout after {OPENCLAW_TIMEOUT}s"
     except Exception as e:
         result.error = str(e)
 
@@ -177,10 +164,6 @@ def run_case(case: dict) -> CaseResult:
 
 
 def run(cases: list[dict], max_cases: int | None = None) -> list[CaseScore]:
-    """
-    Run Tier 2 benchmark sequentially (each turn invokes openclaw CLI).
-    Set max_cases to limit run time during development.
-    """
     selected = cases[:max_cases] if max_cases else cases
     scores: list[CaseScore] = []
 
