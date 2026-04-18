@@ -18,12 +18,15 @@ PLUGIN_DIST = Path(__file__).parent.parent.parent / "packages" / "openclaw-pkg" 
 HOME = Path.home()
 MAIN_CONFIG = HOME / ".openclaw" / "openclaw.json"
 
-PROFILE_ON  = HOME / ".openclaw-benchmark-on"
-PROFILE_OFF = HOME / ".openclaw-benchmark-off"
+PROFILE_ON  = HOME / ".openclaw" / "profiles" / "bm_on"
+PROFILE_OFF = HOME / ".openclaw" / "profiles" / "bm_off"
 
 
 def _load_main_config() -> dict:
     """Load ~/.openclaw/openclaw.json as the base for both profiles."""
+    if not MAIN_CONFIG.exists():
+        # Fallback for fresh installs or cross-platform differences
+        return {"plugins": {"slots": {}, "entries": {}}}
     with open(MAIN_CONFIG) as f:
         return json.load(f)
 
@@ -46,25 +49,31 @@ def _make_config_off(base: dict) -> dict:
     cfg.setdefault("plugins", {}).setdefault("slots", {})["contextEngine"] = "legacy"
     return cfg
 
-
 def _write_config(profile_dir: Path, config: dict) -> None:
+    # Ensure the profiles directory exists (standard OpenClaw location)
     profile_dir.mkdir(parents=True, exist_ok=True)
+
+    # Each profile is a directory containing an openclaw.json
     config_path = profile_dir / "openclaw.json"
     with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
-    print(f"  Written: {config_path}")
+
+    # ID is the folder name (e.g., "bm_on")
+    profile_id = profile_dir.name
+    print(f"  Written: {config_path} (ID: {profile_id})")
 
     # Modern OpenClaw integration: install the local plugin into this profile
-    # Use the absolute path to ensure OpenClaw can find it from anywhere
     plugin_root = PLUGIN_DIST.parent
     try:
+        # Use --profile [ID] which OpenClaw resolves from ~/.openclaw/profiles/[ID]/openclaw.json
         subprocess.run(
-            ["openclaw", "--profile", profile_dir.name, "plugins", "install", "-l", str(plugin_root)],
+            ["openclaw", "--profile", profile_id, "plugins", "install", "-l", str(plugin_root)],
             check=True, capture_output=True, text=True
         )
         print(f"  Installed local plugin: {plugin_root}")
     except subprocess.CalledProcessError as e:
-        print(f"  Warning: Could not install plugin to {profile_dir.name}: {e.stderr}")
+        print(f"  Warning: Could not install plugin to {profile_id}: {e.stderr}")
+
 
 
 def setup_profiles(force: bool = False) -> None:

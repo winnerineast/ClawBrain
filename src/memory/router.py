@@ -162,34 +162,35 @@ class MemoryRouter:
 
     def _get_wm(self, context_id: str) -> WorkingMemory:
         if context_id not in self._wm_sessions:
-            self._wm_sessions[context_id] = WorkingMemory()
-        return self._wm_sessions[context_id]
-
-    def _hydrate(self):
-        try:
-            sessions = self.hippo.get_all_session_ids()
-            for session in sessions:
-                snapshot = self.hippo.load_wm_state(session)
+            wm = WorkingMemory()
+            self._wm_sessions[context_id] = wm
+            # Phase 33: Lazy on-demand hydration for this specific session
+            try:
+                snapshot = self.hippo.load_wm_state(context_id)
                 if snapshot:
-                    wm = self._get_wm(session)
                     for row in snapshot:
                         item = WorkingMemoryItem(trace_id=row["trace_id"], content=row["content"], timestamp=row["timestamp"])
                         item.activation = row["activation"]
                         wm.items.append(item)
-                    continue
-                recent = self.hippo.get_recent_traces(limit=15, context_id=session)
-                wm = self._get_wm(session)
-                for row in reversed(recent):
-                    content_json = row.get("raw_content") or self.hippo.get_content(row["trace_id"])
-                    if content_json:
-                        try:
-                            payload = json.loads(content_json).get("stimulus", {})
-                            content = payload.get("messages", [{}])[-1].get("content", "")
-                            if content:
-                                wm.items.append(WorkingMemoryItem(trace_id=row["trace_id"], content=content, timestamp=row["timestamp"]))
-                        except: pass
-        except Exception as e:
-            logger.exception(f"Hydration failed: {e}")
+                else:
+                    # Fallback to recent traces
+                    recent = self.hippo.get_recent_traces(limit=15, context_id=context_id)
+                    for row in reversed(recent):
+                        content_json = row.get("raw_content") or self.hippo.get_content(row["trace_id"])
+                        if content_json:
+                            try:
+                                payload = json.loads(content_json).get("stimulus", {})
+                                content = payload.get("messages", [{}])[-1].get("content", "")
+                                if content:
+                                    wm.items.append(WorkingMemoryItem(trace_id=row["trace_id"], content=content, timestamp=row["timestamp"]))
+                            except: pass
+            except Exception as e:
+                logger.error(f"[ROUTER] Lazy hydration failed for {context_id}: {e}")
+        return self._wm_sessions[context_id]
+
+    def _hydrate(self):
+        """Phase 33: Removed global hydration in favor of lazy session-specific loading."""
+        pass
 
     async def pre_turn_pending(self, payload: Dict[str, Any], context_id: str = "default", offload_threshold: int = None) -> str:
         await self.wait_until_ready()
@@ -413,36 +414,40 @@ class MemoryRouter:
             output_parts = []
             current_len = 0
             
-            def try_add_section(header: str, content_list: List[str]):
+            def try_add_section(header: str, content_list: List[str], item_prefix: str = "- "):
                 nonlocal current_len
                 if not content_list: return
                 
                 # Double newline for clear separation
                 section_header = f"\n\n=== {header} ===\n"
-                section_content = "\n".join([f"- {c}" for c in content_list])
+                section_content = "\n".join([f"{item_prefix}{c}" for c in content_list])
                 
                 total_section = section_header + section_content
-                if current_len + len(total_section) <= (max_chars - 50): # 50 for wrapper
+                if current_len + len(total_section) <= (max_chars - 100): # 100 for wrapper/coupling
                     output_parts.append(total_section)
                     current_len += len(total_section)
 
             # 1. Neocortex (L3)
             if l3_summary:
-                try_add_section("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary])
+                try_add_section("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary], item_prefix="- ")
             
             # 2. Vault (External)
             if vault_results:
-                try_add_section("EXTERNAL KNOWLEDGE (VAULT)", [f"# {r['title']}\n{r['content']}" for r in vault_results])
+                try_add_section("EXTERNAL KNOWLEDGE (VAULT)", [f"# {r['title']}\n{r['content']}" for r in vault_results], item_prefix="- ")
                 
             # 3. Working Memory (L1)
-            try_add_section("ACTIVE CONVERSATION (WORKING MEMORY)", working_contents)
+            try_add_section("ACTIVE CONVERSATION (WORKING MEMORY)", working_contents, item_prefix="- ")
             
-            # 4. Hippocampus (L2)
-            try_add_section("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents)
+            # 4. Hippocampus (L2) - Use a numbered list to allow model to refer to specific facts
+            try_add_section("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents, item_prefix="FACT_")
 
             if not output_parts: return ""
             
-            wrapped = "[CLAWBRAIN MEMORY]" + "".join(output_parts) + "\n[END CLAWBRAIN MEMORY]"
+            # Phase 39: Cognitive Coupling Instruction
+            coupling = ("\n\n[COGNITIVE COUPLING]: You MUST cross-reference facts from the sections above "
+                        "to provide a unified answer. If facts conflict, prioritize NEOCORTEX over HIPPOCAMPUS.")
+            
+            wrapped = "[CLAWBRAIN MEMORY]" + "".join(output_parts) + coupling + "\n[END CLAWBRAIN MEMORY]"
             return wrapped
 
     async def _vault_scan_loop(self):

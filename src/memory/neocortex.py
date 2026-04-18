@@ -44,8 +44,7 @@ class Neocortex:
         pass
 
     async def distill(self, context_id: str, traces: List[Dict[str, Any]]) -> str:
-        """§2.2: Async distillation logic with universal provider support (ISSUE-004)."""
-        # ... rest of corpus prep ...
+        """§2.2: Async distillation logic with recursive knowledge merging (Phase 40)."""
         corpus = []
         for t in traces:
             stimulus = t.get("stimulus", {})
@@ -54,13 +53,17 @@ class Neocortex:
                 corpus.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
         
         full_text = "\n".join(corpus)
-        # Phase 32 (ISSUE-007): Structured template-based distillation instruction
+        existing_summary = self.get_summary(context_id) or "(No existing summary)"
+        
+        # Phase 40: Recursive Summarization Instruction
         instruction = (
             "You are a professional Memory Distiller for an AI Agent. "
-            "Your goal is to extract and preserve critical information from the following dialogue into a concise summary.\n\n"
+            "Your goal is to extract critical information from a NEW dialogue and MERGE it into the EXISTING summary.\n\n"
             "STRICT GUIDELINES:\n"
             "1. PRESERVE TECHNICAL IDENTIFIERS: Always keep exact FQDNs, IP addresses, Port numbers, and Database names.\n"
-            "2. REQUIRED TEMPLATE: You MUST output the summary strictly using the following Markdown template. "
+            "2. STATEFUL MERGE: Integrate new facts from the dialogue into the existing summary below. "
+            "Do not drop old facts unless they are explicitly contradicted/updated by the new dialogue.\n"
+            "3. REQUIRED TEMPLATE: You MUST output the summary strictly using the following Markdown template. "
             "Do not output categories that have no facts.\n\n"
             "   ### Technical Decisions\n"
             "   - [Technical details, URLs, IPs, architecture]\n"
@@ -70,10 +73,12 @@ class Neocortex:
             "   - [General context, names, goals]\n"
             "   ### Relationships\n"
             "   - [People, roles, teams]\n\n"
-            "3. BE CONCISE: Use Bullet Points. No conversational filler or introductory text.\n"
-            "4. EVOLUTION: If a fact is updated in the dialogue, only preserve the NEWEST value."
+            "4. BE CONCISE: Use Bullet Points. Max total length: 1500 characters.\n"
+            "5. EVOLUTION: If a fact is updated in the dialogue, only preserve the NEWEST value."
         )
-        prompt = f"{instruction}\n\nDialogue to Distill:\n{full_text}"
+        prompt = (f"{instruction}\n\n"
+                  f"--- EXISTING SUMMARY ---\n{existing_summary}\n\n"
+                  f"--- NEW DIALOGUE TO DISTILL ---\n{full_text}")
         
         # 2. Dispatch by provider
         try:

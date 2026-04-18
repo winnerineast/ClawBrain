@@ -176,6 +176,7 @@ class Hippocampus:
             is_complete = payload["reaction"].get("is_complete", True)
         
         # Phase 33/34: ChromaDB Storage with Room support
+        # Step 2: Removed raw_content from metadata to prevent exponential latency.
         metadata = {
             "timestamp": now,
             "context_id": context_id,
@@ -186,12 +187,11 @@ class Hippocampus:
             "blob_path": blob_path,
             "checksum": checksum,
             "is_complete": 1 if is_complete else 0,
-            "state": state,
-            "raw_content": raw_content # Store full JSON in metadata for fast hydration
+            "state": state
         }
         
         # We index the human-readable search_text (intent) as the document 
-        # for semantic precision.
+        # for semantic precision. If search_text is missing, we use raw_content.
         document = search_text if search_text else raw_content
         
         self.traces_col.upsert(
@@ -287,9 +287,18 @@ class Hippocampus:
             return None
 
     def get_recent_traces(self, limit: int, context_id: str = None) -> List[Dict[str, Any]]:
-        """Phase 33: Filter and sort by timestamp in Python."""
-        where = {"context_id": context_id} if context_id else None
-        res = self.traces_col.get(where=where)
+        """Phase 33: Filter and sort by timestamp in Python (Optimized)."""
+        if not context_id:
+            logger.warning("[HIPPO] get_recent_traces called without context_id. Isolation risk.")
+            return []
+            
+        # Step 3: Optimization - Use limit at DB level to prevent large memory load.
+        # Fetch slightly more than needed to allow for Python-side sorting/filtering.
+        res = self.traces_col.get(
+            where={"context_id": context_id},
+            include=["metadatas", "documents"],
+            limit=limit * 3
+        )
         
         if not res or not res["ids"]:
             return []
@@ -300,7 +309,7 @@ class Hippocampus:
             # Reconstruct the row-like dict
             trace = {
                 "trace_id": res["ids"][i],
-                "timestamp": meta.get("timestamp"),
+                "timestamp": meta.get("timestamp") or 0,
                 "model": meta.get("model"),
                 "is_blob": meta.get("is_blob"),
                 "blob_path": meta.get("blob_path"),
@@ -312,20 +321,25 @@ class Hippocampus:
             traces.append(trace)
             
         # Sort by timestamp DESC
-        traces.sort(key=lambda x: x["timestamp"] or 0, reverse=True)
+        traces.sort(key=lambda x: x["timestamp"], reverse=True)
         return traces[:limit]
 
     def get_all_session_ids(self) -> List[str]:
-        """Return all known context_ids in the traces collection."""
-        res = self.traces_col.get(include=["metadatas"])
+        """
+        Step 1: Optimized Session ID Retrieval.
+        Instead of scanning the massive 'traces' collection, we scan 'wm_state'.
+        Since there is only one active snapshot set per session, this is O(Sessions).
+        """
+        res = self.wm_col.get(include=["metadatas"])
         if not res or not res["metadatas"]:
             return []
         
         sids = set()
         for meta in res["metadatas"]:
-            if "context_id" in meta:
-                sids.add(meta["context_id"])
-        return list(sids)
+            sid = meta.get("session_id")
+            if sid:
+                sids.add(sid)
+        return sorted(list(sids))
 
     # ── P22: WorkingMemory Exact Persistence (ChromaDB Version) ──────────────
 
