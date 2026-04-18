@@ -45,26 +45,21 @@ Evaluator: does addition contain must_contain patterns?
 
 ### Tier 2 — OpenClaw CLI (requires local LLM, slower, evaluates real responses)
 
-Drives the full stack: OpenClaw CLI → ClawBrain Context Engine plugin → LLM.
+Drives the full stack: OpenClaw CLI → ClawBrain Context Engine plugin → LLM. 
 Measures whether the model's response correctly reflects facts from memory.
 
-```
-Test Conversation
-      │
-      │  openclaw agent --local --json --profile benchmark-{on|off}
-      ▼
-OpenClaw (calls ingest/assemble/compact/afterTurn hooks)
-      │
-      ▼
-LLM response text
-      │
-      ▼
-Evaluator: does response contain must_contain patterns?
-```
+**Phase 47 (Physical Toggle Mode)**: To ensure absolute environment purity and simplify plugin management, the benchmark uses the **MAIN profile** and toggles the plugin's physical existence:
+- **ClawBrain ON**: Plugin is physically copied to `~/.openclaw/extensions/clawbrain` and authorized in `openclaw.json`.
+- **ClawBrain OFF**: Plugin is physically removed and `contextEngine` is reverted to `legacy`.
 
-OpenClaw profiles:
-- `benchmark-on`: `contextEngine: "clawbrain"` + plugin loaded
-- `benchmark-off`: `contextEngine: "legacy"` (OpenClaw built-in, no ClawBrain)
+```
+Execution Flow:
+1. RUNNER: install_plugin()
+2. RUNNER: execute all cases (ON mode) -> save tier2_on.jsonl
+3. RUNNER: uninstall_plugin()
+4. RUNNER: execute all cases (OFF mode) -> save tier2_off.jsonl
+5. EVALUATOR: compare results.
+```
 
 ## 3. Test Dimensions
 
@@ -175,20 +170,15 @@ benchmark/
 # Generate test cases from seed data
 python benchmark/run_benchmark.py generate
 
-# Set up OpenClaw profiles (benchmark-on / benchmark-off)
-python benchmark/run_benchmark.py setup-profiles
-
 # Tier 1 only (fast, no LLM)
 python benchmark/run_benchmark.py run --tier 1
 
 # Tier 2 only (requires openclaw + local model)
+# This will automatically toggle the plugin for ON/OFF segments
 python benchmark/run_benchmark.py run --tier 2
 
-# Specific dimension
-python benchmark/run_benchmark.py run --tier 1 --dim recall_dist
-
-# Full run
-python benchmark/run_benchmark.py run --tier all
+# Resume a paused run
+python benchmark/run_benchmark.py run --tier 2 --resume
 
 # Print last results summary
 python benchmark/run_benchmark.py report

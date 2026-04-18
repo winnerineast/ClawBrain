@@ -1,4 +1,4 @@
-# design/openclaw_plugin.md v1.0
+# design/openclaw_plugin.md v1.1
 
 ## 1. Objective
 
@@ -44,34 +44,40 @@ packages/openclaw/
     engine.test.ts      # Vitest unit tests with mocked fetch
 ```
 
-## 4. Configuration
+## 4. Security & Installation Model (Phase 46)
 
-### 4.1 Environment variables (read by the plugin at runtime)
+### 4.1 Manifest Permissions (`openclaw.plugin.json`)
+The plugin manifest MUST include a `permissions` block. This allows the OpenClaw installer to authorize specific sensitive operations, bypassing heuristic "dangerous pattern" blocks (e.g., env access).
+
+```json
+{
+  "id": "clawbrain",
+  "name": "ClawBrain Neural Memory",
+  "kind": "context-engine",
+  "permissions": {
+    "env": ["CLAWBRAIN_URL", "CLAWBRAIN_TIMEOUT_MS"],
+    "network": {
+      "hosts": ["127.0.0.1", "localhost"]
+    }
+  }
+}
+```
+
+### 4.2 Installation Strategy (The Gold Standard)
+For production use and rigorous benchmarking, ClawBrain uses **Main Profile Physical Registration**. This bypasses child-profile isolation walls and ensures 100% recognition by the OpenClaw loader.
+
+1. **Physical Placement**: Copy the `packages/openclaw-pkg` directory to the global extensions path: `~/.openclaw/extensions/clawbrain`.
+2. **Global Trust**: Add `"clawbrain"` to `plugins.allow` and `plugins.installs` in the primary `~/.openclaw/openclaw.json`.
+
+### 4.3 Benchmark Toggle Mode
+To measure the **Cognitive Delta**, the benchmark runner physically automates this process:
+- **ON Mode**: Executes the steps in 4.2.
+- **OFF Mode**: Deletes the physical directory and reverts `contextEngine` to `legacy`. This ensures a mathematically pure baseline where no ClawBrain code exists in the runtime path.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `CLAWBRAIN_URL` | `http://localhost:11435` | Base URL of the ClawBrain server |
 | `CLAWBRAIN_TIMEOUT_MS` | `5000` | Per-request timeout in milliseconds |
-
-### 4.2 User openclaw.json
-
-```json5
-{
-  plugins: {
-    slots: { contextEngine: "clawbrain" },
-    entries: {
-      "clawbrain": {
-        enabled: true,
-        config: {
-          // Optional: override server URL
-          // url: "http://localhost:11435"
-        }
-      }
-    },
-    load: { paths: ["./packages/openclaw/dist/index.js"] }
-  }
-}
-```
 
 ## 5. Interface Mapping
 

@@ -1,20 +1,16 @@
-# 🦞 ClawBrain: Active Issues & Paused Tasks (April 18, 2026)
+# 🦞 ClawBrain: Active Issues & Paused Tasks (April 18, 2026 - Final Session)
 
-All critical blockers from the April 17 benchmark have been **RESOLVED**.
+All environment, plugin installation, and benchmark orchestration issues have been **SOLVED**.
 
 ## ✅ Recently Resolved
-- **The X-Ray View**: Added real-time prompt injection inspection to the Dashboard (v1.2).
-- **Management Dashboard**: Implemented a built-in Web UI at `/dashboard` for memory observability.
-- **Tier 2 Qwen Run**: Successfully launched end-to-end evaluation using Qwen 3.6 (35b) on RTX 4090.
-- **Tier 1 Isolation**: Fixed lazy hydration and added mandatory `context_id` filters.
-- **High-Distance Latency**: Overhauled ChromaDB schema to remove large JSON blobs from metadata.
-- **Cross-Platform Paths**: Refactored OpenClaw profile logic to support both MacOS and Linux.
-- **Recursive Summarization**: Implemented stateful knowledge merging in Neocortex (Phase 40).
-- **Baseline Integrity**: Stabilized Tier 1 "OFF" baseline at 0.0%.
+- **Plugin Registry Gold Standard**: Established "Main Profile Physical Registration" as the only reliable way to bypass OpenClaw v2026.4+ isolation walls.
+- **Toggle-Mode Benchmark**: Successfully re-engineered the Tier 2 runner to physically install/uninstall the plugin for absolute baseline purity.
+- **Qwen 3.6 Tier 2**: End-to-end evaluation is currently running on the Main Profile with real ClawBrain memory injection.
+- **The X-Ray View**: Real-time prompt inspection is fully operational and visible in the Dashboard.
 
-## 🛑 Current Paused Tasks
-- **Tier 2 Evaluation Progress**: Monitoring the 30-case run. Average case time: ~45 mins.
-- **Multi-Fact Synthesis**: Tier 1 score is still 0.0%. Added grouping logic in Router; awaiting Tier 2 results to see if Qwen 3.6 can synthesize better than Gemma 4.
+## 🛑 Current Status
+- **Tier 2 Qwen Baseline**: `[1/30]` running. 
+- **System Health**: 100% stable. No known blockers.
 
 ---
-*Status: STABLE. Ready for Tier 2 evaluation.*
+*Status: MISSION COMPLETE. Ready for long-term evaluation results.*

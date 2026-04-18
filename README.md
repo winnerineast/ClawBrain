@@ -106,6 +106,18 @@ Point your agent's API `baseUrl` to ClawBrain (port 11435). ClawBrain will inter
 }
 ```
 
+### Choice 1.5: Native OpenClaw Plugin (Context Engine)
+For a deeper integration with [OpenClaw](https://github.com/openclaw/openclaw), use the native Context Engine plugin:
+
+```bash
+# 1. Copy the plugin to the global extensions directory
+mkdir -p ~/.openclaw/extensions/
+cp -r packages/openclaw-pkg ~/.openclaw/extensions/clawbrain
+
+# 2. Add to your ~/.openclaw/openclaw.json whitelist
+# { "plugins": { "allow": ["clawbrain"], "slots": { "contextEngine": "clawbrain" } } }
+```
+
 ### Choice 2: Model Context Protocol (MCP)
 ClawBrain supports the industry-standard MCP for modern agents (Claude Desktop, Cursor, etc.).
 
