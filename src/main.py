@@ -196,6 +196,13 @@ async def get_traces(session_id: str, request: Request, limit: int = 50):
     traces = mr.hippo.get_recent_traces(limit=limit, context_id=session_id)
     return {"session_id": session_id, "traces": traces}
 
+@app.get("/v1/management/last_injection/{session_id}")
+async def get_last_injection(session_id: str, request: Request):
+    check_ready(request.app)
+    mr = request.app.state.memory_router
+    payload = mr._last_injections.get(session_id)
+    return {"session_id": session_id, "payload": payload}
+
 @app.get("/dashboard")
 async def serve_dashboard():
     from fastapi.responses import HTMLResponse
@@ -305,6 +312,9 @@ async def gateway_relay(path: str, request: Request):
     
     # 4. Header Preparation
     upstream_headers = prepare_upstream_headers(request.headers, provider_config, target_protocol)
+    
+    # Phase 45: Capture for X-Ray View (v1.2)
+    mr._last_injections[session_id] = enriched_body
     
     # 4.5. Phase 38: Create PENDING trace (Issue #17)
     trace_id = await mr.pre_turn_pending(body, context_id=session_id)

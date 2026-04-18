@@ -3,6 +3,7 @@
 All critical blockers from the April 17 benchmark have been **RESOLVED**.
 
 ## ✅ Recently Resolved
+- **The X-Ray View**: Added real-time prompt injection inspection to the Dashboard (v1.2).
 - **Management Dashboard**: Implemented a built-in Web UI at `/dashboard` for memory observability.
 - **Tier 2 Qwen Run**: Successfully launched end-to-end evaluation using Qwen 3.6 (35b) on RTX 4090.
 - **Tier 1 Isolation**: Fixed lazy hydration and added mandatory `context_id` filters.

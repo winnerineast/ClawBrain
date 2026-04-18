@@ -1,4 +1,4 @@
-# Generated from design/management_api.md v1.1
+# Generated from design/management_api.md v1.2
 
 DASHBOARD_HTML = """
 <!DOCTYPE html>
@@ -17,6 +17,7 @@ DASHBOARD_HTML = """
             --danger: #f85149;
             --success: #3fb950;
             --border: #30363d;
+            --xray: #1c2128;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -24,7 +25,7 @@ DASHBOARD_HTML = """
             color: var(--text);
             margin: 0;
             display: flex;
-            height: 100 vh;
+            height: 100vh;
         }
         #sidebar {
             width: 250px;
@@ -38,13 +39,15 @@ DASHBOARD_HTML = """
             padding: 20px;
             overflow-y: auto;
         }
-        h1, h2 { color: var(--accent); }
+        h1, h2, h3 { color: var(--accent); }
         .session-item {
             padding: 10px;
             border-radius: 6px;
             cursor: pointer;
             margin-bottom: 5px;
             border: 1px solid transparent;
+            font-size: 13px;
+            word-break: break-all;
         }
         .session-item:hover { background-color: var(--card); }
         .session-item.active { 
@@ -57,6 +60,10 @@ DASHBOARD_HTML = """
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 20px;
+        }
+        .xray-card {
+            background-color: var(--xray);
+            border: 1px solid var(--accent);
         }
         pre {
             background: #000;
@@ -79,6 +86,7 @@ DASHBOARD_HTML = """
             background: var(--sidebar);
             color: var(--text);
             cursor: pointer;
+            font-weight: bold;
         }
         button:hover { background: var(--card); }
         .btn-danger { color: var(--danger); border-color: var(--danger); }
@@ -116,6 +124,11 @@ DASHBOARD_HTML = """
                 <button class="btn-danger" onclick="clearMemory()">🗑️ Clear Memory</button>
             </div>
 
+            <div class="card xray-card">
+                <h3>🔍 The X-Ray View (Last Context Injection)</h3>
+                <div id="xray-content"><pre>Waiting for next interaction...</pre></div>
+            </div>
+
             <div class="card">
                 <h3>🧠 Neocortex (L3 - Semantic Summary)</h3>
                 <div id="l3-content"><pre>Loading...</pre></div>
@@ -137,17 +150,19 @@ DASHBOARD_HTML = """
         let currentSession = null;
 
         async function loadSessions() {
-            const resp = await fetch('/v1/management/sessions');
-            const data = await resp.json();
-            const list = document.getElementById('session-list');
-            list.innerHTML = '';
-            data.sessions.forEach(sid => {
-                const div = document.createElement('div');
-                div.className = 'session-item' + (sid === currentSession ? ' active' : '');
-                div.textContent = sid;
-                div.onclick = () => selectSession(sid);
-                list.appendChild(div);
-            });
+            try {
+                const resp = await fetch('/v1/management/sessions');
+                const data = await resp.json();
+                const list = document.getElementById('session-list');
+                list.innerHTML = '';
+                data.sessions.forEach(sid => {
+                    const div = document.createElement('div');
+                    div.className = 'session-item' + (sid === currentSession ? ' active' : '');
+                    div.textContent = sid;
+                    div.onclick = () => selectSession(sid);
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error('Failed to load sessions', e); }
         }
 
         async function selectSession(sid) {
@@ -167,27 +182,40 @@ DASHBOARD_HTML = """
         async function refreshAll() {
             if (!currentSession) return;
             
-            // Load Memory State (L1/L3)
-            const mResp = await fetch(`/v1/memory/${currentSession}`);
-            const mData = await mResp.json();
-            document.getElementById('l3-content').innerHTML = `<pre>${mData.neocortex_summary || 'No summary generated yet.'}</pre>`;
-            document.getElementById('l1-content').innerHTML = `<pre>${JSON.stringify(mData.working_memory_preview, null, 2)}</pre>`;
+            try {
+                // 1. Load Memory State (L1/L3)
+                const mResp = await fetch(`/v1/memory/${currentSession}`);
+                const mData = await mResp.json();
+                document.getElementById('l3-content').innerHTML = `<pre>${mData.neocortex_summary || 'No summary generated yet.'}</pre>`;
+                document.getElementById('l1-content').innerHTML = `<pre>${JSON.stringify(mData.working_memory_preview, null, 2)}</pre>`;
 
-            // Load Traces (L2)
-            const tResp = await fetch(`/v1/management/traces/${currentSession}?limit=20`);
-            const tData = await tResp.json();
-            const container = document.getElementById('l2-content');
-            container.innerHTML = '';
-            tData.traces.forEach(t => {
-                const div = document.createElement('div');
-                div.className = 'trace-item';
-                const time = new Date(t.timestamp * 1000).toLocaleString();
-                div.innerHTML = `
-                    <div class="timestamp">${time} <span class="tag">${t.model}</span></div>
-                    <pre>${t.raw_content}</pre>
-                `;
-                container.appendChild(div);
-            });
+                // 2. Load X-Ray (Last Injection)
+                const xResp = await fetch(`/v1/management/last_injection/${currentSession}`);
+                const xData = await xResp.json();
+                if (xData.payload) {
+                    // Extract just the messages part for readability
+                    const stimulus = xData.payload.stimulus || xData.payload;
+                    document.getElementById('xray-content').innerHTML = `<pre>${JSON.stringify(stimulus, null, 2)}</pre>`;
+                } else {
+                    document.getElementById('xray-content').innerHTML = `<pre>No injection captured for this session yet.</pre>`;
+                }
+
+                // 3. Load Traces (L2)
+                const tResp = await fetch(`/v1/management/traces/${currentSession}?limit=20`);
+                const tData = await tResp.json();
+                const container = document.getElementById('l2-content');
+                container.innerHTML = '';
+                tData.traces.forEach(t => {
+                    const div = document.createElement('div');
+                    div.className = 'trace-item';
+                    const time = new Date(t.timestamp * 1000).toLocaleString();
+                    div.innerHTML = `
+                        <div class="timestamp">${time} <span class="tag">${t.model}</span></div>
+                        <pre>${t.raw_content}</pre>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) { console.error('Refresh failed', e); }
         }
 
         async function triggerDistill() {
@@ -204,7 +232,7 @@ DASHBOARD_HTML = """
 
         // Initial load
         loadSessions();
-        // Auto refresh
+        // Auto refresh (10s)
         setInterval(refreshAll, 10000);
     </script>
 </body>

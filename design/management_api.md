@@ -1,7 +1,7 @@
-# design/management_api.md v1.1
+# design/management_api.md v1.2
 
 ## 1. Objective
-Expand the **Management API** to support a full **Observability Dashboard**. Adds session discovery, trace inspection, and a built-in Web UI — transforming ClawBrain from a "black box" relay into a transparent memory engine.
+Expand the **Management API** to support "The X-Ray View". This allows users to see the exact enriched prompt (JSON body) that ClawBrain sends to the upstream LLM, resolving the "black box" mystery of context injection. It transforms the Dashboard into a powerful real-time debugging tool.
 
 ## 2. Architecture
 
@@ -36,24 +36,24 @@ Fetch recent raw traces for a session from ChromaDB.
 - Query params: `limit` (default 50)
 - Response: `{"session_id": "xxx", "traces": [...]}`
 
+#### GET `/v1/management/last_injection/{session_id}`
+Returns the last complete JSON payload sent to the LLM for this session.
+- Response: `{"session_id": "xxx", "payload": {...}}`
+
 #### GET `/dashboard`
 Serves a static HTML single-page application.
 
 ### 2.2 Functional logic
 - **Session Discovery**: Uses `Hippocampus.get_all_session_ids()`.
 - **Trace Fetching**: Uses `Hippocampus.get_recent_traces(limit, context_id)`.
+- **Injection Cache**: `MemoryRouter` maintains an in-memory dictionary `_last_injections` capturing the `enriched_body` during relay.
 
 ### 2.3 Dashboard UI (Single-File SPA)
 - **Built-in Template**: Stored in `src/utils/dashboard_tpl.py`.
-- **Tech Stack**: Vanilla HTML5 + CSS (Modern Dark Mode) + standard `fetch` API.
-- **Layout**:
-  - **Sidebar**: List of active sessions with "refresh" button.
-  - **Main View**: 
-    - **Header**: Session ID and Status.
-    - **L3 Panel**: Markdown-rendered (simple pre-wrap) Neocortex summary.
-    - **L1 Panel**: Current activation weights of Working Memory.
-    - **L2 Timeline**: Scrollable list of raw interaction traces.
-  - **Actions**: Floating buttons to Clear or Distill the active session.
+- **Tech Stack**: Vanilla HTML5 + CSS + fetch.
+- **Layout Enhancements**:
+  - **X-Ray Panel**: A collapsible or prominent card showing pretty-printed JSON of the last message sent to the provider.
+  - **Status Indicators**: Show if the last turn was intercepted or direct.
 
 ## 3. Test Specification (TDD)
 
@@ -63,7 +63,10 @@ Serves a static HTML single-page application.
 ### 3.2 Trace API
 - Ingest 5 traces, call `/v1/management/traces/{id}?limit=2`, assert 2 traces returned.
 
+### 3.3 X-Ray Verification
+- Send a request to `/v1/chat/completions`, then call `/v1/management/last_injection/{id}`, assert the returned JSON contains `[CLAWBRAIN MEMORY]`.
+
 ## 4. Output Targets
-- `src/main.py`: Add management routes and mount the `/dashboard` HTML endpoint.
-- `src/utils/dashboard_tpl.py`: Create the HTML/CSS/JS single-string template.
-- `src/memory/storage.py`: Ensure `get_all_session_ids` is exposed and efficient.
+- `src/main.py`: Add `/v1/management/last_injection` route and capture logic.
+- `src/memory/router.py`: Implement `_last_injections` storage.
+- `src/utils/dashboard_tpl.py`: Add X-Ray UI components.

@@ -5,6 +5,7 @@ import os
 import asyncio
 import logging
 import time
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import httpx
@@ -89,6 +90,9 @@ class MemoryRouter:
         self.decomposer = SignalDecomposer()
         self._trace_counters: Dict[str, int] = {}
         self._session_locks: Dict[str, asyncio.Lock] = {}
+        
+        # Phase 45: The X-Ray View Cache (v1.2)
+        self._last_injections: Dict[str, Any] = {}
         
         # Phase 37: Circuit Breakers for Cognitive Plane (Issue #16)
         self.cb_room = CircuitBreaker(max_failures=3, backoff_seconds=60)
@@ -439,13 +443,43 @@ class MemoryRouter:
             try_add_section("ACTIVE CONVERSATION (WORKING MEMORY)", working_contents, item_prefix="- ")
             
             # 4. Hippocampus (L2) - Use a numbered list to allow model to refer to specific facts
-            try_add_section("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents, item_prefix="FACT_")
+            # Step 4: Enhanced Multi-Fact synthesis. If multiple snippets share keywords, group them.
+            if l2_contents:
+                try:
+                    from collections import defaultdict
+                    # Basic entity grouping (keyword-based)
+                    groups = defaultdict(list)
+                    for content in l2_contents:
+                        # Extract potential entities (simple capitalization check or common tech words)
+                        words = set(re.findall(r'\b[A-Z][a-z0-9]+\b|\b[a-z0-9]+\.[a-z0-9]+\b', content))
+                        matched = False
+                        for word in words:
+                            if len(word) > 3:
+                                groups[word].append(content)
+                                matched = True
+                                break
+                        if not matched:
+                            groups["general"].append(content)
+                    
+                    grouped_list = []
+                    for topic, items in groups.items():
+                        if topic == "general": continue
+                        grouped_list.append(f"TOPIC [{topic}]:\n  " + "\n  ".join([f"- {i}" for i in items]))
+                    if groups["general"]:
+                        grouped_list.append("OTHER CONTEXT:\n  " + "\n  ".join([f"- {i}" for i in groups["general"]]))
+                    
+                    try_add_section("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", grouped_list, item_prefix="")
+                except Exception as e:
+                    # Fallback to simple list if grouping fails
+                    logger.error(f"[ASSEMBLE] Grouping failed: {e}")
+                    try_add_section("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents, item_prefix="FACT_")
 
             if not output_parts: return ""
             
-            # Phase 39: Cognitive Coupling Instruction
+            # Phase 39: Cognitive Coupling Instruction (Refined)
             coupling = ("\n\n[COGNITIVE COUPLING]: You MUST cross-reference facts from the sections above "
-                        "to provide a unified answer. If facts conflict, prioritize NEOCORTEX over HIPPOCAMPUS.")
+                        "to provide a unified answer. Facts grouped by TOPIC are related and should be synthesized. "
+                        "If facts conflict, prioritize NEOCORTEX over HIPPOCAMPUS.")
             
             wrapped = "[CLAWBRAIN MEMORY]" + "".join(output_parts) + coupling + "\n[END CLAWBRAIN MEMORY]"
             return wrapped
