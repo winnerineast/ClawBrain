@@ -48,15 +48,18 @@ async def test_p22_exact_activation_restored_after_restart(tmp_path):
     """The activation value of WM after restart should be exactly the same as before restart"""
     clear_chroma_clients()
     router1 = MemoryRouter(db_dir=str(tmp_path))
-    await router1.wait_until_ready()
+    # 1. Setup session with specific items
     await router1.ingest(
         {"messages": [{"role": "user", "content": "topic ALPHA project detail"}]},
-        session_id="persist-session"
+        session_id="persist-session",
+        trace_id="trace-canary-1"
     )
     await router1.ingest(
         {"messages": [{"role": "user", "content": "unrelated item XYZ"}]},
-        session_id="persist-session"
+        session_id="persist-session",
+        trace_id="trace-canary-2"
     )
+
 
     # Get WM state (activation + trace_ids) before restart
     wm_before = router1._get_wm("persist-session").items

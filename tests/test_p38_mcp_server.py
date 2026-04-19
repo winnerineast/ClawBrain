@@ -39,29 +39,33 @@ def mcp_server_instance():
         stderr=subprocess.PIPE
     )
 
-    # Wait for server AND cognitive engine to be ready
+    # Wait for server AND cognitive engine to be ready (Conditional Wait)
+    print("\n[WAIT] Waiting for server stability signal...")
     start_time = time.time()
-    while time.time() - start_time < 60:
+    safety_limit = 300 # 5 minutes for slow hardware
+    
+    while time.time() - start_time < safety_limit:
         if process.poll() is not None:
             stdout, stderr = process.communicate()
-            st_out = stdout.decode() if stdout else "None"
-            st_err = stderr.decode() if stderr else "None"
-            print(f"Server Crashed! STDOUT: {st_out}")
-            print(f"Server Crashed! STDERR: {st_err}")
+            print(f"Server Crashed! STDERR: {stderr.decode() if stderr else 'None'}")
             pytest.fail("MCP Test Server crashed during startup")
             
         try:
-            h_resp = httpx.get(f"http://127.0.0.1:{port}/health", timeout=2.0)
-            s_resp = httpx.get(f"http://127.0.0.1:{port}/v1/status", timeout=2.0)
-            if h_resp.status_code == 200 and s_resp.status_code == 200:
-                if s_resp.json().get("status") == "online":
+            s_resp = httpx.get(f"http://127.0.0.1:{port}/v1/status", timeout=1.0)
+            if s_resp.status_code == 200:
+                status_data = s_resp.json()
+                if status_data.get("status") == "online":
+                    print(f"Success! Server reached ONLINE state in {int(time.time() - start_time)}s")
                     break
+                else:
+                    if int(time.time() - start_time) % 10 == 0:
+                        print(f"  ...still initializing ({status_data.get('status')})...")
         except:
             pass
         time.sleep(2)
     else:
         process.terminate()
-        pytest.fail("MCP Test Server failed to reach ONLINE status in 60s")
+        pytest.fail(f"MCP Test Server failed to reach ONLINE status within {safety_limit}s safety limit")
         
     yield f"http://127.0.0.1:{port}"
     

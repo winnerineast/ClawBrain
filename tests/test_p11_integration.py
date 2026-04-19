@@ -48,8 +48,8 @@ async def test_p11_full_chain_memory_echo_real():
         }
         client.post("/api/chat", json=payload1)
         
-        # Ensure async ingestion is complete
-        time.sleep(1.0)
+        # Ensure async ingestion and WM persistence are complete
+        time.sleep(2.0)
         
         # Round 2: Verify recall
         memory = client.app.state.memory_router

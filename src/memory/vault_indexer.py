@@ -56,7 +56,7 @@ class VaultIndexer:
             logger.warning(f"[VAULT] Path not found: {self.vault_path}")
             return {"scanned": 0, "indexed": 0, "skipped": 0}
 
-        stats = {"scanned": 0, "indexed": 0, "skipped": 0, "hash_checked": 0}
+        stats = {"scanned": 0, "indexed": 0, "skipped": 0, "hash checked": 0}
         processed_files = self.state.get("processed_files", {})
         new_processed = {}
 
@@ -80,7 +80,7 @@ class VaultIndexer:
                     continue
                 
                 # mtime changed, Rule 3.1: TC_TOUCH check (Hash verification)
-                stats["hash_checked"] += 1
+                stats["hash checked"] += 1
                 current_hash = self._get_file_hash(full_path)
                 
                 if old_meta and old_meta.get("hash") == current_hash:

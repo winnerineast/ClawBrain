@@ -70,9 +70,9 @@ async def test_p15_context_budget_enforced(tmp_path):
     for i in range(10):
         await router.ingest({
             "messages": [{"role": "user", "content": f"Long message content number {i} " * 20}]
-        })
+        }, session_id="test-session")
 
-    context = await router.get_combined_context("test", "long message content")
+    context = await router.get_combined_context("test-session", "long message content")
     # 加上固定 header 的字符，允许一定溢出（header ~150 chars）
     visual_audit(
         "Context Budget Enforcement",

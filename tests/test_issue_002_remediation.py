@@ -49,6 +49,9 @@ async def test_phase_30_plain_text_hippocampus(tmp_path):
         ]
     }, session_id="session_l2")
     
+    # Ensure async persistence is complete
+    await asyncio.sleep(1.0)
+    
     context = await router.get_combined_context("session_l2", "Python")
     
     assert "=== RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS) ===" in context

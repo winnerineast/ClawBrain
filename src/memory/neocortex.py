@@ -42,11 +42,14 @@ class Neocortex:
         """§2.2: Async distillation logic with recursive knowledge merging (Phase 40)."""
         corpus = []
         for t in traces:
-            stimulus = t.get("stimulus", {})
-            msgs = stimulus.get("messages", [])
+            # P47: Robust extraction from stimulus (ingest) or top-level (direct)
+            msgs = t.get("messages", []) or t.get("stimulus", {}).get("messages", [])
             for m in msgs:
                 corpus.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
         
+        if not corpus:
+            return "[Error] No dialogue to distill."
+
         full_text = "\n".join(corpus)
         existing_summary = self.get_summary(session_id) or "(No existing summary)"
         
@@ -90,32 +93,41 @@ class Neocortex:
             return f"[Error] Distillation connection error: {str(e)}"
 
     async def _dispatch_request(self, client: httpx.AsyncClient, headers: Dict, prompt: str, session_id: str) -> str:
-        if self.distill_provider == "ollama":
-            resp = await client.post(f"{self.distill_url}/api/generate", headers=headers, json={
-                "model": self.distill_model,
-                "prompt": prompt,
-                "stream": False
-            })
+        try:
+            if self.distill_provider == "ollama":
+                # Ensure URL is correctly formatted for Ollama /api/generate
+                url = f"{self.distill_url.rstrip('/')}/api/generate"
+                resp = await client.post(url, headers=headers, json={
+                    "model": self.distill_model,
+                    "prompt": prompt,
+                    "stream": False
+                })
+            else:
+                # Ensure URL is correctly formatted for OpenAI /chat/completions
+                url = f"{self.distill_url.rstrip('/')}/chat/completions"
+                resp = await client.post(url, headers=headers, json={
+                    "model": self.distill_model,
+                    "messages": [
+                        {"role": "system", "content": "You are a professional memory distiller."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "stream": False
+                })
+            
             if resp.status_code != 200:
-                return f"[Error] Ollama Distillation failed ({resp.status_code}): {resp.text}"
-            summary = resp.json().get("response", "")
-        else:
-            resp = await client.post(f"{self.distill_url}/chat/completions", headers=headers, json={
-                "model": self.distill_model,
-                "messages": [
-                    {"role": "system", "content": "You are a professional memory distiller."},
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": False
-            })
-            if resp.status_code != 200:
-                return f"[Error] OpenAI-compatible Distillation failed ({resp.status_code}): {resp.text}"
-            summary = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+                return f"[Error] Distillation failed ({resp.status_code}): {resp.text}"
+            
+            if self.distill_provider == "ollama":
+                summary = resp.json().get("response", "")
+            else:
+                summary = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
 
-        if summary:
-            self._save_summary(session_id, summary)
-            return summary
-        return "[Error] Empty summary returned from provider."
+            if summary:
+                self._save_summary(session_id, summary)
+                return summary
+            return "[Error] Empty summary returned from provider."
+        except Exception as e:
+            return f"[Error] Distillation connection error: {str(e)}"
 
     def _save_summary(self, session_id: str, summary: str):
         """Phase 33: Summary persistence in ChromaDB."""
@@ -134,7 +146,7 @@ class Neocortex:
         if os.path.exists(self.db_path):
             try:
                 with sqlite3.connect(self.db_path) as conn:
-                    cursor = conn.execute("SELECT summary_text FROM neocortex_summaries WHERE context_id = ?", (session_id,))
+                    cursor = conn.execute("SELECT summary_text FROM neocortex_summaries WHERE session_id = ?", (session_id,))
                     row = cursor.fetchone()
                     return row[0] if row else None
             except Exception: pass

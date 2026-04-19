@@ -42,11 +42,14 @@ class RoomDetector:
         prompt += "Detected Room Name:"
 
         try:
-            # Phase 34: Use Cognitive Plane client
+            # Phase 34: Use Cognitive Plane client with generous timeout for slow hardware
+            # Condition-based: We wait up to 60s which is the typical max for local inference on low-end GPUs
+            timeout = 60.0
+            
             if self.http_client:
                 return await self._dispatch_detect(self.http_client, prompt)
             else:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=timeout) as client:
                     return await self._dispatch_detect(client, prompt)
                 
         except Exception as e:

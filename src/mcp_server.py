@@ -48,7 +48,7 @@ def create_mcp_server(mr: Optional[MemoryRouter] = None, remote_url: Optional[st
         
         if mr:
             stimulus = {"messages": [{"role": "user", "content": fact}]}
-            return await mr.ingest(stimulus, context_id=session_id, sync_distill=False)
+            return await mr.ingest(stimulus, session_id=session_id, sync_distill=False)
         return "engine_offline"
 
     @server.list_tools()

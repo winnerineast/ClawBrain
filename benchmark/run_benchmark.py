@@ -83,13 +83,15 @@ def cmd_run(args: argparse.Namespace) -> None:
     for c in cases:
         tid = c["test_id"]
         # Create a mock result object that evaluate.py expects
-        from runner_direct import RunResult # Reuse the dataclass
-        res = RunResult(
+        from evaluate import CaseResult
+        res = CaseResult(
             test_id=tid,
             dimension=c["dimension"],
+            session_id=c["session_id"],
             expected_output=c["evaluation"]["must_contain"][0] if c["evaluation"]["must_contain"] else "",
             must_contain=c["evaluation"]["must_contain"],
             must_not_contain=c["evaluation"]["must_not_contain"],
+            eval_type=c["evaluation"]["type"],
             response_on=on_responses.get(tid, ""),
             response_off=off_responses.get(tid, ""),
         )

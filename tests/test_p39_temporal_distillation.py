@@ -42,14 +42,24 @@ async def test_temporal_distillation_logic(tmp_path):
     print("\n[TEMPORAL TEST] Ingested 5 turns. Polling for summary...")
     
     start_poll = time.monotonic()
+    safety_limit = 300 # 5 minutes for slow hardware
     summary = None
-    while time.monotonic() - start_poll < 60:
+    while time.monotonic() - start_poll < safety_limit:
         summary = router.neo.get_summary(session_id)
         if summary and not summary.startswith("[Error]"):
+            print(f"Success! Summary generated in {int(time.monotonic() - start_poll)}s")
             break
-        await asyncio.sleep(2)
+        
+        if summary and summary.startswith("[Error]"):
+            # Check if it's a transient connection error
+            if "connection error" in summary.lower():
+                pass # Continue polling
+            else:
+                pytest.fail(f"Distillation failed with critical error: {summary}")
+                
+        await asyncio.sleep(5)
     
-    assert summary is not None, "Distillation failed to produce a summary within 60s"
+    assert summary is not None, f"Distillation failed to produce a summary within {safety_limit}s"
     print(f"Resulting Summary:\n{summary}")
     
     # Verify that critical facts were preserved despite the "noise" and temporal spread

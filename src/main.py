@@ -119,6 +119,30 @@ def prepare_upstream_headers(raw_headers: Dict[str, str], provider_config: Any, 
 async def health():
     return {"status": "ok", "version": "1.42", "engine": "ClawBrain (session_id unified)"}
 
+@app.get("/v1/status")
+async def get_status(request: Request):
+    mr = request.app.state.memory_router
+    sids = mr.hippo.get_all_session_ids()
+    return {
+        "status": "online" if request.app.state.engine_state == EngineState.READY else "initializing",
+        "engine": "ClawBrain",
+        "db_dir": str(mr.db_dir),
+        "vault_enabled": mr.vault_path is not None,
+        "vault_path": mr.vault_path,
+        "active_sessions": sids
+    }
+
+@app.post("/v1/query")
+async def query_v1(request: Request):
+    check_ready(request.app)
+    body = await request.json()
+    session_id = body.get("session_id", "default")
+    query = body.get("query", "")
+    budget = body.get("budget", 2000)
+    mr = request.app.state.memory_router
+    context = await mr.get_combined_context(session_id, query, max_chars=budget)
+    return {"context": context, "session_id": session_id}
+
 # ── INTERNAL PLUGIN API ──
 
 @app.post("/internal/ingest")
@@ -179,6 +203,14 @@ async def clear_memory(session_id: str, request: Request):
     if session_id in mr._wm_sessions:
         del mr._wm_sessions[session_id]
     return {"status": "cleared", "session_id": session_id}
+
+@app.post("/v1/memory/{session_id}/distill")
+async def trigger_manual_distill(session_id: str, request: Request):
+    check_ready(request.app)
+    mr = request.app.state.memory_router
+    # Trigger background distillation
+    asyncio.create_task(mr._auto_distill_worker(session_id))
+    return {"status": "distillation_triggered", "session_id": session_id}
 
 @app.get("/v1/management/sessions")
 async def list_sessions(request: Request):

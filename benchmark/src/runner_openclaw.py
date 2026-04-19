@@ -45,14 +45,23 @@ def _run_turn(
         raise Exception(f"openclaw exited {proc.returncode}: {error_msg}")
 
     try:
-        data = json.loads(proc.stdout)
+        # P47: Robust JSON extraction
+        raw_out = proc.stdout.strip()
+        start = raw_out.find('{')
+        end = raw_out.rfind('}')
+        if start != -1 and end != -1:
+            json_str = raw_out[start:end+1]
+            data = json.loads(json_str)
+        else:
+            raise ValueError("No JSON object found in stdout")
+
         if "payloads" in data and len(data["payloads"]) > 0:
             text = data["payloads"][0].get("text", "")
         else:
             text = data.get("finalAssistantVisibleText", "")
         return text, latency
     except Exception as e:
-        raise Exception(f"Failed to parse JSON: {e}\nSTDOUT: {proc.stdout}")
+        raise Exception(f"Failed to parse JSON: {e}\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}")
 
 
 def _run_conversation(session_id: str, turns: list[dict]) -> tuple[str, float]:

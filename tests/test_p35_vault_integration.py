@@ -60,9 +60,9 @@ async def test_p35_vault_change_detection_matrix(tmp_path):
     
     stats = await router.vault_indexer.scan()
     visual_audit("TC_TOUCH", "mtime changed, hash same", "0 indexed, 1 hash checked", 
-                 f"{stats['indexed']} indexed, {stats['hash_checked']} hash_checked")
+                 f"{stats['indexed']} indexed, {stats['hash checked']} hash checked")
     assert stats["indexed"] == 0
-    assert stats["hash_checked"] == 1
+    assert stats["hash checked"] == 1
     
     # TC_REAL: Real content change
     gen.create_note(str(vault_dir), "root_note.md", "# Root Note\nUpdated content for TC_REAL.")
