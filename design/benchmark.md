@@ -1,11 +1,11 @@
-# design/benchmark.md v1.0
+# design/benchmark.md v1.1 (Phase 55 Upgrade)
 
 ## 1. Objective
 
 Provide a reproducible, automated benchmark that quantifies ClawBrain's value
-by comparing memory recall quality with ClawBrain ON vs OFF, across multiple
-test dimensions. The benchmark also validates the end-to-end integration with
-the OpenClaw CLI as a second test tier.
+by comparing memory recall quality with ClawBrain ON vs OFF. The v1.1 upgrade
+introduces **ATM-Bench** inspired reasoning: Alias Resolution, Temporal 
+Conflict, and Abstention (Hallucination Control).
 
 ## 2. Two Test Tiers
 
@@ -73,6 +73,9 @@ Execution Flow:
 | Multi-fact synthesis | `multi_fact` | Single query needs 2–5 historical facts | 40 | 80 |
 | Neocortex distillation | `neocortex` | Recall after compact + cold session restart | 30 | 120 |
 | WM decay | `wm_decay` | Evicted WM items still recoverable from L2 | 20 | 60 |
+| **Abstention** (v1.1) | `abstention` | Correctly saying "I don't know" for unplanted facts | 40 | 50 |
+| **Alias Resolution** (v1.1) | `alias_res` | Mapping nicknames ("The Architect") to system facts | 30 | 40 |
+| **Chronicle Conflict** (v1.1)| `chronicle` | Using dates/versions to resolve "Current State" | 30 | 100 |
 
 ## 4. Data Format
 
@@ -93,7 +96,11 @@ Execution Flow:
 }
 ```
 
-`update_message`: if non-null, planted after an initial noise block to test fact evolution. When generating fact evolution tests, the `must_contain` token extracted from `update_message` MUST prioritize technical identifiers (IPs, ports, FQDNs, URLs, tokens with `. : -` or digits) over generic vocabulary to avoid false negatives.
+`update_message`: if non-null, planted after an initial noise block to test fact evolution. 
+
+**v1.1 Special Extensions:**
+- **Aliases**: `{"fact_id": "...", "aliases": ["Nickname1", "Alias2"]}` - tests PR (Personalized References).
+- **Temporal Versions**: `{"versions": [{"date": "2024", "val": "..."}, {"date": "2025", "val": "..."}]}` - tests Chronicle Conflict.
 
 ### Noise turn pair (`data/noise/*.jsonl`, one record per line)
 
@@ -134,6 +141,7 @@ Execution Flow:
 | Metric | Formula | Ideal |
 |--------|---------|-------|
 | **Recall rate** | % of `must_contain` patterns found in addition/response | 100% |
+| **Abstention rate** | % of correct "unknown" responses for unplanted facts | 100% |
 | **Isolation rate** | % of `must_not_contain` patterns absent (isolation tests only) | 100% |
 | **Delta vs baseline** | ClawBrain ON recall − OFF recall | Maximise |
 | **Budget efficiency** | `chars_used / budget_chars` (Tier 1 only) | 0.7–0.95 |
@@ -150,6 +158,8 @@ benchmark/
       preferences.jsonl      # ~25 user preference facts
       decisions.jsonl        # ~25 project decision facts
       relationships.jsonl    # ~20 people/role facts
+      personalized.jsonl     # v1.1 Nicknames and Aliases
+      conflicts.jsonl        # v1.1 Chronological conflicts
     noise/
       engineering.jsonl      # ~60 engineering discussion pairs
       general.jsonl          # ~30 general conversation pairs

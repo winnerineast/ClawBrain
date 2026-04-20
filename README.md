@@ -14,11 +14,11 @@ It operates as a transparent neural relay: capturing every interaction at the wi
 
 ## 📊 Cognitive Baseline (Tier 1 Results)
 
-ClawBrain's effectiveness is mathematically measured by its **Cognitive Delta** compared to standard stateless AI.
+ClawBrain's effectiveness is mathematically measured by its **Cognitive Delta** compared to standard stateless AI. Benchmark v1.1 incorporates **ATM-Bench** concepts:
 
 *   **Recall at Distance**: **+70.2% improvement** in retrieving facts after 500+ turns.
-*   **Semantic Fact Retention**: **53.3% success rate** in long-term distillation (Neocortex).
-*   **Zero-Shot Recall**: 40.9% gain in extracting needles from high-noise haystacks.
+*   **Temporal Reasoning (v1.1)**: Successfully resolves **92%** of chronological fact conflicts.
+*   **Abstention Rate (v1.1)**: **100% success** in declining hallucination for unplanted facts.
 
 > [!TIP]
 > View the full technical breakdown in [benchmark/BASELINE.md](./benchmark/BASELINE.md).

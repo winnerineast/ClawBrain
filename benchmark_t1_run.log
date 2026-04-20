@@ -1,0 +1,13 @@
+Loaded 159 cases for Tier 1 Direct Run
+
+Final Report:
+==============================================================================
+  CLAWBRAIN GROUND-TRUTH BENCHMARK REPORT — Tier 1
+==============================================================================
+
+Dimension               N      ON     OFF    Delta  IsoFail
+------------------------------------------------------------
+abstention             14    0.0%  100.0%  -100.0%        0
+==============================================================================
+
+Saved to /home/nvidia/ClawBrain/benchmark/results/20260420_135345_t1_final_tier1.jsonl

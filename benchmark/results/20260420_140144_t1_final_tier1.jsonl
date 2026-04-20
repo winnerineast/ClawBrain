@@ -1,0 +1,1 @@
+{"test_id": "abstention_00", "dimension": "abstention", "recall_on": 0.0, "recall_off": 1.0, "isolation_pass": true, "budget_efficiency": 0.0, "latency_ms": 0.0, "response_recall_on": 0.0, "response_recall_off": 0.0, "delta_t1": -1.0, "delta_t2": 0.0, "error": ""}

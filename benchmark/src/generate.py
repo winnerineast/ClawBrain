@@ -456,13 +456,143 @@ def gen_neocortex(
     return cases
 
 
+def gen_abstention(
+    noise_pool: list[dict],
+    num_cases: int,
+    rng: random.Random,
+) -> list[dict]:
+    """Test that agent correctly abstains from hallucinating unplanted facts."""
+    cases = []
+    # Queries about things NEVER mentioned in the facts library
+    unknown_queries = [
+        {"query": "What is the Wi-Fi password for the guest network?", "ans": "unknown"},
+        {"query": "Who is the lead manager for the Mars mission?", "ans": "unknown"},
+        {"query": "What is the secret code for the vault room?", "ans": "unknown"},
+        {"query": "When is the next company retreat in Hawaii?", "ans": "unknown"},
+    ]
+    
+    for i in range(num_cases):
+        q_obj = rng.choice(unknown_queries)
+        raw_turns = make_noise_block(noise_pool, 10, rng)
+        raw_turns.append({
+            "role": "user",
+            "content": q_obj["query"],
+            "is_recall_query": True,
+            "expected_facts": [], # Ground truth: no facts
+        })
+        
+        test_id = f"abstention_{i:02d}"
+        cases.append({
+            "test_id": test_id,
+            "dimension": "abstention",
+            "params": {"query": q_obj["query"]},
+            "session_id": f"bm-{test_id}",
+            "conversation": build_conversation(raw_turns),
+            "evaluation": {
+                "expected_output": "I don't know",
+                "must_contain": ["unknown", "do not know", "no information", "not mentioned"],
+                "must_not_contain": [],
+                "type": "abstention",
+            },
+        })
+    return cases
+
+
+def gen_alias_resolution(
+    facts: list[dict],
+    noise_pool: list[dict],
+    per_case: int,
+    rng: random.Random,
+) -> list[dict]:
+    """Test resolution of nicknames/aliases back to planted facts."""
+    aliases_pool = [f for f in facts if f.get("aliases")]
+    cases = []
+    for i, fact in enumerate(aliases_pool[:per_case]):
+        raw_turns = []
+        raw_turns.append({
+            "role": "user",
+            "content": fact["plant_message"],
+            "is_fact_plant": True,
+            "fact_id": fact["fact_id"],
+        })
+        raw_turns.append({"role": "assistant", "content": "Confirmed."})
+        raw_turns.extend(make_noise_block(noise_pool, 10, rng))
+        
+        query_obj = rng.choice(fact["recall_queries"])
+        raw_turns.append({
+            "role": "user",
+            "content": query_obj["query"],
+            "is_recall_query": True,
+            "expected_facts": [fact["fact_id"]],
+        })
+        
+        test_id = f"alias_res_{fact['fact_id']}_{i:02d}"
+        cases.append({
+            "test_id": test_id,
+            "dimension": "alias_res",
+            "params": {"fact_id": fact["fact_id"], "aliases": fact["aliases"]},
+            "session_id": f"bm-{test_id}",
+            "conversation": build_conversation(raw_turns),
+            "evaluation": {
+                "expected_output": query_obj["expected_output"],
+                "must_contain": fact["must_contain"],
+                "must_not_contain": [],
+                "type": "pattern_match",
+            },
+        })
+    return cases
+
+
+def gen_chronicle_conflict(
+    facts: list[dict],
+    noise_pool: list[dict],
+    num_cases: int,
+    rng: random.Random,
+) -> list[dict]:
+    """Test resolution of conflicting facts across time."""
+    conflict_pool = [f for f in facts if f.get("versions")]
+    cases = []
+    for i, fact in enumerate(conflict_pool[:num_cases]):
+        raw_turns = []
+        for msg in fact["plant_messages"]:
+            raw_turns.append({"role": "user", "content": msg})
+            raw_turns.append({"role": "assistant", "content": "Noted."})
+            raw_turns.extend(make_noise_block(noise_pool, 5, rng))
+            
+        query_obj = rng.choice(fact["recall_queries"])
+        raw_turns.append({
+            "role": "user",
+            "content": query_obj["query"],
+            "is_recall_query": True,
+            "expected_facts": [fact["fact_id"]],
+        })
+        
+        test_id = f"chronicle_{i:02d}"
+        cases.append({
+            "test_id": test_id,
+            "dimension": "chronicle",
+            "params": {"fact_id": fact["fact_id"]},
+            "session_id": f"bm-{test_id}",
+            "conversation": build_conversation(raw_turns),
+            "evaluation": {
+                "expected_output": query_obj["expected_output"],
+                "must_contain": fact["must_contain"],
+                "must_not_contain": fact["must_not_contain"],
+                "type": "pattern_match",
+            },
+        })
+    return cases
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def generate_all(seed: int = 42) -> dict[str, int]:
     rng = random.Random(seed)
-    facts = load_all_facts()
+    all_facts = load_all_facts()
+    # Filter facts that have the standard v1.0 plant_message structure
+    facts = [f for f in all_facts if "plant_message" in f]
     noise = load_all_noise()
-    print(f"Loaded {len(facts)} facts, {len(noise)} noise pairs")
+    print(f"Loaded {len(all_facts)} total facts ({len(facts)} standard), {len(noise)} noise pairs")
 
     counts: dict[str, int] = {}
 
@@ -507,6 +637,18 @@ def generate_all(seed: int = 42) -> dict[str, int]:
 
     write("neocortex", gen_neocortex(
         facts, noise, per_case=15, rng=rng,
+    ))
+
+    write("abstention", gen_abstention(
+        noise, num_cases=20, rng=rng,
+    ))
+
+    write("alias_res", gen_alias_resolution(
+        facts, noise, per_case=15, rng=rng,
+    ))
+
+    write("chronicle", gen_chronicle_conflict(
+        all_facts, noise, num_cases=15, rng=rng,
     ))
 
     total = sum(counts.values())

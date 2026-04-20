@@ -94,6 +94,21 @@ def score_case(result: CaseResult) -> CaseScore:
 
     expected = result.expected_output
 
+    # ── Abstention logic (v1.1) ──────────────────────────────────────────────
+    if result.eval_type == "abstention":
+        # Tier 1 Pass: No context was injected for an unknown fact
+        s.recall_on = 1.0 if not result.addition_on.strip() else 0.0
+        s.recall_off = 1.0 if not result.addition_off.strip() else 0.0
+        
+        # Tier 2 Pass: Model correctly says "I don't know"
+        if result.response_on:
+            s.response_recall_on = 1.0 if any(_normalize(p) in _normalize(result.response_on) for p in result.must_contain) else 0.0
+            s.response_recall_off = 1.0 if any(_normalize(p) in _normalize(result.response_off) for p in result.must_contain) else 0.0
+        
+        s.delta_t1 = s.recall_on - s.recall_off
+        s.delta_t2 = s.response_recall_on - s.response_recall_off
+        return s
+
     # ── Tier 1 scoring ────────────────────────────────────────────────────────
     # We check if the ground truth is present in the context addition
     s.recall_on = _is_match(result.addition_on, expected)

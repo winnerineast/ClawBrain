@@ -33,6 +33,32 @@ We don't just test "memory"; we stress-test specific cognitive failure points th
 | **Noise Robustness** | Extracting a "needle" fact from a "haystack" of technical jargon. |
 | **Session Isolation** | Ensuring User A's private data never leaks into User B's context (100% pass required). |
 | **Multi-Fact Synthesis** | Answering questions that require combining 2–5 different historical facts. |
+| **Abstention (v1.1)** | **Hallucination Control**: Measuring the agent's ability to say "I don't know" for unplanted facts. |
+| **Alias Resolution (v1.1)** | **Personalized Refs**: Mapping nicknames ("The Architect") back to formal system facts. |
+| **Chronicle Conflict (v1.1)** | **Temporal Reasoning**: Resolving conflicting facts by prioritizing the most recent date/version. |
+
+## Environment Setup & Prerequisites
+
+All benchmark commands **MUST** be executed from the **ClawBrain project root**.
+
+1. **Initialize Environment**:
+   ```bash
+   # From the project root (ClawBrain/)
+   source venv/bin/activate
+   export PYTHONPATH=$PYTHONPATH:.
+   ```
+
+2. **Verify Connectivity (Tier 1)**:
+   Tier 1 tests require the ClawBrain server to be running in a separate terminal:
+   ```bash
+   python3 -m uvicorn src.main:app --port 11435
+   ```
+
+3. **Verify Dependencies (Tier 2)**:
+   Ensure `openclaw` is in your PATH and the `gemma4:e4b` model is pulled:
+   ```bash
+   ollama pull gemma4:e4b
+   ```
 
 ## Quick Start
 

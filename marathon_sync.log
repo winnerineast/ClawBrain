@@ -1,0 +1,20 @@
+[CLEANUP] Reaping legacy server processes... Done.
+Loaded 159 cases for Tier 1 Direct Run
+[SERVER] Starting background engine... Ready.
+
+[TIER 1] Starting execution of 159 cases...
+[001/159] Running abstention_00... [002/159] Running abstention_01... ❌ FAIL
+❌ FAIL
+[003/159] Running abstention_02... [004/159] Running abstention_03... ❌ FAIL
+[005/159] Running abstention_04... ❌ FAIL
+[006/159] Running abstention_05... ❌ FAIL
+[007/159] Running abstention_06... ❌ FAIL
+[008/159] Running abstention_07... ❌ FAIL
+[009/159] Running abstention_08... ❌ FAIL
+[010/159] Running abstention_09... ❌ FAIL
+[011/159] Running abstention_10... ❌ FAIL
+[012/159] Running abstention_11... ❌ FAIL
+[013/159] Running abstention_12... ❌ FAIL
+[014/159] Running abstention_13... ❌ FAIL
+[015/159] Running abstention_14... ❌ FAIL
+[016/159] Running abstention_15... 

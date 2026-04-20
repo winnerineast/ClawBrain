@@ -1,0 +1,8 @@
+INFO:     Started server process [14606]
+INFO:     Waiting for application startup.
+[2026-04-20 12:29:55] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Establishing long-term memory engine...
+[2026-04-20 12:29:55] [GATEWAY.MEMORY] [INFO] [HIPPO] Storage stabilized (session_id unified).
+[2026-04-20 12:29:55] [GATEWAY.MEMORY.ROUTER] [INFO] [COGNITIVE] Intelligence layer stabilized.
+[2026-04-20 12:29:55] [GATEWAY] [INFO] [INIT] Cognitive plane fully stabilized. State: READY
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:11435 (Press CTRL+C to quit)

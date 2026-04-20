@@ -1,0 +1,32 @@
+[CLEANUP] Reaping legacy server processes... Done.
+Loaded 159 cases for Tier 1 Direct Run
+[SERVER] Starting background engine... Ready.
+
+[TIER 1] Starting execution of 159 cases...
+[001/159] Running abstention_00... [002/159] Running abstention_01... ❌ FAIL
+[003/159] Running abstention_02... ❌ FAIL
+[004/159] Running abstention_03... ❌ FAIL
+[005/159] Running abstention_04... ❌ FAIL
+[006/159] Running abstention_05... ❌ FAIL
+[007/159] Running abstention_06... ❌ FAIL
+[008/159] Running abstention_07... ❌ FAIL
+[009/159] Running abstention_08... ❌ FAIL
+[010/159] Running abstention_09... ❌ FAIL
+[011/159] Running abstention_10... ❌ FAIL
+[012/159] Running abstention_11... ❌ FAIL
+[013/159] Running abstention_12... ❌ FAIL
+[014/159] Running abstention_13... ❌ FAIL
+[015/159] Running abstention_14... ❌ FAIL
+[016/159] Running abstention_15... ❌ FAIL
+[017/159] Running abstention_16... ❌ FAIL
+[018/159] Running abstention_17... ❌ FAIL
+[019/159] Running abstention_18... ❌ FAIL
+[020/159] Running abstention_19... ❌ FAIL
+[021/159] Running alias_res_pers_001_00... ❌ FAIL
+[022/159] Running alias_res_pers_002_01... ❌ FAIL
+[023/159] Running alias_res_pers_003_02... ✅ PASS
+[024/159] Running chronicle_00... ❌ FAIL
+[025/159] Running chronicle_01... ✅ PASS
+[026/159] Running fact_evol_tech_003_00... ✅ PASS
+[027/159] Running fact_evol_tech_007_01... ❌ FAIL
+[028/159] Running fact_evol_tech_025_02... 

@@ -122,14 +122,26 @@ async def run_case(client: httpx.AsyncClient, case: dict) -> CaseResult:
 
 async def run_cases(cases: list[dict], concurrency: int = 2) -> list[CaseScore]:
     semaphore = asyncio.Semaphore(concurrency)
+    total = len(cases)
+    print(f"\n[TIER 1] Starting execution of {total} cases...")
     
     async with httpx.AsyncClient() as client:
-        async def run_one(case: dict) -> CaseScore:
+        async def run_one(idx: int, case: dict) -> CaseScore:
             async with semaphore:
-                result = await run_case(client, case)
-                return score_case(result)
+                # Heartbeat: [001/159] Running test_id...
+                print(f"[{idx+1:03d}/{total:03d}] Running {case['test_id']}... ", end="", flush=True)
+                try:
+                    result = await run_case(client, case)
+                    score = score_case(result)
+                    status = "✅ PASS" if score.recall_on > 0 else "❌ FAIL"
+                    if score.error: status = f"⚠️ ERROR: {score.error[:20]}"
+                    print(status, flush=True)
+                    return score
+                except Exception as e:
+                    print(f"💥 CRASH: {str(e)[:30]}", flush=True)
+                    return CaseScore(test_id=case['test_id'], dimension=case['dimension'], error=str(e))
 
-        tasks = [run_one(c) for c in cases]
+        tasks = [run_one(i, c) for i, c in enumerate(cases)]
         scores = await asyncio.gather(*tasks)
 
     return list(scores)
