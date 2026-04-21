@@ -7,7 +7,7 @@ import os
 import hashlib
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 logger = logging.getLogger("GATEWAY.MEMORY")
 
@@ -164,13 +164,51 @@ class Hippocampus:
         items = [{"trace_id": m["trace_id"], "content": d, "timestamp": m["timestamp"], "activation": m["activation"]} for d, m in zip(res["documents"], res["metadatas"])]
         return sorted(items, key=lambda x: x["timestamp"])
 
-    def search(self, query: str, session_id: str = "default", room_id: str = None, limit: int = 5) -> List[str]:
+    def search(self, query: str, session_id: str = "default", room_id: str = None, limit: int = 10, include_distances: bool = False) -> Union[List[str], List[Dict[str, Any]]]:
         where = {"session_id": session_id}
         if room_id: where = {"$and": [{"session_id": session_id}, {"room_id": room_id}]}
         res = self.traces_col.query(query_texts=[query], n_results=limit, where=where)
-        if res and res["ids"] and len(res["ids"]) > 0:
-            return res["ids"][0]
-        return []
+        
+        if not res or not res["ids"] or len(res["ids"]) == 0:
+            return []
+            
+        ids = res["ids"][0]
+        if include_distances:
+            distances = res["distances"][0] if res.get("distances") else [0.0] * len(ids)
+            return [{"id": tid, "distance": d} for tid, d in zip(ids, distances)]
+        
+        return ids
+
+    def search_lexical(self, tokens: List[str], session_id: str = "default", limit: int = 10) -> List[str]:
+        """v1.12: Substring-based retrieval to ensure technical facts (IDs, Ports) are captured."""
+        results = set()
+        
+        # Path 1: ChromaDB $contains filter (efficient but strict)
+        for token in tokens:
+            if len(token) < 3: continue
+            try:
+                res = self.traces_col.get(
+                    where={"session_id": session_id},
+                    where_document={"$contains": token},
+                    limit=limit
+                )
+                if res and res["ids"]:
+                    results.update(res["ids"])
+            except: pass
+        
+        # Path 2: Brute-force substring match on recent history (Fallback for precision)
+        # If we still have room, scan the last 50 traces manually
+        if len(results) < limit:
+            recent = self.get_recent_traces(limit=50, session_id=session_id)
+            for row in recent:
+                content = str(row.get("raw_content", "")).upper()
+                for t in tokens:
+                    if t.upper() in content:
+                        results.add(row["trace_id"])
+                        break
+                if len(results) >= limit: break
+        
+        return list(results)[:limit]
 
     def upsert_fact(self, session_id: str, entity: str, key: str, value: str, trace_id: str = None) -> str:
         fid = f"{session_id}_{entity}_{key}".replace(" ", "_")

@@ -155,3 +155,41 @@ class Neocortex:
     def clear_summary(self, session_id: str):
         """P17 Management API: Clear Neocortex summary."""
         self.summary_col.delete(ids=[session_id])
+
+    async def verify_relevance(self, query: str, context_sample: str) -> bool:
+        """Phase 55: Cognitive Judge (v1.3). Verify if context truly addresses the query."""
+        instruction = (
+            "You are a Grounding Judge. Your task is to decide if the provided CONTEXT contains "
+            "facts that are actually relevant to the USER QUERY. "
+            "Ignore general similarity; look for factual utility.\n"
+            "Respond ONLY with 'YES' or 'NO'."
+        )
+        prompt = f"USER QUERY: {query}\n\nCONTEXT SAMPLE:\n{context_sample[:1000]}"
+        
+        try:
+            # Re-use the distillation infrastructure for speed
+            headers = {}
+            if self.api_key: headers["Authorization"] = f"Bearer {self.api_key}"
+            
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                if self.distill_provider == "ollama":
+                    url = f"{self.distill_url.rstrip('/')}/api/generate"
+                    resp = await client.post(url, headers=headers, json={
+                        "model": self.distill_model,
+                        "prompt": f"{instruction}\n\n{prompt}",
+                        "stream": False
+                    })
+                    result = resp.json().get("response", "").strip().upper()
+                else:
+                    url = f"{self.distill_url.rstrip('/')}/chat/completions"
+                    resp = await client.post(url, headers=headers, json={
+                        "model": self.distill_model,
+                        "messages": [{"role": "system", "content": instruction}, {"role": "user", "content": prompt}],
+                        "stream": False
+                    })
+                    result = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip().upper()
+                
+                return "YES" in result
+        except Exception as e:
+            # On error, default to True to avoid losing memory (fail-open)
+            return True

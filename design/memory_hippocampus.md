@@ -21,12 +21,16 @@ Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This 
   - If `len <= threshold`: set `is_blob=0`.
 - **ChromaDB Insert**: `traces_col.add(ids=[trace_id], documents=[search_text or raw_content], metadatas=[{...}])`.
 
-### 2.3 Semantic Vector Search (Phase 33)
+### 2.3 Semantic Vector Search (Phase 33 / v1.11 Update)
 - **Background**: Replaces legacy SQLite FTS5 with semantic recall.
-- **Method signature**: `search(query: str, session_id: str = "default") -> List[str]`
+- **Method signature**: `search(query: str, session_id: str = "default", limit: int = 10, include_distances: bool = False) -> Union[List[str], List[Dict[str, Any]]]`
 - **Implementation**:
-  `traces_col.query(query_texts=[query], n_results=10, where={"session_id": session_id})`
-- Returns a list of `trace_id`s (from `results["ids"][0]`).
+  `traces_col.query(query_texts=[query], n_results=limit, where={"session_id": session_id})`
+
+### 2.8 Hybrid Retrieval Support (v1.11)
+- **Lexical Search**: `search_lexical(tokens: List[str], session_id: str, limit: int = 10) -> List[str]`
+- **Implementation**: Uses ChromaDB's `where_document` filter with `$contains` or local iterative scanning of the `raw_content` index to ensure exact keyword matches (IDs, Ports, Tokens) are not lost by the vector model.
+- **Result**: Router will perform a Union of Semantic and Lexical paths.
 
 ### 2.4 Data Retrieval Interfaces
 - **`get_content(trace_id: str) -> Optional[str]`**: Retrieve from ChromaDB document or blob file.

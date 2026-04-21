@@ -216,30 +216,104 @@ class MemoryRouter:
             working_items = wm.get_active_items()
             working_contents = [it.content for it in working_items]
             
-            l2_ids = self.hippo.search(query, session_id, self._get_current_room(session_id))
-            if not l2_ids and query:
-                recent = self.hippo.get_recent_traces(limit=20, session_id=session_id)
-                l2_ids = [t["trace_id"] for t in recent if query.lower() in str(t["raw_content"]).lower()][:5]
+            # Phase 55: Universal Cognitive Filter (v1.22 - Density Gating)
+            # 1. Precise Intent Extraction
+            stop_words = {"what", "how", "when", "where", "which", "who", "whom", "this", "that", "these", "those", "does", "done", "list", "tell", "show", "concisely", "reply", "only", "about"}
+            query_words = re.findall(r'\b\w{3,}\b', query.lower())
+            core_subjects = [w for w in query_words if w not in stop_words and len(w) >= 4]
+            hard_anchors = set(re.findall(r'\b(?:[A-Z0-9_\-\.]{3,}|[A-Z][a-z]+[0-9]*)\b', query))
+            
+            def _is_constraint_satisfied(content: str, distance: float) -> tuple[bool, float]:
+                """Universal gate: Does this snippet SPECIFICALLY focus on the query subject?"""
+                content_lower = content.lower()
+                content_upper = content.upper()
+                
+                # Check 1: Hard Anchor match (Identity)
+                anchor_hits = sum(1 for a in hard_anchors if a.upper() in content_upper)
+                
+                # Check 2: Subject Density (Focus)
+                matched_subjects = sum(1 for s in core_subjects if s in content_lower)
+                subject_coverage = matched_subjects / len(core_subjects) if core_subjects else 1.0
+                
+                # Check 3: Semantic Proximity
+                similarity = max(0.0, 1.0 - distance)
+                
+                # --- UNIVERSAL ADMISSION RULES (v1.22) ---
+                is_ok = False
+                # Rule A: Hard Anchor match is always accepted
+                if anchor_hits > 0:
+                    is_ok = True
+                # Rule B: High-Density Subject match (>= 70% coverage)
+                elif subject_coverage >= 0.7:
+                    is_ok = True
+                # Rule C: Moderate Density (>= 50%) with reasonable similarity
+                elif subject_coverage >= 0.5 and similarity > 0.4:
+                    is_ok = True
+                # Rule D: Extreme Semantic parity (Fallback)
+                elif similarity > 0.8:
+                    is_ok = True
+                
+                score = (anchor_hits * 150.0) + (subject_coverage * 60.0) + (similarity * 15.0)
+                return is_ok, score
 
-            l2_contents = []
-            for tid in l2_ids:
+            # --- Unified Processing ---
+            sem_results = self.hippo.search(query, session_id, self._get_current_room(session_id), limit=25, include_distances=True)
+            lex_ids = self.hippo.search_lexical(list(hard_anchors) + core_subjects[:5], session_id, limit=25)
+            
+            candidate_map = {c["id"]: c["distance"] for c in sem_results}
+            for lid in lex_ids:
+                if lid not in candidate_map: candidate_map[lid] = 1.0 
+            
+            reranked_items = []
+            seen_contents = set()
+            for tid, distance in candidate_map.items():
                 p = self.hippo.get_full_payload(tid)
-                if p:
-                    # P47: Robust extraction for historical snippets
-                    msgs = p.get("messages", []) or p.get("stimulus", {}).get("messages", [])
-                    if not msgs and "reaction" in p:
-                        msgs = [{"role": "assistant", "content": p["reaction"].get("content", "")}]
-                    elif not msgs and p.get("stimulus", {}).get("content"): # Robustness for manual test plants
-                        msgs = [{"role": "user", "content": p["stimulus"]["content"]}]
-                        
-                    turn = [f"{m.get('role','user')}: {m.get('content','')}" for m in msgs]
-                    if turn:
-                        l2_contents.append(" | ".join(turn))
+                if not p: continue
+                msgs = p.get("messages", []) or p.get("stimulus", {}).get("messages", [])
+                content_str = " | ".join([f"{m.get('role','user')}: {m.get('content','')}" for m in msgs])
+                if content_str in seen_contents: continue 
+                
+                is_ok, score = _is_constraint_satisfied(content_str, distance)
+                if is_ok:
+                    reranked_items.append({"content": content_str, "score": score})
+                    seen_contents.add(content_str)
 
-            vault_results = self.vault_indexer.search(query, limit=3) if self.vault_indexer else []
+            reranked_items.sort(key=lambda x: x["score"], reverse=True)
+            l2_contents = [it["content"] for it in reranked_items]
+
+            # --- Vault (External Knowledge) ---
+            vault_results = []
+            if self.vault_indexer:
+                raw_vault = self.vault_indexer.search(query, limit=5)
+                for r in raw_vault:
+                    is_ok, score = _is_constraint_satisfied(r["content"], r.get("distance", 1.0))
+                    if is_ok:
+                        vault_results.append({"title": r["title"], "content": r["content"], "score": score})
+                vault_results.sort(key=lambda x: x["score"], reverse=True)
+
             potential_entities = re.findall(r'\b[A-Z][a-z0-9]+\b|\b[a-z0-9]+\.[a-z0-9]+\b', query or "")
             entity_facts = self.hippo.get_facts_for_entities(session_id, list(set(potential_entities)))
             
+            # Phase 55: Contextual Silence & Cognitive Verification (v1.23)
+            # 1. Heuristic Check
+            has_long_term_gain = any([l3_summary, entity_facts, vault_results, l2_contents])
+            if not has_long_term_gain:
+                return ""
+            
+            # 2. Cognitive Final Verification (The Judge)
+            # We pick the top signal from Hippo or Vault as a sample for the judge
+            sample_parts = []
+            if l3_summary: sample_parts.append(l3_summary)
+            if l2_contents: sample_parts.append(l2_contents[0])
+            if vault_results: sample_parts.append(vault_results[0]["content"])
+            
+            context_sample = "\n".join(sample_parts)
+            is_truly_relevant = await self.neo.verify_relevance(query, context_sample)
+            
+            if not is_truly_relevant:
+                logger.info(f"[ROUTER] Cognitive Judge rejected context for query: '{query}'")
+                return ""
+
             output_parts = []
             current_len = 0
             
@@ -249,15 +323,14 @@ class MemoryRouter:
                 if not contents: return
                 header_text = f"\n\n=== {header} ===\n"
                 
-                # Header safety: header_text + buffer (approx 20 chars)
                 if current_len + len(header_text) + 20 > max_chars:
                     return
 
                 section_lines = []
-                # Greedily add contents within budget
                 for it in contents:
-                    line = f"{prefix}{it}"
-                    # Check if adding this line + header + current total exceeds max_chars
+                    # Support for structured results (Vault uses dicts)
+                    content_val = it["content"] if isinstance(it, dict) else it
+                    line = f"{prefix}{content_val}"
                     potential_full = header_text + "\n".join(section_lines + [line])
                     if current_len + len(potential_full) <= max_chars:
                         section_lines.append(line)
@@ -269,20 +342,18 @@ class MemoryRouter:
                     output_parts.append(full_section)
                     current_len += len(full_section)
 
-            # Design v1.13 Priority: L3 -> L1 -> L2
-            if entity_facts: try_add("ENTITY REGISTRY (VERIFIED FACTS)", [f"{f['entity']} > {f['key']}: {f['value']}" for f in entity_facts])
+            # Design v1.14 Priority: L3 -> L1 -> Vault -> L2
             if l3_summary: try_add("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary])
-            if vault_results: try_add("EXTERNAL KNOWLEDGE (VAULT)", [f"# {r['title']}\n{r['content']}" for r in vault_results])
-            
-            # L1: Working Memory
             try_add("ACTIVE CONVERSATION (WORKING MEMORY)", working_contents)
+            
+            # Entities and Vault
+            if entity_facts: try_add("ENTITY REGISTRY (VERIFIED FACTS)", [f"{f['entity']} > {f['key']}: {f['value']}" for f in entity_facts])
+            if vault_results: try_add("EXTERNAL KNOWLEDGE (VAULT)", vault_results)
             
             # L2: Hippocampus (Episodic)
             try_add("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents, prefix="") 
 
-            if not output_parts: return ""
             coupling = "\n\n[COGNITIVE COUPLING]: Cross-reference above facts. Prioritize NEOCORTEX."
-            # Ensure coupling fits
             final_output = "[CLAWBRAIN MEMORY]" + "".join(output_parts)
             if len(final_output) + len(coupling) + 20 <= max_chars:
                 final_output += coupling

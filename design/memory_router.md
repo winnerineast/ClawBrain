@@ -71,5 +71,16 @@ Implement the **ClawBrain MemoryRouter** — the central memory hub that orchest
 - **`_hydrate` change**: First try `hippo.load_wm_state(session)` for an exact restore; fall back to the traces-rebuild path only if the snapshot is absent.
 - **`clear_summary` coupling**: `DELETE /v1/memory/{session_id}` also calls `hippo.clear_wm_state(session_id)` and evicts the in-memory WM instance, ensuring the management API semantically clears all layers.
 
+### 2.9 Hybrid Cognitive Retrieval (Phase 55 / v1.16)
+- **Concept**: Combine vector similarity (intuition) with keyword matching (precision).
+- **Multi-Path Retrieval**:
+  1. **Semantic Path**: Top-20 vector search.
+  2. **Lexical Path**: Top-20 keyword search (search items containing specific tokens from query).
+  3. **Index Path**: Search recent entities and verified facts.
+- **Fusion & Reranking**:
+  - Merge all candidates, keeping unique items.
+  - Scoring: `(Anchor Score * 150) + (Keyword Score * 30) + (Similarity * 10)`.
+  - Result: Even if a fact has 0.9 distance (semantic failure), it is saved by its 100% keyword resonance.
+
 ## 4. Output Targets
 - `src/memory/router.py`, `src/memory/storage.py`, `src/main.py`, `tests/test_p22_wm_persistence.py`.

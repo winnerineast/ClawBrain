@@ -156,9 +156,11 @@ class VaultIndexer:
         output = []
         if results["documents"] and results["documents"][0]:
             for i in range(len(results["documents"][0])):
+                # Default to 1.0 (neutral) if distance missing to avoid 'perfect match' hallucinations
+                dist = results["distances"][0][i] if (results.get("distances") and results["distances"][0]) else 1.0
                 output.append({
                     "content": results["documents"][0][i],
                     "title": results["metadatas"][0][i].get("file_path", "Unknown Note"),
-                    "distance": results["distances"][0][i] if "distances" in results else 0
+                    "distance": dist
                 })
         return output

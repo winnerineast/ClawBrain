@@ -27,6 +27,9 @@ class CaseScore:
     dimension: str
     recall_on: float = 0.0
     recall_off: float = 0.0
+    # Context preservation
+    addition_on: str = ""
+    addition_off: str = ""
     isolation_pass: bool = True
     budget_efficiency: float = 0.0
     latency_ms: float = 0.0

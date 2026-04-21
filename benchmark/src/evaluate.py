@@ -40,6 +40,9 @@ class CaseScore:
     # Tier 1
     recall_on: float = 0.0      # 1.0 if expected_output found in addition_on
     recall_off: float = 0.0
+    # Context preservation (v1.2)
+    addition_on: str = ""
+    addition_off: str = ""
     isolation_pass: bool = True
     budget_efficiency: float = 0.0
     latency_ms: float = 0.0
@@ -53,8 +56,10 @@ class CaseScore:
 
 
 def _normalize(text: str) -> str:
-    """Lowercase and strip non-alphanumeric noise for robust matching."""
-    return re.sub(r'[^a-z0-9]', '', text.lower())
+    """Lowercase and strip excessive noise while preserving technical symbols."""
+    # Keep alphanumeric plus common tech symbols: - . / _
+    cleaned = re.sub(r'[^a-z0-9\-\.\/\_]', '', text.lower())
+    return cleaned
 
 
 def _is_match(actual: str, expected: str) -> float:
@@ -88,16 +93,24 @@ def _isolation_check(text: str, forbidden: list[str]) -> bool:
 def score_case(result: CaseResult) -> CaseScore:
     s = CaseScore(test_id=result.test_id, dimension=result.dimension)
     s.error = result.error
+    s.addition_on = result.addition_on
+    s.addition_off = result.addition_off
 
     if result.error:
         return s
 
-    expected = result.expected_output
-
     # ── Abstention logic (v1.1) ──────────────────────────────────────────────
     if result.eval_type == "abstention":
-        # Tier 1 Pass: No context was injected for an unknown fact
-        s.recall_on = 1.0 if not result.addition_on.strip() else 0.0
+        # Tier 1 Pass: No LONG-TERM context was injected for an unknown fact.
+        # We strip out the WORKING MEMORY section robustly.
+        text = result.addition_on
+        # Remove L1 section (everything from the header until the next === header or end)
+        text = re.sub(r"=== ACTIVE CONVERSATION \(WORKING MEMORY\) ===.*?(?====|$)", "", text, flags=re.DOTALL)
+        
+        # Also strip the master header/footer
+        text = text.replace("[CLAWBRAIN MEMORY]", "").replace("[END CLAWBRAIN MEMORY]", "").strip()
+        
+        s.recall_on = 1.0 if not text else 0.0
         s.recall_off = 1.0 if not result.addition_off.strip() else 0.0
         
         # Tier 2 Pass: Model correctly says "I don't know"
@@ -109,29 +122,33 @@ def score_case(result: CaseResult) -> CaseScore:
         s.delta_t2 = s.response_recall_on - s.response_recall_off
         return s
 
-    # ── Tier 1 scoring ────────────────────────────────────────────────────────
-    # We check if the ground truth is present in the context addition
-    s.recall_on = _is_match(result.addition_on, expected)
-    s.recall_off = _is_match(result.addition_off, expected)
+    # ── Standard Fact-Aware Scoring (v1.17) ──────────────────────────────────
+    # We calculate how many of the 'must_contain' facts were actually found.
+    # This correctly handles multi_fact cases.
+    def calculate_coverage(actual_text: str, targets: list[str]) -> float:
+        if not targets: return 1.0
+        found = sum(1 for t in targets if _is_match(actual_text, t) > 0)
+        return found / len(targets)
+
+    # Tier 1
+    s.recall_on = calculate_coverage(result.addition_on, result.must_contain)
+    s.recall_off = calculate_coverage(result.addition_off, result.must_contain)
     s.delta_t1 = s.recall_on - s.recall_off
 
     # Phase 41: Targeted Isolation Check
     # Only check the HIPPOCAMPUS section for session leaks.
-    # VAULT is global and permitted to appear in any session.
     hippo_match = re.search(r"=== RELEVANT HISTORICAL SNIPPETS \(HIPPOCAMPUS\) ===(.*?)\n\n", result.addition_on, re.DOTALL)
     text_to_check = hippo_match.group(1) if hippo_match else result.addition_on
-    
     s.isolation_pass = _isolation_check(text_to_check, result.must_not_contain)
 
     if result.budget_chars > 0:
         s.budget_efficiency = result.chars_used / result.budget_chars
     s.latency_ms = result.latency_ms
 
-    # ── Tier 2 scoring ────────────────────────────────────────────────────────
-    # We check if the model's response matches the ground truth
+    # Tier 2
     if result.response_on:
-        s.response_recall_on = _is_match(result.response_on, expected)
-        s.response_recall_off = _is_match(result.response_off, expected)
+        s.response_recall_on = calculate_coverage(result.response_on, result.must_contain)
+        s.response_recall_off = calculate_coverage(result.response_off, result.must_contain)
         s.delta_t2 = s.response_recall_on - s.response_recall_off
 
     return s
