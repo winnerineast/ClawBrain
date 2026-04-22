@@ -41,7 +41,15 @@ ClawBrain is built on **Engineering Transparency**. We prove our claims with raw
 *   **ClawBrain Action**: Neocortex extracts granular "Thoughts" and maps them back to their original **Root Source** Interaction IDs.
 *   **Verified Result**: Context retrieval now includes high-level thoughts accompanied by their supporting raw evidence, ensuring perfect factual grounding.
 
-### 3. Rigid Budget Enforcement (Stack Math)
+### 3. 100% Passive Capture (No "Decisions" Required)
+*   **The Problem**: Models often forget to "save" important context during fast-paced sessions.
+*   **ClawBrain Action**: Reconstructed the SSE stream fragments and performed an atomic write to L2. No model-side tool calls required.
+
+### 4. Intent-Based Retrieval (Beyond Keyword Matching)
+*   **The Problem**: Searching for "database" misses notes written as "data store" or "Postgres."
+*   **ClawBrain Action**: Embedded **ChromaDB** vector store performs semantic search to find conceptually similar items even with zero keyword overlap.
+
+### 5. Rigid Budget Enforcement (Stack Math)
 *   **The Problem**: Over-injecting context causes the model to lose the "end" of your prompt.
 *   **Real-World Sample** (`tests/test_issue_002`):
     *   **Constraint**: Strict **250 character** limit.
@@ -49,14 +57,14 @@ ClawBrain is built on **Engineering Transparency**. We prove our claims with raw
     *   **ClawBrain Action**: Calculated that L2 Header (49) would bring total to 258.
     *   **Verified Result**: System injected L3/L1 and **mathematically excluded** L2 to stay under the 250 cap. **Zero prompt truncation.**
 
-### 4. Zero-Waste Vault Sync (The "Touch" Test)
+### 6. Zero-Waste Vault Sync (The "Touch" Test)
 *   **The Problem**: Re-indexing thousands of notes on every change is slow and expensive.
 *   **Real-World Sample** (`tests/test_p35`):
     *   **Input**: 100 Obsidian notes. Manually `touch`ed 4 files (changing timestamp only).
     *   **ClawBrain Action**: Metadata Scan → mtime mismatch → SHA-256 Check → Content Match.
     *   **Verified Result**: `0 embeddings updated`. 100% of compute cost was saved by recognizing the content hadn't changed.
 
-### 5. High-Pressure Stability (Dual-Channel Isolation)
+### 7. High-Pressure Stability (Dual-Channel Isolation)
 *   **The Problem**: Background tasks (distillation/scanning) shouldn't make your chat laggy.
 *   **Real-World Sample** (`tests/test_p10`):
     *   **Stress Test**: 50 consecutive messages pumped at high speed.

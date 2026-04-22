@@ -31,8 +31,28 @@ Implement the **ClawBrain MemoryRouter v2** — the central cognitive hub that o
   - `=== VERIFIED THOUGHTS (NEOCORTEX) ===`
   - `=== SUPPORTING EVIDENCE (ROOT SOURCES) ===`
   - `=== ACTIVE CONVERSATION (WORKING MEMORY) ===`
+- **Header Safety**: Before injecting a layer's content, the budget must be checked against the **header length plus a 20-character safety margin**. Exact lengths of headers, newlines, and truncation ellipses MUST be precisely deducted.
 
-## 3. Configuration & Resiliency
+## 3. Core Sub-Systems (Retained from v1.x)
+
+### 3.1 Dynamic Offload Threshold
+- The `ingest` method accepts `offload_threshold` (bytes); if provided it overrides the Hippocampus default.
+- High-volume payloads are automatically offloaded to the filesystem to keep ChromaDB performant.
+
+### 3.2 Per-session Working Memory Isolation (P18)
+- Memory is isolated via `self._wm_sessions: Dict[str, WorkingMemory] = {}`.
+- **Strict Separation**: Cross-session context contamination is prevented by filtering all Hippo/Neocortex queries by `session_id`.
+
+### 3.3 Exact Working Memory Persistence (P22)
+- WM state is persisted after every `ingest` to ensure the attention state (activations/timestamps) survives system restarts.
+- Reconstruction fallback: If a snapshot is missing, WM is rebuilt from the most recent interaction traces.
+
+### 3.4 Hybrid Cognitive Retrieval (L2 Fallback Path)
+- Combine vector similarity (intuition) with keyword matching (precision).
+- Candidates are fused and reranked using: `(Anchor Score * 150) + (Subject Coverage * 60) + (Similarity * 15)`.
+- This ensures technical facts (ports, IDs) are captured even when semantic distance is high.
+
+## 4. Configuration & Resiliency
 - **`CLAWBRAIN_HEARTBEAT_SECONDS`**: Interval for background processing.
 - **`CLAWBRAIN_JUDGE_TIMEOUT`**: (Deprecated for read-only path, kept for manual triggers) Timeout for cognitive judge.
 - **`CircuitBreaker`**: Protects the background heartbeat from LLM backend failures.
