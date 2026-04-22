@@ -1,4 +1,4 @@
-# design/memory_router.md v1.13 (Phase 32)
+# design/memory_router.md v1.14 (Phase 56)
 
 ## 1. Objective
 Implement the **ClawBrain MemoryRouter** — the central memory hub that orchestrates the three-layer memory system. It must provide an **Asynchronous Sequential Gate** to ensure that memory ingestion, distillation, and assembly for any given session occur in a consistent logical order without race conditions.
@@ -7,7 +7,7 @@ Implement the **ClawBrain MemoryRouter** — the central memory hub that orchest
 
 ### 2.1 Initialisation & Sub-module Mounting
 - **Constructor parameters**: `db_dir` (default: dynamic), `distill_threshold` (default 50).
-- **Sub-modules**: `Hippocampus`, `Neocortex`, `SignalDecomposer`.
+- **Sub-modules**: `Hippocampus`, `Neocortex`, `SignalDecomposer`, `VaultIndexer`.
 - **Per-session Registry**:
   - `self._wm_sessions: Dict[str, WorkingMemory] = {}`
   - `self._session_locks: Dict[str, asyncio.Lock] = {}` — **Phase 32: Per-session concurrency control**.
@@ -34,28 +34,29 @@ Implement the **ClawBrain MemoryRouter** — the central memory hub that orchest
 - Fetches the most recent `distill_threshold` traces for `session_id`; passes them to `neo.distill(session_id, traces)`.
 
 ### 2.4 Combined Context Retrieval (get_combined_context)
-- **Method signature**: `async def get_combined_context(session_id: str, current_focus: str) -> str`
-- **Logic (Phase 32)**:
+- **Method signature**: `async def get_combined_context(session_id: str, query: str) -> str`
+- **Logic (Phase 56)**:
   1. Acquire the lock for `session_id`: `async with self._get_session_lock(session_id):`. This ensures we don't read a summary or WM state while it is being updated by a parallel `ingest` or `distill` operation.
   2. Read `CLAWBRAIN_MAX_CONTEXT_CHARS` (default 2000).
-  3. Perform L3 -> L1 -> L2 greedy allocation (as defined in §2.6).
+  3. Perform L3 -> L1 -> Vault -> L2 greedy allocation (as defined in §2.6).
 
 ### 2.5 Dynamic Offload Threshold
 - The `ingest` method accepts `offload_threshold` (bytes); if provided it overrides the Hippocampus default.
 - **Verification**: Pass 1 MB data with `offload_threshold=500 KB`; verify offload triggers 100% of the time.
 
-### 2.6 Greedy Context Budget (P15 + Phase 29/30/31)
+### 2.6 Greedy Context Budget (P15 + Phase 29/30/31 + Phase 56)
 - **Background**: `get_combined_context` injected noisy strings and had sub-optimal layer priority.
 - **Env var `CLAWBRAIN_MAX_CONTEXT_CHARS`**: Default `2000`.
 - **Phase 29/30**: Neocortex silence and Plain-Text Hippocampus.
-- **Phase 31 (Context Budgeting v2)**: Re-prioritise layers to L3 -> L1 -> L2. Working Memory (L1) contains active attractor-driven context and is more critical for current turn focus than historical L2 snippets.
+- **Phase 31/56 (Context Budgeting v2)**: Re-prioritise layers to L3 -> L1 -> Vault -> L2. 
 - **Header Safety**: Before injecting a layer's content, the budget must be checked against the **header length plus a 20-character safety margin**. When appending content, the exact lengths of headers, newlines, and truncation ellipses (`...`) MUST be precisely deducted from the remaining character budget to prevent budget efficiency overruns (ISSUE-006).
 - **Priority greedy allocation** (highest value density first):
   1. **L3 Neocortex summary first**: If exists, inject header `=== SYSTEM MEMORY SUMMARY (NEOCORTEX) ===` followed by the summary.
   2. **L1 Working Memory next**: Check if `remaining > 60` (header + safety). If so, inject header `=== ACTIVE CONVERSATION (WORKING MEMORY) ===` and then as much of the active messages as possible.
-  3. **L2 Hippocampus last**: Check if `remaining > 70` (header + safety). If so, inject header `=== RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS) ===` and then append plain-text bullet points until budget exhausted.
+  3. **Ext Vault / Entities next**: If exists, inject header `=== EXTERNAL KNOWLEDGE (VAULT) ===` or `=== ENTITY REGISTRY ===` and append relevant facts.
+  4. **L2 Hippocampus last**: Check if `remaining > 70` (header + safety). If so, inject header `=== RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS) ===` and then append plain-text bullet points until budget exhausted.
 - **Output Format**: Separate sections with a single newline. If no layers have content, return an empty string.
-- **Log point**: `[CTX_BUDGET] Budget: N | Used(L3): N | Used(L1): N | Used(L2): N | Session: ctx`.
+- **Log point**: \`[CTX_BUDGET] Budget: N | Used(L3): N | Used(L1): N | Used(V): N | Used(L2): N | Session: ctx\`.
 
 ### 2.7 Per-session Working Memory Isolation (P18)
 - **Background**: A global `WorkingMemory` singleton shared across all sessions caused cross-session context contamination.

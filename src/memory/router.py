@@ -16,6 +16,7 @@ from src.memory.neocortex import Neocortex
 from src.memory.room_detector import RoomDetector
 from src.memory.vault_indexer import VaultIndexer
 from src.memory.signals import SignalDecomposer
+from src.memory.entities import EntityExtractor
 
 logger = logging.getLogger("GATEWAY.MEMORY.ROUTER")
 
@@ -41,13 +42,15 @@ class MemoryRouter:
     Rule 12: Unified session_id terminology enforced.
     """
     def __init__(self, db_dir: str, distill_url: str = None, distill_model: str = None, distill_provider: str = "ollama", 
-                 enable_room_detection: bool = True, distill_threshold: int = 10, enable_auto_scan: bool = True):
+                 enable_room_detection: bool = True, distill_threshold: int = 10, enable_auto_scan: bool = True,
+                 cb_max_failures: int = None, cb_backoff: int = None, judge_timeout: float = 2.0):
         self.db_dir = Path(db_dir)
         self.ready_event = asyncio.Event()
         self.hippo = None
         self.neo = None
         self.room_detector = None
         self.vault_indexer = None
+        self.entity_extractor = None
         
         self.distill_url = os.getenv("CLAWBRAIN_DISTILL_URL", distill_url or "http://127.0.0.1:11434")
         self.distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", distill_model or "gemma4:e4b")
@@ -63,8 +66,15 @@ class MemoryRouter:
         self._session_locks: Dict[str, asyncio.Lock] = {}
         self._last_injections: Dict[str, Any] = {}
         
-        self.cb_room = CircuitBreaker()
-        self.cb_distill = CircuitBreaker()
+        # P56: Configurable Circuit Breakers
+        self.cb_max_failures = int(os.getenv("CLAWBRAIN_CB_MAX_FAILURES", cb_max_failures or 3))
+        self.cb_backoff = int(os.getenv("CLAWBRAIN_CB_BACKOFF", cb_backoff or 60))
+        
+        self.cb_room = CircuitBreaker(max_failures=self.cb_max_failures, backoff_seconds=self.cb_backoff)
+        self.cb_distill = CircuitBreaker(max_failures=self.cb_max_failures, backoff_seconds=self.cb_backoff)
+        
+        # P56: Cognitive Judge Timeout
+        self.judge_timeout = float(os.getenv("CLAWBRAIN_JUDGE_TIMEOUT", judge_timeout))
         self.vault_path = os.getenv("CLAWBRAIN_VAULT_PATH")
         
         asyncio.create_task(self._async_init())
@@ -75,6 +85,7 @@ class MemoryRouter:
             self.hippo = Hippocampus(str(self.db_dir))
             self.neo = Neocortex(str(self.db_dir), self.distill_url, self.distill_model, self.distill_provider)
             self.room_detector = RoomDetector(url=self.distill_url, model=self.distill_model)
+            self.entity_extractor = EntityExtractor(url=self.distill_url, model=self.distill_model, provider=self.distill_provider)
             self.decomposer = SignalDecomposer()
             
             if self.vault_path:
@@ -156,6 +167,10 @@ class MemoryRouter:
             if self.enable_room_detection:
                 asyncio.create_task(self._auto_room_worker(session_id, search_text))
             
+            # Phase 56: Background Entity Extraction
+            if self.entity_extractor:
+                asyncio.create_task(self._auto_entity_worker(session_id, trace_id))
+            
             return trace_id
 
     async def _auto_room_worker(self, session_id: str, current_turn: str):
@@ -188,6 +203,10 @@ class MemoryRouter:
                 wm.add_item(WorkingMemoryItem(trace_id=trace_id, content=reaction_content))
             
             self.hippo.save_wm_state(session_id, wm.items)
+            
+            # Phase 56: Background Entity Extraction
+            if self.entity_extractor:
+                asyncio.create_task(self._auto_entity_worker(session_id, trace_id))
 
     async def orphan_turn(self, trace_id: str, payload: Dict[str, Any], error: str, session_id: str):
         await self.wait_until_ready()
@@ -308,7 +327,17 @@ class MemoryRouter:
             if vault_results: sample_parts.append(vault_results[0]["content"])
             
             context_sample = "\n".join(sample_parts)
-            is_truly_relevant = await self.neo.verify_relevance(query, context_sample)
+            try:
+                is_truly_relevant = await asyncio.wait_for(
+                    self.neo.verify_relevance(query, context_sample),
+                    timeout=self.judge_timeout
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"[ROUTER] Cognitive Judge timed out for query: '{query}'. Failing open.")
+                is_truly_relevant = True
+            except Exception as e:
+                logger.warning(f"[ROUTER] Cognitive Judge error: {e}. Failing open.")
+                is_truly_relevant = True
             
             if not is_truly_relevant:
                 logger.info(f"[ROUTER] Cognitive Judge rejected context for query: '{query}'")
@@ -368,6 +397,30 @@ class MemoryRouter:
             await self.neo.distill(session_id, [p for p in payloads if p])
             self.cb_distill.record_success()
         except Exception: self.cb_distill.record_failure()
+
+    async def _auto_entity_worker(self, session_id: str, trace_id: str):
+        """Background extraction of entities from a specific turn."""
+        try:
+            p = self.hippo.get_full_payload(trace_id)
+            if not p: return
+            
+            # Reconstruct dialogue for extraction
+            msgs = p.get("messages", []) or p.get("stimulus", {}).get("messages", [])
+            reaction = p.get("reaction")
+            if reaction:
+                msgs = msgs + [{"role": "assistant", "content": reaction.get("content", "")}]
+            
+            text = "\n".join([f"{m.get('role', 'user')}: {m.get('content', '')}" for m in msgs])
+            entities = await self.entity_extractor.extract_entities(text)
+            
+            for ent in entities:
+                entity = ent.get("entity")
+                key = ent.get("key")
+                val = ent.get("value")
+                if entity and key and val:
+                    self.hippo.upsert_fact(session_id, entity, key, val, trace_id=trace_id)
+        except Exception as e:
+            logger.warning(f"[ROUTER] Entity extraction worker fail: {e}")
 
     async def distill_session(self, session_id: str) -> str:
         await self._auto_distill_worker(session_id)

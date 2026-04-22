@@ -66,17 +66,21 @@ async def test_p34_room_prioritized_search(tmp_path):
     session_id = "search-test"
     
     # Manually plant traces in different rooms
-    router.hippo.save_trace("t1", {"stimulus": {"content": "FastAPI is for Python"}}, 
+    router.hippo.save_trace("t1", {"stimulus": {"messages": [{"role": "user", "content": "Backend: FastAPI is for Python"}]}}, 
                             search_text="backend info", session_id=session_id, room_id="backend")
-    router.hippo.save_trace("t2", {"stimulus": {"content": "Vue is for JS"}}, 
+    router.hippo.save_trace("t2", {"stimulus": {"messages": [{"role": "user", "content": "Frontend: Vue is for JS"}]}}, 
                             search_text="frontend info", session_id=session_id, room_id="frontend")
+    
+    # Mock Cognitive Judge for unit test
+    async def mock_verify(*args, **kwargs): return True
+    router.neo.verify_relevance = mock_verify
     
     # Case A: Current room is 'backend'
     router._current_rooms[session_id] = "backend"
-    context_a = await router.get_combined_context(session_id, "backend")
+    context_a = await router.get_combined_context(session_id, "backend python")
     assert "FastAPI" in context_a
     
     # Case B: Current room is 'frontend'
     router._current_rooms[session_id] = "frontend"
-    context_b = await router.get_combined_context(session_id, "frontend")
+    context_b = await router.get_combined_context(session_id, "frontend vue")
     assert "Vue" in context_b

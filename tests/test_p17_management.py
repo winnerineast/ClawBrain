@@ -151,7 +151,7 @@ def test_p17_internal_assemble_v1_v2(tmp_path):
         # 2. Simulate Plugin Assemble Call
         assemble_payload = {
             "session_id": "plugin_test",
-            "current_focus": "What language?",
+            "current_focus": "What codebase language?",
             "token_budget": 500
         }
         resp = client.post("/internal/assemble", json=assemble_payload)

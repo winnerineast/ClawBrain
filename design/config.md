@@ -24,6 +24,10 @@ Enable **hot-reload** of the ClawBrain provider registry via environment variabl
   `[SESSION] No session header — using 'default'. Set 'x-clawbrain-session' for isolation.`
 - This is a warning log only; the request is not blocked.
 
+### 2.4 Cognitive Circuit Breaker (Env-Var Injection)
+- **`CLAWBRAIN_CB_MAX_FAILURES`**: Integer (default: 3). Maximum failures before opening the circuit for background cognitive tasks (Room Detection, Distillation).
+- **`CLAWBRAIN_CB_BACKOFF`**: Integer (default: 60). Seconds to wait before attempting to close the circuit after a failure threshold is reached.
+
 ## 3. Test Specification (TDD)
 
 ### 3.1 Env-Var Injection Validation
