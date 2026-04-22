@@ -11,7 +11,9 @@ from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse, HTMLResponse
 from starlette.responses import Response
+from starlette.types import Scope, Receive, Send
 
+from starlette.routing import Route
 from src.scout import ModelScout, ModelTier
 from src.memory.router import MemoryRouter
 from src.gateway.registry import ProviderRegistry
@@ -72,7 +74,7 @@ async def lifespan(app: FastAPI):
         await app.state.memory_router.wait_until_ready()
         
         app.state.mcp_server = create_mcp_server(app.state.memory_router)
-        app.state.mcp_sse = SseServerTransport("messages")
+        app.state.mcp_sse = SseServerTransport("/mcp/messages")
         
         app.state.engine_state = EngineState.READY
         logger.info("[INIT] Cognitive plane fully stabilized. State: READY")
@@ -111,7 +113,12 @@ def prepare_upstream_headers(raw_headers: Dict[str, str], provider_config: Any, 
         else:
             upstream_headers["Authorization"] = f"Bearer {provider_config.api_key}"
     elif client_auth:
-        upstream_headers["Authorization"] = client_auth
+        if target_protocol == "anthropic":
+            # Strip "Bearer " prefix if provided by client (Issue #25)
+            clean_key = client_auth.replace("Bearer ", "").replace("bearer ", "").strip()
+            upstream_headers["x-api-key"] = clean_key
+        else:
+            upstream_headers["Authorization"] = client_auth
 
     return upstream_headers
 
@@ -245,6 +252,30 @@ async def ingest_v1(request: Request):
     tid = await mr.ingest(stimulus, session_id=session_id)
     return {"trace_id": tid, "status": "ingested"}
 
+class MCPASGIBase:
+    def __init__(self, handler_name: str):
+        self.handler_name = handler_name
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        app = scope["app"]
+        if app.state.engine_state != EngineState.READY:
+            res = Response(f"Memory engine is {app.state.engine_state.value}", status_code=503)
+            await res(scope, receive, send)
+            return
+            
+        if self.handler_name == "sse":
+            logger.info("[MCP] SSE connection initiated.")
+            async with app.state.mcp_sse.connect_sse(scope, receive, send) as (read_stream, write_stream):
+                await app.state.mcp_server.run(
+                    read_stream,
+                    write_stream,
+                    app.state.mcp_server.create_initialization_options()
+                )
+        elif self.handler_name == "messages":
+            await app.state.mcp_sse.handle_post_message(scope, receive, send)
+
+app.router.routes.insert(0, Route("/mcp/sse", MCPASGIBase("sse"), methods=["GET"]))
+app.router.routes.insert(1, Route("/mcp/messages", MCPASGIBase("messages"), methods=["POST"]))
+
 @app.post("/{path:path}")
 async def gateway_relay(path: str, request: Request):
     check_ready(request.app)
@@ -289,14 +320,3 @@ async def gateway_relay(path: str, request: Request):
     except Exception as e:
         await mr.orphan_turn(trace_id, body, str(e), session_id=session_id)
         raise HTTPException(status_code=502, detail=str(e))
-
-async def mcp_router(scope, receive, send):
-    app, path = scope["app"], scope["path"]
-    if app.state.engine_state != EngineState.READY: return
-    if path == "/mcp/sse":
-        async with app.state.mcp_sse.connect_sse(scope, receive, send) as (r_str, w_str):
-            await app.state.mcp_server.run(r_str, w_str, app.state.mcp_server.create_initialization_options())
-    elif path == "/mcp/messages": 
-        await app.state.mcp_sse.handle_post_message(scope, receive, send)
-
-app.mount("/mcp", mcp_router)

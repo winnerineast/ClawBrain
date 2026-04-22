@@ -1,17 +1,18 @@
-# Generated from design/memory_router.md v1.10
+# Generated from design/memory_router.md v1.10 / v0.2.1
 import pytest
 import os
 import shutil
 import asyncio
 import time
 import httpx
+import random
 from src.memory.router import MemoryRouter
 from src.memory.storage import clear_chroma_clients
 
 async def is_ollama_ready():
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:11434/api/tags", timeout=2.0)
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get("http://127.0.0.1:11434/api/tags")
             return resp.status_code == 200
     except:
         return False
@@ -19,53 +20,58 @@ async def is_ollama_ready():
 @pytest.mark.asyncio
 async def test_p10_auto_distill_trigger_audit(tmp_path):
     """
-    实测态度：验证异步提纯。
-    无限轮询，直到 LLM 完成冷启动并生成摘要。
+    v0.2.1: Real-world Stress Test (LLM Optimized).
+    Pumping 15 turns of varied development dialogue.
     """
     if not await is_ollama_ready():
-        pytest.skip("Ollama is not running on 127.0.0.1:11434. Skipping real distillation test.")
+        pytest.skip("Ollama is not running. Skipping stress test.")
 
     clear_chroma_clients()
     test_dir = str(tmp_path)
-    
-    # 显式使用较快的模型 qwen2.5:latest 
-    router = MemoryRouter(db_dir=test_dir, distill_threshold=50, 
+
+    # Threshold set to 10 to ensure we trigger dirty state with 15 messages
+    router = MemoryRouter(db_dir=test_dir, distill_threshold=10,
                           distill_model="qwen2.5:latest", enable_room_detection=False)
-    
-    # Phase 36: Synchronize with background initialization
     await router.wait_until_ready()
+
+    session_id = "marathon_real_world"
     
-    threshold = router.distill_threshold
-    session_id = "marathon_audit"
-    print(f"\n[MARATHON TRIGGER TEST] Pumping {threshold} messages into session: {session_id}...")
+    # ── HIGH-FIDELITY TEST DATASET ──
+    topics = [
+        "Backend: We chose FastAPI with Python 3.12.",
+        "Database: Production DB moved to 10.0.5.20 (Postgres 15).",
+        "Frontend: User prefers Tailwind CSS over Bootstrap.",
+        "Infrastructure: Kubernetes cluster is running on version 1.28.",
+        "Team: Alice is the lead architect.",
+    ]
     
-    for i in range(threshold):
+    print(f"\n[MARATHON TEST] Pumping 15 turns of dialogue...")
+    
+    for i in range(15):
+        content = topics[i % len(topics)]
         await router.ingest({
-            "messages": [{"role": "user", "content": f"Fact #{i}: The system component {i} is verified."}]
-        }, session_id=session_id, sync_distill=False)
+            "messages": [{"role": "user", "content": f"Turn {i}: {content}"}]
+        }, session_id=session_id)
+
+    # ── THE BREATHE TRIGGER ──
+    print("Ingestion complete. Triggering brain processing cycle...")
+    # Triggering breathe manually
+    await router.breathe()
     
-    # ── 关键变更：无限轮询 ──
-    print("Ingestion complete. Waiting for Neocortex summary (NC_DIST) to appear...")
+    # v0.2.1: Give the LLM some time to finish the distill call which was triggered by breathe
+    # Even though breathe awaits _auto_distill_worker, let's be safe.
+    await asyncio.sleep(2.0)
     
-    start_time = time.time()
-    summary_text = None
+    # ── VERIFICATION ──
+    # Check for Distilled Thoughts (Semantic insights)
+    res = router.hippo.thoughts_col.get(where={"session_id": session_id})
     
-    while True:
-        elapsed = int(time.time() - start_time)
-        print(f"  > Polling... ({elapsed}s elapsed)")
-        res = router.neo.summary_col.get(ids=[session_id])
-        if res and res["documents"]:
-            summary_text = res["documents"][0]
-            if not summary_text.startswith("[Error]"):
-                print(f"Success! Summary detected after {elapsed}s.")
-                break
+    print(f"\n[STRESS TEST AUDIT]")
+    print("-" * 50)
+    print(f"Total Thoughts Found: {len(res['documents'])}")
+    for i, doc in enumerate(res['documents']):
+        print(f"Thought {i+1}: {doc[:100]}...")
         
-        # Safety break for absolute hung state (e.g. 10 mins) to prevent CI bill explosion
-        if elapsed > 600:
-            pytest.fail("AUDIT FAIL: No summary record found even after 10 minutes.")
-            
-        await asyncio.sleep(5.0) 
+    assert len(res['documents']) > 0, "Brain failed to generate thoughts. Check LLM logs."
     
-    print(f"\n[DATABASE PENETRATION AUDIT SUCCESS]")
-    assert len(summary_text) > 10
-    assert not summary_text.startswith("[Error]")
+    await router.aclose()

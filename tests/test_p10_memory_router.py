@@ -9,20 +9,20 @@ TEST_DIR = os.path.join(PROJECT_ROOT, "tests/data/p10_load_tmp")
 
 @pytest.mark.asyncio
 async def test_p10_dynamic_offload_audit():
-    """验证：基于模型窗口动态触发磁盘分流"""
+    """Audit: Verify dynamic disk offloading based on model context window limits."""
     if os.path.exists(TEST_DIR): shutil.rmtree(TEST_DIR)
     router = MemoryRouter(db_dir=TEST_DIR)
     await router.wait_until_ready()
     
-    # 模拟一个 10KB 的输入
+    # Simulate a 10KB input
     data = "X" * 10240
     payload = {"messages": [{"role": "user", "content": data}]}
     
-    # 场景 1：如果模型窗口很大 (100KB)，不应触发分流
+    # Case 1: If model window is large (100KB), no offload should trigger
     await router.ingest(payload, offload_threshold=102400)
     blob_count_1 = len(list(os.listdir(os.path.join(TEST_DIR, "blobs"))))
     
-    # 场景 2：如果模型窗口很小 (5KB)，必须触发分流
+    # Case 2: If model window is small (5KB), offload must trigger
     await router.ingest(payload, offload_threshold=5120)
     blob_count_2 = len(list(os.listdir(os.path.join(TEST_DIR, "blobs"))))
     
@@ -35,14 +35,14 @@ async def test_p10_dynamic_offload_audit():
 
 @pytest.mark.asyncio
 async def test_p10_cognitive_load_trigger():
-    """验证：认知负荷（整合周期）触发"""
+    """Audit: Verify trigger for cognitive load (integration cycle)."""
     router = MemoryRouter(db_dir=TEST_DIR, distill_threshold=3)
     await router.wait_until_ready()
     
     print("\n[AUDIT: Cognitive Load]")
-    # 连续发送 3 条消息，触发一个周期
+    # Send 3 messages consecutively to trigger one cycle
     for i in range(3):
         await router.ingest({"messages": [{"role": "user", "content": f"msg {i}"}]})
     
-    # 检查控制台输出 [MEMORY_DYNAMIC] (通过 pytest 捕获验证)
-    # 此处逻辑已在 test_p10_auto_trigger 中通过，此处为全链路确认
+    # Check console output for [MEMORY_DYNAMIC] (verified via pytest capture)
+    # Logic already verified in test_p10_auto_trigger; this is for full-chain confirmation.

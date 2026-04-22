@@ -1,4 +1,4 @@
-# Generated from design/memory_router.md v1.13 / GEMINI.md Rule 12
+# Generated from design/memory_router.md v1.21 / GEMINI.md Rule 12
 import uuid
 import json
 import os
@@ -44,7 +44,7 @@ class MemoryRouter:
     def __init__(self, db_dir: str, distill_url: str = None, distill_model: str = None, distill_provider: str = "ollama", 
                  enable_room_detection: bool = True, distill_threshold: int = 10, enable_auto_scan: bool = True,
                  cb_max_failures: int = None, cb_backoff: int = None, judge_timeout: float = 2.0,
-                 heartbeat_interval: int = None):
+                 heartbeat_interval: int = None, enable_cognitive_plane: bool = True):
         self.db_dir = Path(db_dir)
         self.ready_event = asyncio.Event()
         self.hippo = None
@@ -52,6 +52,7 @@ class MemoryRouter:
         self.room_detector = None
         self.vault_indexer = None
         self.entity_extractor = None
+        self.enable_cognitive_plane = enable_cognitive_plane
         
         self.distill_url = os.getenv("CLAWBRAIN_DISTILL_URL", distill_url or "http://127.0.0.1:11434")
         self.distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", distill_model or "gemma4:e4b")
@@ -90,18 +91,19 @@ class MemoryRouter:
         try:
             logger.info("[COGNITIVE] Establishing long-term memory engine...")
             self.hippo = Hippocampus(str(self.db_dir))
-            self.neo = Neocortex(str(self.db_dir), self.distill_url, self.distill_model, self.distill_provider)
+            self.neo = Neocortex(str(self.db_dir), self.distill_url, self.distill_model, self.distill_provider, hippo=self.hippo)
             self.room_detector = RoomDetector(url=self.distill_url, model=self.distill_model)
             self.entity_extractor = EntityExtractor(url=self.distill_url, model=self.distill_model, provider=self.distill_provider)
             self.decomposer = SignalDecomposer()
             
             if self.vault_path:
                 self.vault_indexer = VaultIndexer(self.vault_path, self.db_dir, client=self.hippo.client)
-                if self.enable_auto_scan:
+                if self.enable_auto_scan and self.enable_cognitive_plane:
                     asyncio.create_task(self._vault_scan_loop())
             
             # v0.2: Start the background heartbeat
-            asyncio.create_task(self._cognitive_heartbeat_loop())
+            if self.enable_cognitive_plane:
+                asyncio.create_task(self._cognitive_heartbeat_loop())
                 
             logger.info("[COGNITIVE] Intelligence layer stabilized.")
         except Exception as e:
@@ -324,7 +326,7 @@ class MemoryRouter:
 
             # 5. L2 Fallback (Only if no high-level gains found)
             l2_contents = []
-            if not thoughts and not entity_facts:
+            if not thoughts and not entity_facts and not vault_results:
                 sem_results = self.hippo.search(query, session_id, self._get_current_room(session_id), limit=25, include_distances=True)
                 lex_ids = self.hippo.search_lexical(list(hard_anchors) + core_subjects[:5], session_id, limit=25)
                 
@@ -350,7 +352,7 @@ class MemoryRouter:
                 l2_contents = [it["content"] for it in reranked_items]
 
             # Phase 55: Contextual Silence (v1.23)
-            has_long_term_gain = any([thoughts, entity_facts, vault_results, l2_contents])
+            has_long_term_gain = any([thoughts, l3_summary, entity_facts, vault_results, l2_contents])
             if not has_long_term_gain:
                 return ""
             
@@ -368,6 +370,7 @@ class MemoryRouter:
                     return
 
                 section_lines = []
+                is_truncated = False
                 for it in contents:
                     # Support for structured results (Vault uses dicts)
                     content_val = it["content"] if isinstance(it, dict) else it
@@ -376,9 +379,12 @@ class MemoryRouter:
                     if current_len + len(potential_full) <= max_chars:
                         section_lines.append(line)
                     else:
+                        is_truncated = True
                         break
                 
                 if section_lines:
+                    if is_truncated:
+                        section_lines.append(f"{prefix}...")
                     full_section = header_text + "\n".join(section_lines)
                     output_parts.append(full_section)
                     current_len += len(full_section)
@@ -409,14 +415,23 @@ class MemoryRouter:
             return final_output + "\n[END CLAWBRAIN MEMORY]"
 
     async def _auto_distill_worker(self, session_id: str):
-        if self.cb_distill.is_open(): return
+        if self.cb_distill.is_open(): 
+            logger.debug(f"[DISTILL] Circuit breaker open for {session_id}")
+            return
         try:
             recent = self.hippo.get_recent_traces(limit=50, session_id=session_id)
-            if not recent: return
-            payloads = [self.hippo.get_full_payload(t["trace_id"]) for t in recent if t]
-            await self.neo.distill(session_id, [p for p in payloads if p])
+            if not recent: 
+                logger.debug(f"[DISTILL] No recent traces for {session_id}")
+                return
+            
+            # recent already contains [{"trace_id": "...", "payload": {...}, ...}]
+            logger.debug(f"[DISTILL] Distilling {len(recent)} traces for {session_id}.")
+            res = await self.neo.distill(session_id, recent)
+            logger.debug(f"[DISTILL] Neocortex.distill result: {res}")
             self.cb_distill.record_success()
-        except Exception: self.cb_distill.record_failure()
+        except Exception as e: 
+            logger.error(f"[DISTILL] Exception: {e}")
+            self.cb_distill.record_failure()
 
     async def _auto_entity_worker(self, session_id: str, trace_id: str):
         """Background extraction of entities from a specific turn."""
@@ -466,12 +481,12 @@ class MemoryRouter:
             logger.info(f"[BREATHE] Processing {len(to_process)} pending extractions.")
             for sid, tid in to_process:
                 await self._auto_entity_worker(sid, tid)
-                await asyncio.sleep(0.01) # Tiny gap
-        
+                await asyncio.sleep(0.5) # Breather to avoid LLM overload
         # 2. Process dirty sessions (Distillation)
         if self._dirty_sessions:
             to_distill = list(self._dirty_sessions)
             self._dirty_sessions.clear()
+            logger.debug(f"[BREATHE] Distilling dirty sessions: {to_distill}")
             for sid in to_distill:
                 logger.info(f"[BREATHE] Distilling session: {sid}")
                 await self._auto_distill_worker(sid)
@@ -490,6 +505,7 @@ class MemoryRouter:
                 
                 self._nudge_event.clear()
                 await self.breathe()
+                await asyncio.sleep(0) # Yield control
                         
             except asyncio.CancelledError:
                 break

@@ -9,7 +9,7 @@ load_dotenv()
 logger = logging.getLogger("GATEWAY")
 
 class ProviderConfig:
-    def __init__(self, name: str, base_url: str, protocol: str, api_key: str = ""):
+    def __init__(self, name: str, base_url: str, protocol: str = "openai", api_key: str = None):
         self.name = name
         self.base_url = base_url
         self.protocol = protocol
@@ -17,68 +17,69 @@ class ProviderConfig:
 
 class ProviderRegistry:
     """
-    智能路由注册表。支持环境变量热扩展。
+    Intelligent Routing Registry. Supports hot extensions via environment variables.
     """
     def __init__(self):
-        self.providers: Dict[str, ProviderConfig] = {
-            "ollama":      ProviderConfig("ollama",      "http://127.0.0.1:11434",                    "ollama"),
-            "lmstudio":    ProviderConfig("lmstudio",    "http://127.0.0.1:1234",                     "openai"),
-            "openai":      ProviderConfig("openai",      "https://api.openai.com",                    "openai"),
-            "deepseek":    ProviderConfig("deepseek",    "https://api.deepseek.com",                  "openai"),
-            "anthropic":   ProviderConfig("anthropic",   "https://api.anthropic.com",                 "anthropic"),
-            "google":      ProviderConfig("google",      "https://generativelanguage.googleapis.com", "google"),
-            "mistral":     ProviderConfig("mistral",     "https://api.mistral.ai",                    "openai"),
-            "xai":         ProviderConfig("xai",         "https://api.xai.com",                       "openai"),
-            "openrouter":  ProviderConfig("openrouter",  "https://openrouter.ai/api",                 "openai"),
-            "together":    ProviderConfig("together",    "https://api.together.xyz",                  "openai"),
-        }
+        # Phase 16: Environment Variable Provider Extensions
+        extra_providers_json = os.getenv("CLAWBRAIN_EXTRA_PROVIDERS", "{}")
+        try:
+            extra_providers = json.loads(extra_providers_json)
+        except:
+            logger.warning("[REGISTRY] Malformed CLAWBRAIN_EXTRA_PROVIDERS. Using defaults.")
+            extra_providers = {}
 
+        self.providers = {
+            "openai": ProviderConfig("openai", "https://api.openai.com/v1", "openai"),
+            "anthropic": ProviderConfig("anthropic", "https://api.anthropic.com/v1", "anthropic"),
+            "google": ProviderConfig("google", "https://generativelanguage.googleapis.com/v1beta", "google"),
+            "ollama": ProviderConfig("ollama", "http://127.0.0.1:11434", "ollama"),
+            "lmstudio": ProviderConfig("lmstudio", "http://127.0.0.1:1234/v1", "openai"),
+            "mistral": ProviderConfig("mistral", "https://api.mistral.ai/v1", "openai"),
+            "together": ProviderConfig("together", "https://api.together.xyz/v1", "openai"),
+            "deepseek": ProviderConfig("deepseek", "https://api.deepseek.com", "openai"),
+        }
+        
+        # Inject extra providers
+        for name, config in extra_providers.items():
+            self.providers[name] = ProviderConfig(
+                name, 
+                config.get("base_url"), 
+                config.get("protocol", "openai"),
+                config.get("api_key")
+            )
+
+        # Phase 16: Environment Variable Local Model Whitelist
+        extra_models_json = os.getenv("CLAWBRAIN_LOCAL_MODELS", "{}")
+        try:
+            extra_models = json.loads(extra_models_json)
+        except:
+            logger.warning("[REGISTRY] Malformed CLAWBRAIN_LOCAL_MODELS. Using defaults.")
+            extra_models = {}
+
+        # Default local models (no prefix needed)
         self.known_no_prefix_models = {
-            "gemma4:e4b":      "ollama",
-            "gemma4:31b":      "ollama",
-            "qwen2.5:latest":  "ollama",
+            "gemma4:e4b": "ollama",
+            "gemma4:31b": "ollama",
+            "qwen2.5:latest": "ollama",
+            "llama3:8b": "ollama",
+            "deepseek-chat": "deepseek",
         }
-
-        # P16: 环境变量扩展提供商
-        extra_providers_json = os.getenv("CLAWBRAIN_EXTRA_PROVIDERS")
-        if extra_providers_json:
-            try:
-                extras = json.loads(extra_providers_json)
-                for name, cfg in extras.items():
-                    self.providers[name] = ProviderConfig(
-                        name,
-                        cfg["base_url"],
-                        cfg.get("protocol", "openai")
-                    )
-                logger.info(f"[REGISTRY] Loaded {len(extras)} extra provider(s) from env.")
-            except Exception as e:
-                logger.warning(f"[REGISTRY] CLAWBRAIN_EXTRA_PROVIDERS parse failed: {e}")
-
-        # P16: 环境变量扩展本地模型白名单
-        extra_models_json = os.getenv("CLAWBRAIN_LOCAL_MODELS")
-        if extra_models_json:
-            try:
-                extra_models = json.loads(extra_models_json)
-                self.known_no_prefix_models.update(extra_models)
-                logger.info(f"[REGISTRY] Loaded {len(extra_models)} extra local model(s) from env.")
-            except Exception as e:
-                logger.warning(f"[REGISTRY] CLAWBRAIN_LOCAL_MODELS parse failed: {e}")
-
-    def get_provider(self, name: str) -> ProviderConfig:
-        return self.providers.get(name, self.providers["openai"])
+        self.known_no_prefix_models.update(extra_models)
 
     def resolve_provider(self, full_model_name: str) -> Tuple[Optional[str], Optional[ProviderConfig]]:
-        # 1. 显式前缀匹配
+        """
+        Map a model name to its target provider.
+        """
+        # 1. Explicit Prefix Matching
         if "/" in full_model_name:
-            prefix = full_model_name.split("/")[0].lower()
-            if prefix in self.providers:
-                return prefix, self.providers[prefix]
-            return None, None
+            p_name = full_model_name.split("/")[0]
+            if p_name in self.providers:
+                return p_name, self.providers[p_name]
 
-        # 2. 本地白名单
+        # 2. Local Whitelist
         if full_model_name in self.known_no_prefix_models:
             p_name = self.known_no_prefix_models[full_model_name]
             return p_name, self.providers[p_name]
 
-        # 3. 无匹配 → 501
+        # 3. No Match -> 501
         return None, None

@@ -21,8 +21,8 @@ def visual_audit(test_name, input_desc, target_prov, actual_status):
 @pytest.mark.asyncio
 @respx.mock
 async def test_universal_routing_lmstudio():
-    """验证 /v1/chat/completions 输入，被正确翻译并路由到 lmstudio"""
-    # 彻底隔离：关闭 Room Detection 以防产生背景流量干扰
+    """Verify that /v1/chat/completions input is correctly translated and routed to LM Studio."""
+    # Strict isolation: Disable Room Detection to prevent background traffic interference
     import os
     os.environ["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
     
@@ -31,7 +31,7 @@ async def test_universal_routing_lmstudio():
         "messages": [{"role": "user", "content": "Hello"}]
     }
     
-    # 精准拦截：只拦截发往 LMStudio 的请求
+    # Precise interception: Only capture requests directed to LM Studio
     route = respx.post("http://127.0.0.1:1234/v1/chat/completions").mock(
         return_value=Response(200, json={"choices": [{"message": {"content": "mock"}}]})
     )
@@ -47,7 +47,7 @@ async def test_universal_routing_lmstudio():
 @pytest.mark.asyncio
 @respx.mock
 async def test_universal_routing_ollama():
-    """验证 /api/chat 输入，被路由到默认 ollama"""
+    """Verify that /api/chat input is correctly routed to default Ollama."""
     import os
     os.environ["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
     
@@ -57,7 +57,7 @@ async def test_universal_routing_ollama():
         "options": {"temperature": 0.5}
     }
     
-    # 精准拦截：只拦截发往 Ollama 的请求
+    # Precise interception: Only capture requests directed to Ollama
     route = respx.post("http://127.0.0.1:11434/api/chat").mock(
         return_value=Response(200, json={"message": {"content": "mock"}})
     )

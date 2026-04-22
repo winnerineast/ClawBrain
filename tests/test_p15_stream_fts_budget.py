@@ -18,10 +18,10 @@ def visual_audit(test_name, description, expected, actual):
     print(f"MATCH: {match}")
     print("=" * 70)
 
-# ── P15-A: FTS 降级回退 (Now ChromaDB Semantic Search) ──────────────────
+# --- P15-A: FTS Fallback (Now ChromaDB Semantic Search) ---
 
 def test_p15_fts_exact_phrase_match(tmp_path):
-    """Level 1：精确短语能命中时直接返回 (Top Match in Semantic)"""
+    """Level 1: Return direct match if exact phrase hits (Top Match in Semantic)."""
     clear_chroma_clients()
     hp = Hippocampus(db_dir=str(tmp_path))
     hp.save_trace("t1", {"x": 1}, search_text="CANARY-EXACT-MATCH")
@@ -34,46 +34,46 @@ def test_p15_fts_exact_phrase_match(tmp_path):
     assert results[0] == "t1"
 
 def test_p15_fts_keyword_fallback(tmp_path):
-    """Level 2：短语无法命中时，关键词 AND 回退能召回 (Semantic context match)"""
+    """Level 2: Semantic recall works via keyword match if exact phrase fails."""
     clear_chroma_clients()
     hp = Hippocampus(db_dir=str(tmp_path))
-    # 存入包含多关键词的内容
+    # Store content with multiple keywords
     hp.save_trace("t3", {"x": 3}, search_text="fastapi database migration guide")
     hp.save_trace("t4", {"x": 4}, search_text="unrelated content here")
 
-    # 用自然语言查询（不会精确命中，但关键词应该匹配）
+    # Query with natural language (won't hit exactly, but keywords should match)
     results = hp.search("fastapi migration")
     visual_audit("FTS Level 2 (Keyword Fallback)", "Natural language query", True, len(results) > 0)
     assert len(results) > 0
     assert "t3" in results
 
 def test_p15_fts_empty_query_safe(tmp_path):
-    """空 query 不抛异常，返回空列表"""
+    """Empty query should return an empty list without raising exceptions."""
     clear_chroma_clients()
     hp = Hippocampus(db_dir=str(tmp_path))
     results = hp.search("")
     visual_audit("FTS Empty Query Safety", "Empty string input", "[]", str(results))
     assert results == []
 
-# ── P15-B: Context 预算控制 ────────────────────────────────────────────────
+# --- P15-B: Context Budget Control ---
 
 @pytest.mark.asyncio
 async def test_p15_context_budget_enforced(tmp_path):
-    """注入内容不超过 MAX_CONTEXT_CHARS 上限"""
+    """Injected content must not exceed MAX_CONTEXT_CHARS limit."""
     clear_chroma_clients()
     os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "500"
 
     router = MemoryRouter(db_dir=str(tmp_path))
     await router.wait_until_ready()
 
-    # 塞入大量内容
+    # Fill with large amount of content
     for i in range(10):
         await router.ingest({
             "messages": [{"role": "user", "content": f"Long message content number {i} " * 20}]
         }, session_id="test-session")
 
     context = await router.get_combined_context("test-session", "long message content")
-    # 加上固定 header 的字符，允许一定溢出（header ~150 chars）
+    # Buffer allowed for headers (~150 chars)
     visual_audit(
         "Context Budget Enforcement",
         f"MAX=500, actual len={len(context)}",
@@ -88,20 +88,21 @@ async def test_p15_context_budget_enforced(tmp_path):
 
 @pytest.mark.asyncio
 async def test_p15_context_budget_priority_order(tmp_path):
-    """L3 内容优先于 L2 被保留"""
+    """L3 content must be prioritized over L2."""
     clear_chroma_clients()
     os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "300"
 
     router = MemoryRouter(db_dir=str(tmp_path))
     await router.wait_until_ready()
 
-    # 手动写入新皮层摘要
-    router.neo._save_summary("priority_test", "NEOCORTEX_CANARY " * 10)
+    # v0.2.0: Manually write high-priority thought
+    router.hippo.upsert_thought("priority_test", "NEOCORTEX_CANARY " * 5, ["trace-id"])
 
-    # 写入海马体
+    # Write to Hippocampus
     await router.ingest({"messages": [{"role": "user", "content": "HIPPOCAMPUS_CANARY data here"}]})
 
-    context = await router.get_combined_context("priority_test", "HIPPOCAMPUS_CANARY")
+    # Use clear signal for L2 search
+    context = await router.get_combined_context("priority_test", "NEOCORTEX_CANARY HIPPOCAMPUS_CANARY")
     visual_audit(
         "Context Priority Order",
         "L3 Neocortex should appear before L2 Hippocampus",
@@ -113,10 +114,10 @@ async def test_p15_context_budget_priority_order(tmp_path):
     if "CLAWBRAIN_MAX_CONTEXT_CHARS" in os.environ:
         del os.environ["CLAWBRAIN_MAX_CONTEXT_CHARS"]
 
-# ── P15-C: 流式内容提取工具函数 ────────────────────────────────────────────
+# --- P15-C: Streaming Content Extraction Utilities ---
 
 def _extract_chunk_content(chunk: bytes) -> str:
-    """从单个 streaming chunk 中提取 assistant 内容（与 main.py 逻辑对齐）"""
+    """Extract assistant content from a single streaming chunk (aligned with main.py logic)."""
     import json
     try:
         text = chunk.decode('utf-8', errors='ignore').strip()
@@ -137,7 +138,7 @@ def _extract_chunk_content(chunk: bytes) -> str:
         return ''
 
 def test_p15_stream_chunk_ollama_format():
-    """Ollama 流式 chunk 提取"""
+    """Ollama streaming chunk extraction."""
     import json
     chunk = json.dumps({"message": {"content": "Hello"}, "done": False}).encode()
     result = _extract_chunk_content(chunk)
@@ -145,7 +146,7 @@ def test_p15_stream_chunk_ollama_format():
     assert result == "Hello"
 
 def test_p15_stream_chunk_openai_sse_format():
-    """OpenAI SSE 流式 chunk 提取"""
+    """OpenAI SSE streaming chunk extraction."""
     import json
     data = {"choices": [{"delta": {"content": "World"}, "index": 0}]}
     chunk = f"data: {json.dumps(data)}".encode()
@@ -154,14 +155,14 @@ def test_p15_stream_chunk_openai_sse_format():
     assert result == "World"
 
 def test_p15_stream_chunk_done_signal():
-    """[DONE] 信号正确忽略"""
+    """[DONE] signal correctly ignored."""
     chunk = b"data: [DONE]"
     result = _extract_chunk_content(chunk)
     visual_audit("Stream Chunk ([DONE])", "Should return empty string", "", result)
     assert result == ""
 
 def test_p15_stream_chunk_malformed():
-    """损坏 chunk 静默跳过"""
+    """Malformed chunks silently skipped."""
     chunk = b"garbage data }{]["
     result = _extract_chunk_content(chunk)
     visual_audit("Stream Chunk (Malformed)", "Should return empty string", "", result)

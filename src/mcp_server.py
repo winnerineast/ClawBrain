@@ -151,10 +151,13 @@ async def main():
         pass
 
     if is_remote:
+        print(f"DEBUG: [MCP] Connecting to remote gateway at {gateway_url}", file=sys.stderr)
         server = create_mcp_server(remote_url=gateway_url)
     else:
-        print(f"DEBUG: [MCP] No live Gateway found. Initializing local MemoryRouter.", file=sys.stderr)
-        mr = MemoryRouter(db_dir=db_dir)
+        print(f"DEBUG: [MCP] Initializing local MemoryRouter...", file=sys.stderr)
+        # v0.2.1: Disable heavy background tasks and wait for ready event
+        mr = MemoryRouter(db_dir=db_dir, enable_room_detection=False, enable_cognitive_plane=False)
+        await mr.wait_until_ready()
         server = create_mcp_server(mr=mr)
     
     async with stdio_server() as (read_stream, write_stream):

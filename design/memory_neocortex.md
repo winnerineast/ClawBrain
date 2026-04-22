@@ -1,7 +1,7 @@
-# design/memory_neocortex.md v2.0 (v0.2.0 - Thought-Retriever)
+# design/memory_neocortex.md v2.1 (v0.2.1 - Thought-Retriever)
 
 ## 1. Objective
-Implement the **ClawBrain Neocortex v2** — a high-level cognitive processor that transforms verbose episodic interactions (L2) into granular, grounded "Thoughts" (L3). It employs **Root Source Mapping** to ensure every insight is traceable to its original interaction, solving the "Multi-Fact Join" problem.
+Implement the **ClawBrain Neocortex v2.1** — a high-level cognitive processor that transforms verbose episodic interactions (L2) into granular, grounded "Thoughts" (L3). It employs **Root Source Mapping** to ensure every insight is traceable to its original interaction, and a **Cognitive Judge** to ensure retrieval precision.
 
 ## 2. Architecture
 
@@ -22,10 +22,13 @@ Implement the **ClawBrain Neocortex v2** — a high-level cognitive processor th
   3. **Strict Requirement**: Every thought MUST include the `source_traces` list containing the relevant trace IDs from the prompt.
   4. Upsert individual thoughts into ChromaDB `thoughts` collection.
 
-### 2.3 Grounded Recall Interface
+### 2.3 Grounded Recall & Cognitive Judge (v2.1)
 - **Method signature**: `search_thoughts(query: str, session_id: str) -> List[Dict]`
 - Returns thoughts matching the query, including their `source_traces`.
-- **Root Source Resolution**: The caller (MemoryRouter) uses these trace IDs to fetch raw interaction payloads from the Hippocampus to provide "Evidence" in the final prompt.
+- **Cognitive Judge (`verify_relevance`)**:
+  - **Goal**: Prevent retrieval of semantically similar but logically irrelevant "hallucinated" context.
+  - **Implementation**: Uses a fast LLM to verify if a retrieved snippet or thought specifically answers the user query.
+  - **Verdict**: Returns "YES" or "NO". Router uses this to gate inclusion in the final context.
 
 ## 3. Test Specification (v2.0)
 - **Root Mapping Audit**: Verify that for a given "Thought", the resolved "Evidence" contains the actual keywords from the original interaction.

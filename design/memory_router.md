@@ -1,4 +1,4 @@
-# design/memory_router.md v1.20 (v0.2.0)
+# design/memory_router.md v1.21 (v0.2.1)
 
 ## 1. Objective
 Implement the **ClawBrain MemoryRouter v2** — the central cognitive hub that orchestrates the "Breathing Brain" architecture. It decouples active memory processing (distillation, extraction) from real-time response generation (context assembly) to ensure ultra-low latency and grounded reasoning.
@@ -32,6 +32,11 @@ Implement the **ClawBrain MemoryRouter v2** — the central cognitive hub that o
   - `=== SUPPORTING EVIDENCE (ROOT SOURCES) ===`
   - `=== ACTIVE CONVERSATION (WORKING MEMORY) ===`
 - **Header Safety**: Before injecting a layer's content, the budget must be checked against the **header length plus a 20-character safety margin**. Exact lengths of headers, newlines, and truncation ellipses MUST be precisely deducted.
+
+### 2.5 Contextual Silence (v1.23)
+- To prevent polluting the LLM prompt with empty headers, `get_combined_context` MUST return an empty string if NO long-term memory exists.
+- **Long-term Gain Condition**: `any([thoughts, l3_summary, entity_facts, vault_results, l2_contents])`.
+- Note: Working Memory (L1) presence alone does not satisfy the "gain" requirement for long-term retrieval, as L1 is expected to be part of the user's immediate message history anyway.
 
 ## 3. Core Sub-Systems (Retained from v1.x)
 

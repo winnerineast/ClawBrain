@@ -16,14 +16,14 @@ async def is_ollama_ready():
 
 @pytest.mark.asyncio
 async def test_p34_room_auto_segmentation(tmp_path):
-    """实测态度：验证真实环境下 LLM 对 Room 的自动切分"""
+    """Real-world Audit: Verify LLM's automatic room segmentation in a live environment."""
     if not await is_ollama_ready():
         pytest.skip("Ollama not running. Skipping real room test.")
 
     clear_chroma_clients()
     test_dir = str(tmp_path)
     
-    # 显式配置真实模型
+    # Explicitly configure real model
     router = MemoryRouter(db_dir=test_dir, distill_model="qwen2.5:latest")
     await router.wait_until_ready()
     session_id = "segment-test"
@@ -32,7 +32,7 @@ async def test_p34_room_auto_segmentation(tmp_path):
     print("\n[ROOM TEST] Turn 1: Database optimization...")
     await router.ingest({"messages": [{"role": "user", "content": "How to create an index in Postgres?"}]}, session_id=session_id)
     
-    # ── 关键变更：轮询直到 Room 变化 ──
+    # --- Critical Change: Poll until Room changes ---
     print("Waiting for LLM to detect topic shift (Room change)...")
     start_time = time.time()
     room_detected = False

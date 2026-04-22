@@ -1,7 +1,7 @@
-# design/memory_hippocampus.md v1.9
+# design/memory_hippocampus.md v1.13
 
 ## 1. Objective
-Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This engine handles lossless persistence of interaction traces, streaming offload of large payloads to disk, and **semantic vector search** via an embedded ChromaDB instance. It also enforces byte-level integrity audit and session-isolated retrieval.
+Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This engine handles lossless persistence of interaction traces, streaming offload of large payloads to disk, and **semantic vector search** across multiple cognitive layers (Traces, Entities, Thoughts).
 
 ## 2. Architecture & Implementation Details
 
@@ -11,6 +11,8 @@ Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This 
 - **Collections**:
   - `traces`: Stores episodic archive. Documents are the `search_text` (intent) or `raw_content`. Metadata includes `timestamp`, `model`, `is_blob`, `blob_path`, `checksum`, and `session_id`.
   - `wm_state`: Stores L1 working memory snapshot persistence.
+  - `entities`: Stores extracted facts and attributes (L3 Semantic).
+  - `thoughts`: Stores high-level cognitive insights (L3 Neocortex).
 
 ### 2.2 Dynamic Tiered Storage (save_trace)
 - **Method signature**: `save_trace(trace_id, payload, search_text="", threshold=None, session_id="default")`

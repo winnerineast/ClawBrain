@@ -1,48 +1,59 @@
-# Generated from design/gateway.md v1.33
-from typing import Dict, Any, Tuple
-from src.models import StandardRequest
+# Generated from design/gateway.md v1.42
+import json
+import logging
+from typing import Dict, Any, List, Optional
+from src.models import StandardRequest, Message, Tool
+
+logger = logging.getLogger("GATEWAY.DETECTOR")
 
 class ProtocolDetector:
     """
-    负责将不同客户端协议标准化。
-    2.3 准则修正：深度提取 tools, options, stream 等元数据。
+    Universal Protocol Detector.
+    Responsible for standardizing various client protocols.
+    Rule 2.3 Correction: Deep extraction of tools, options, stream, and other metadata.
     """
+    
     @staticmethod
-    def detect(path: str, payload: Dict[str, Any]) -> str:
-        # 1. Path-based detection (Priority)
-        path_lower = path.lower()
-        if "v1/" in path_lower or "chat/completions" in path_lower:
+    def detect(path: str, body: Dict[str, Any]) -> str:
+        """1. Detect Protocol"""
+        if "/chat/completions" in path or "messages" in body:
             return "openai"
-        if "api/chat" in path_lower or "api/generate" in path_lower:
+        if "/api/generate" in path:
             return "ollama"
-            
-        # 2. Payload-based fallback
-        if "options" in payload:
-            return "ollama"
-            
-        return "openai"
+        if "contents" in body:
+            return "google"
+        return "openai" # Default to OpenAI-compatible
 
     @staticmethod
-    def detect_and_standardize(payload: Dict[str, Any]) -> Tuple[str, StandardRequest]:
-        # 1. 探测协议
-        source_protocol = "ollama" if "options" in payload else "openai"
+    def to_standard(protocol: str, body: Dict[str, Any]) -> StandardRequest:
+        """2. Deep Metadata Alignment"""
+        # Rule 2.3: Extract from top-level, options, or extra_body
+        options = body.get("options", {})
+        extra = body.get("extra_body", {})
         
-        # 2. 深度元数据对齐
-        # 尝试从顶层、options 或 extra_body 中提取 tools
-        tools = payload.get("tools")
-        if not tools and "options" in payload:
-            # 某些 Ollama 客户端可能将 tools 放入 options
-            tools = payload["options"].get("tools")
-            
-        stream = payload.get("stream", False)
+        tools = body.get("tools") or options.get("tools") or extra.get("tools")
+        tool_choice = body.get("tool_choice") or options.get("tool_choice") or extra.get("tool_choice")
+        stream = body.get("stream") or options.get("stream") or extra.get("stream") or False
         
-        # 3. 构造标准请求
-        try:
-            req = StandardRequest(**payload)
-            # 强制覆盖以确保元数据完整
-            if tools: req.tools = tools
-            req.stream = stream
-        except Exception as e:
-            raise ValueError(f"Standardization failed: {e}")
+        # Merge options (Ollama compatibility)
+        merged_options = {**options}
+        if "options" in extra:
+            merged_options.update(extra["options"])
+        
+        # 3. Construct Standard Request
+        req = StandardRequest(
+            model=body.get("model", ""),
+            messages=body.get("messages", []),
+            stream=stream,
+            temperature=body.get("temperature") or options.get("temperature"),
+            max_tokens=body.get("max_tokens") or body.get("max_tokens_to_sample") or options.get("num_predict"),
+            tools=tools,
+            tool_choice=tool_choice,
+            options=merged_options
+        )
+        
+        # Force override to ensure metadata integrity
+        if not req.messages and "prompt" in body:
+            req.messages = [{"role": "user", "content": body["prompt"]}]
             
-        return source_protocol, req
+        return req

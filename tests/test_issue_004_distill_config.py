@@ -49,13 +49,15 @@ async def test_ollama_distillation_protocol(tmp_path):
     clear_chroma_clients()
     test_dir = str(tmp_path)
     nc = Neocortex(db_dir=test_dir, distill_url=url, distill_model="qwen2.5:latest", distill_provider="ollama")
-    
-    traces = [{"stimulus": {"messages": [{"role": "user", "content": "Short fact about Linux."}]}}]
-    summary = await robust_distill(nc, "session_ollama", traces)
-    
-    assert len(summary) > 0
-    assert "[Error]" not in summary
 
+    traces = [{
+        "trace_id": "trace-ollama",
+        "payload": {"messages": [{"role": "user", "content": "Short fact about Linux."}]}
+    }]
+    summary = await robust_distill(nc, "session_ollama", traces)
+
+    assert len(summary) > 0
+    assert "extracted" in summary
 @pytest.mark.asyncio
 async def test_openai_distillation_protocol(tmp_path):
     """实测态度：验证 Neocortex 对真实 OpenAI 兼容协议 (LM Studio) 的处理"""
@@ -72,9 +74,13 @@ async def test_openai_distillation_protocol(tmp_path):
         model = m_resp.json()["data"][0]["id"]
 
     nc = Neocortex(db_dir=test_dir, distill_url=url, distill_model=model, distill_provider="openai")
-    
-    traces = [{"stimulus": {"messages": [{"role": "user", "content": "Short fact about JS."}]}}]
+
+    traces = [{
+        "trace_id": "trace-openai",
+        "payload": {"messages": [{"role": "user", "content": "Short fact about JS."}]}
+    }]
     summary = await robust_distill(nc, "session_openai", traces)
-    
+
     assert len(summary) > 0
-    assert "[Error]" not in summary
+    assert "extracted" in summary
+

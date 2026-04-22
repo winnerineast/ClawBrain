@@ -58,6 +58,12 @@ To prevent internal cognitive tasks from interfering with the main relay through
 - **Non-blocking Guarantee**: Cognitive Plane tasks must never block the Relay Plane. Failures or timeouts in the Cognitive Plane (e.g., local Ollama being offline) must fail silently or log warnings without returning 5xx errors to the user.
 - **Mock Integrity**: Tests must use URL-targeted mocking (e.g., `respx`) instead of global class patching (`unittest.mock.patch`). This ensures that mocks intended for the Relay Plane do not accidentally capture or interfere with Cognitive Plane requests.
 
+## 2.9 Model Context Protocol (MCP) Integration
+- **Endpoints**:
+  - `GET /mcp/sse`: Establishes an SSE connection for server-to-client messages.
+  - `POST /mcp/messages`: Receives client-to-server JSON-RPC messages via the standard MCP SSE transport.
+- **Routing Priority**: To prevent semantic collision with the catch-all relay, MCP endpoints MUST be registered in the FastAPI application BEFORE the `gateway_relay` route. This ensures that MCP-specific control messages are not intercepted by the model-aware relay logic which expects a `model` field in the payload.
+
 ## 3. Test Specification (TDD & High-Fidelity Audit)
 ...
 

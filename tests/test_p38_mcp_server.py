@@ -36,8 +36,17 @@ def mcp_server_instance():
         env=env,
         cwd=project_root,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.STDOUT # Merge stdout and stderr
     )
+
+    # Function to print server logs in background
+    def log_reader(proc):
+        for line in iter(proc.stdout.readline, b''):
+            print(f"[SERVER_LOG] {line.decode().strip()}")
+
+    import threading
+    log_thread = threading.Thread(target=log_reader, args=(process,), daemon=True)
+    log_thread.start()
 
     # Wait for server AND cognitive engine to be ready (Conditional Wait)
     print("\n[WAIT] Waiting for server stability signal...")
@@ -75,28 +84,43 @@ def mcp_server_instance():
 async def test_p38_mcp_full_handshake(mcp_server_instance):
     """Verify MCP Tool Discovery and Tool Calling."""
     url = f"{mcp_server_instance}/mcp/sse"
+    print(f"\n[MCP_CLIENT] Connecting to SSE at {url}...")
     
     async with sse_client(url) as streams:
+        print("[MCP_CLIENT] SSE streams opened. Creating session...")
         async with ClientSession(streams[0], streams[1]) as session:
             # 1. Initialize
+            print("[MCP_CLIENT] Initializing session...")
             await session.initialize()
+            print("[MCP_CLIENT] Session initialized.")
             
             # 2. List Tools
+            print("[MCP_CLIENT] Listing tools...")
             tools = await session.list_tools()
             tool_names = [t.name for t in tools.tools]
+            print(f"[MCP_CLIENT] Found tools: {tool_names}")
             assert "recall_memory" in tool_names
             assert "ingest_fact" in tool_names
             
             # 3. Call Ingest Tool
             session_id = "mcp-audit-session"
+            print(f"[MCP_CLIENT] Calling ingest_fact for {session_id}...")
             await session.call_tool("ingest_fact", {"fact": "The MCP canary is RED-FOX-5", "session_id": session_id})
+            print("[MCP_CLIENT] ingest_fact finished.")
+            
+            # v0.2.1: Give the heartbeat a moment or at least ensure L2 is committed
+            await asyncio.sleep(1.0)
             
             # 4. Call Recall Tool (Use strong semantic signal)
+            print("[MCP_CLIENT] Calling recall_memory...")
             res = await session.call_tool("recall_memory", {"query": "RED-FOX-5", "session_id": session_id})
+            print(f"[MCP_CLIENT] recall_memory response: {res.content[0].text[:50]}...")
             assert len(res.content) > 0
             assert "RED-FOX-5" in res.content[0].text
             
             # 5. List Resources (After ingestion, session should be active)
+            print("[MCP_CLIENT] Listing resources...")
             resources = await session.list_resources()
-            uris = [str(r.uri) for r in resources.resources] # Convert AnyUrl to string
+            uris = [str(r.uri) for r in resources.resources] 
+            print(f"[MCP_CLIENT] Found URIs: {uris}")
             assert f"memory://neocortex/{session_id}" in uris

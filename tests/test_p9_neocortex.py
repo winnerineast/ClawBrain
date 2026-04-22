@@ -1,32 +1,31 @@
-# Generated from design/memory_neocortex.md v1.1
+# Generated from design/memory_neocortex.md v2.0
 import pytest
 import os
 import shutil
 import respx
+import json
 from httpx import Response
 from pathlib import Path
 from src.memory.neocortex import Neocortex
+from src.memory.storage import clear_chroma_clients
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "tests/data/p9_neocortex_tmp")
 
-def visual_audit_semantic(test_name, input_desc, canary_facts, summary_text):
+def visual_audit_semantic(test_name, input_desc, canary_facts, thoughts_list):
     """
-    Semantic Distillation Audit Output: Display fact preservation checklist.
+    Semantic Distillation Audit Output: Display fact preservation checklist for thoughts.
     """
-    print(f"\n[SEMANTIC DELTA AUDIT: {test_name}]")
+    print(f"\n[SEMANTIC THOUGHT AUDIT: {test_name}]")
     print("=" * 80)
     print(f"DESCRIPTION: {input_desc}")
     print("-" * 80)
     
-    # Preview summary output
-    print(f"SUMMARY OUTPUT PREVIEW:\n{summary_text[:150]}...\n")
-    print(f"{'EXPECTED FACT (CANARY)':<38} | {'ACTUAL PRESERVATION'}")
-    print(f"{'-'*38} | {'-'*38}")
+    all_text = " ".join([t["thought"] for t in thoughts_list])
     
     all_passed = True
     for fact in canary_facts:
-        passed = fact.lower() in summary_text.lower()
+        passed = fact.lower() in all_text.lower()
         if not passed: all_passed = False
         
         status_box = "[ x ]" if passed else "[   ]"
@@ -38,52 +37,47 @@ def visual_audit_semantic(test_name, input_desc, canary_facts, summary_text):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_p9_neocortex_distillation_audit():
-    """Phase 9 Depth Audit: Long context extraction and canary fact verification."""
+async def test_p9_neocortex_thought_extraction_audit():
+    """v0.2.0: Verify Neocortex extracts granular thoughts and maps to root sources."""
     if os.path.exists(TEST_DATA_DIR): shutil.rmtree(TEST_DATA_DIR)
+    clear_chroma_clients()
     
     nc = Neocortex(db_dir=TEST_DATA_DIR)
     
-    # Mock Ollama Response containing the canary facts
-    mock_summary = "Technical decisions: Use PostgreSQL 15.2 and Tortoise ORM."
-    respx.post(f"{nc.distill_url}/api/generate").mock(return_value=Response(200, json={"response": mock_summary}))
+    # Mock Ollama Response containing structured JSON thoughts
+    mock_thoughts = [
+        {"thought": "Use PostgreSQL version 15.2.", "source_traces": ["trace-3"], "confidence": 0.9},
+        {"thought": "Implement Tortoise ORM for data mapping.", "source_traces": ["trace-3"], "confidence": 0.8}
+    ]
+    respx.post(f"{nc.distill_url}/api/generate").mock(return_value=Response(200, json={"response": json.dumps(mock_thoughts)}))
     
-    # Construct: 3 noise turns + 1 core tech decision (Canary)
     traces = [
-        {"stimulus": {"messages": [{"role": "user", "content": "Hi, are you there?"}]}, 
-         "reaction": {"message": {"content": "Yes, I am here."}}},
-        
-        {"stimulus": {"messages": [{"role": "user", "content": "We need to set up the database."}]}, 
-         "reaction": {"message": {"content": "Okay, which one?"}}},
-        
-        # --- Core Canary Fact ---
-        {"stimulus": {"messages": [{"role": "user", "content": "Let's use PostgreSQL version 15.2 with Tortoise ORM."}]}, 
-         "reaction": {"message": {"content": "Understood. I will configure PostgreSQL 15.2 and Tortoise ORM."}}},
-         
-        {"stimulus": {"messages": [{"role": "user", "content": "Also, what is the weather today?"}]}, 
-         "reaction": {"message": {"content": "I am an AI, I don't know the weather."}}}
+        {"trace_id": "trace-1", "payload": {"messages": [{"role": "user", "content": "Hi"}]}},
+        {"trace_id": "trace-3", "payload": {"messages": [{"role": "user", "content": "Let's use PostgreSQL version 15.2 with Tortoise ORM."}]}}
     ]
     
     canary_facts = ["PostgreSQL", "15.2", "Tortoise"]
     
     # Execute distillation
-    summary = await nc.distill("session-audit-01", traces)
+    result_msg = await nc.distill("session-audit-01", traces)
+    assert "extracted 2 thoughts" in result_msg
     
-    # Verify success (no error prefix)
-    assert not summary.startswith("[Error]")
+    # Verify thoughts in storage
+    thoughts = nc.hippo.search_thoughts("database", "session-audit-01")
+    assert len(thoughts) >= 2
     
     # Perform semantic audit
     visual_audit_semantic(
-        "Knowledge Distillation Pipeline",
-        "Distilling 4 rounds of chat to extract core tech decisions",
+        "Thought-Retriever Pipeline",
+        "Extracting granular thoughts with Root Source Mapping",
         canary_facts,
-        summary
+        thoughts
     )
     
-    # Hard assertion: Canary facts must be present in the summary
+    # Hard assertion: Canary facts must be present in the thoughts
+    all_thoughts_text = " ".join([t["thought"] for t in thoughts]).lower()
     for fact in canary_facts:
-        assert fact.lower() in summary.lower()
+        assert fact.lower() in all_thoughts_text
         
-    # Verify persistence
-    saved_summary = nc.get_summary("session-audit-01")
-    assert saved_summary == summary
+    # Verify Root Source Mapping
+    assert "trace-3" in thoughts[0]["source_traces"]

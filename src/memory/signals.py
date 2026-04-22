@@ -1,31 +1,43 @@
-# Generated from design/memory.md v1.8
-import hashlib
+# Generated from design/memory_router.md v1.12
 import json
-from typing import Dict, Any
+import hashlib
+from typing import Dict, Any, List
 
 class SignalDecomposer:
     """
-    负责将原始 Payload 拆解为背景、环境和核心信号。
-    基于 design/memory.md v1.8 实现。
+    Cognitive Signal Decomposer.
+    Responsible for breaking down raw payloads into background, environment, and core signals.
+    Implemented based on design/memory.md v1.8.
     """
     
-    @staticmethod
-    def get_schema_fingerprint(payload: Dict[str, Any]) -> str:
-        # 2.2 准则：排除消息内容，对协议结构进行指纹识别
-        struct_only = {k: v for k, v in payload.items() if k != "messages"}
-        # 确保字典 key 有序，保证 Hash 稳定性
-        encoded = json.dumps(struct_only, sort_keys=True).encode()
-        return hashlib.md5(encoded).hexdigest()
-
-    @staticmethod
-    def extract_core_intent(payload: Dict[str, Any]) -> str:
-        # 2.2 准则：精准剥离最后一条 user 消息内容
-        messages = payload.get("messages", [])
-        if not messages:
-            return ""
+    def extract_fingerprint(self, payload: Dict[str, Any]) -> str:
+        """
+        Extract a unique structural fingerprint from the request.
+        Rule 2.2: Exclude message content to fingerprint the protocol structure.
+        """
+        # Create a content-free copy of the payload
+        p_copy = json.loads(json.dumps(payload))
         
-        # 从后往前找第一条 user 消息
-        for msg in reversed(messages):
-            if msg.get("role") == "user":
-                return msg.get("content", "")
-        return ""
+        if "messages" in p_copy:
+            for m in p_copy["messages"]:
+                m["content"] = "" # Strip content
+                
+        if "prompt" in p_copy:
+            p_copy["prompt"] = ""
+            
+        # Ensure dict keys are ordered for hash stability
+        stable_json = json.dumps(p_copy, sort_keys=True)
+        return hashlib.sha256(stable_json.encode()).hexdigest()
+
+    def extract_stimulus_content(self, payload: Dict[str, Any]) -> str:
+        """
+        Extract the core stimulus text from the payload.
+        Rule 2.2: Precisely strip the last user message content.
+        """
+        messages = payload.get("messages", [])
+        # Search backwards for the first user message
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                return m.get("content", "")
+                
+        return payload.get("prompt", "")

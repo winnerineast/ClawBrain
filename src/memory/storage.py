@@ -1,4 +1,4 @@
-# Generated from design/memory_hippocampus.md v1.9 / GEMINI.md Rule 12
+# Generated from design/memory_hippocampus.md v1.13 / GEMINI.md Rule 12
 import sqlite3
 import chromadb
 import json
@@ -22,6 +22,16 @@ def get_chroma_client(db_path: Path):
 def clear_chroma_clients():
     global _CHROMA_CLIENTS
     _CHROMA_CLIENTS.clear()
+
+def get_running_ollama_models() -> List[str]:
+    """v0.2.1: Utility for GPU resource management."""
+    import subprocess
+    try:
+        result = subprocess.run(["ollama", "ps"], capture_output=True, text=True)
+        lines = result.stdout.strip().split("\n")[1:]
+        return [line.split()[0] for line in lines if line]
+    except:
+        return []
 
 class Hippocampus:
     """
@@ -129,15 +139,23 @@ class Hippocampus:
     def get_recent_traces(self, limit: int, session_id: str = None) -> List[Dict[str, Any]]:
         # P18: Default session_id is None to allow broad fetching in tests
         where = {"session_id": session_id} if session_id else None
-        res = self.traces_col.get(where=where, include=["metadatas", "documents"], limit=limit * 3)
-        if not res or not res["ids"]: return []
+        res = self.traces_col.get(where=where, include=["metadatas"], limit=limit * 3)
+        if not res or not res["ids"]: 
+            logger.debug(f"[HIPPO] No traces found in ChromaDB for session {session_id}")
+            return []
+        
+        logger.debug(f"[HIPPO] Found {len(res['ids'])} raw IDs in ChromaDB.")
         traces = []
         for i in range(len(res["ids"])):
+            tid = res["ids"][i]
             m = res["metadatas"][i]
+            payload = self.get_full_payload(tid)
             traces.append({
-                "trace_id": res["ids"][i], "timestamp": m.get("timestamp") or 0,
-                "model": m.get("model"), "raw_content": res["documents"][i],
-                "session_id": m.get("session_id"), "room_id": m.get("room_id", "general")
+                "trace_id": tid, "timestamp": m.get("timestamp") or 0,
+                "payload": payload,
+                "raw_content": m.get("raw_content", ""), # Restore for MGMT API
+                "session_id": m.get("session_id"),
+                "room_id": m.get("room_id", "general")
             })
         return sorted(traces, key=lambda x: x["timestamp"], reverse=True)[:limit]
 
@@ -225,15 +243,17 @@ class Hippocampus:
         """v0.2: Store a high-level thought with root source mapping."""
         # Use a hash of the thought text as ID to prevent duplicates per session
         tid = f"{session_id}_{hashlib.md5(thought.encode()).hexdigest()}"
-        self.thoughts_col.upsert(
-            ids=[tid],
-            documents=[thought],
-            metadatas=[{
+        meta = {
                 "session_id": session_id,
                 "source_traces": json.dumps(source_traces),
                 "confidence": confidence,
                 "timestamp": time.time()
-            }]
+            }
+        logger.debug(f"[HIPPO] Upserting thought for {session_id}: {thought[:50]}...")
+        self.thoughts_col.upsert(
+            ids=[tid],
+            documents=[thought],
+            metadatas=[meta]
         )
         return tid
 

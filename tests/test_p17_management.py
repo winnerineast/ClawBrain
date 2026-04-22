@@ -84,8 +84,15 @@ def test_p17_manual_distill_trigger(tmp_path):
     os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
 
     with TestClient(app) as client:
+        # Ingest one message to make the session "dirty"
+        client.post("/v1/ingest", json={"session_id": "distill_session", "content": "The codebase uses FastAPI."})
+        
         response = client.post("/v1/memory/distill_session/distill")
         data = response.json()
+        
+        # Nudge the brain to process
+        mr = app.state.memory_router
+        asyncio.run(mr.breathe())
 
         visual_audit(
             "Manual Distill Trigger (Status)",

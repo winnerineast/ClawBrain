@@ -17,7 +17,7 @@ def visual_audit(test_name, description, expected, actual):
     print("=" * 70)
 
 def test_p16_extra_provider_injection():
-    """通过环境变量注入新提供商，resolve_provider 应能正确路由"""
+    """Verify that new providers injected via environment variables are correctly routed by resolve_provider."""
     extra = {"myprovider": {"base_url": "https://api.myprovider.com", "protocol": "openai"}}
     os.environ["CLAWBRAIN_EXTRA_PROVIDERS"] = json.dumps(extra)
 
@@ -37,7 +37,7 @@ def test_p16_extra_provider_injection():
     del os.environ["CLAWBRAIN_EXTRA_PROVIDERS"]
 
 def test_p16_extra_local_models_injection():
-    """通过环境变量注入本地模型白名单"""
+    """Verify the injection of a local model whitelist via environment variables."""
     extra_models = {"llama3:8b": "ollama", "phi3:mini": "ollama"}
     os.environ["CLAWBRAIN_LOCAL_MODELS"] = json.dumps(extra_models)
 
@@ -56,13 +56,13 @@ def test_p16_extra_local_models_injection():
     del os.environ["CLAWBRAIN_LOCAL_MODELS"]
 
 def test_p16_invalid_json_graceful():
-    """非法 JSON 不抛异常，注册表仍正常初始化"""
+    """Verify that invalid JSON in environment variables does not raise exceptions and initializes the registry normally."""
     os.environ["CLAWBRAIN_EXTRA_PROVIDERS"] = "{ this is not valid json !!!"
     os.environ["CLAWBRAIN_LOCAL_MODELS"] = "{ bad }"
 
     try:
         registry = ProviderRegistry()
-        # 原有内置提供商不受影响
+        # Original built-in providers should remain unaffected
         name, config = registry.resolve_provider("ollama/gemma4:e4b")
         visual_audit(
             "Invalid JSON Graceful Fallback",
@@ -76,7 +76,7 @@ def test_p16_invalid_json_graceful():
         del os.environ["CLAWBRAIN_LOCAL_MODELS"]
 
 def test_p16_builtin_providers_intact():
-    """内置提供商在无环境变量时保持完整"""
+    """Verify that built-in providers remain intact when no environment variable overrides are present."""
     for key in ["CLAWBRAIN_EXTRA_PROVIDERS", "CLAWBRAIN_LOCAL_MODELS"]:
         os.environ.pop(key, None)
 

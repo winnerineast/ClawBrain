@@ -5,19 +5,19 @@ from src.models import StandardRequest
 
 class DialectTranslator:
     """
-    万能方言翻译器。
-    负责将 StandardRequest 转换为各 Provider 的原生格式。
+    Universal Dialect Translator.
+    Responsible for converting StandardRequest into each provider's native format.
     """
     
     @staticmethod
     def extract_query(protocol: str, payload: Dict[str, Any]) -> str:
-        """从不同协议中提取用户最新的查询意图。"""
+        """Extract the latest user query intent from various protocols."""
         messages = payload.get("messages", [])
         if not messages:
-            # api/generate 可能是 prompt 模式
+            # api/generate might be in prompt mode
             return payload.get("prompt", "")
             
-        # 寻找最后一条 user 消息
+        # Search backwards for the last user message
         for msg in reversed(messages):
             if msg.get("role") == "user":
                 return msg.get("content", "")
@@ -25,24 +25,24 @@ class DialectTranslator:
 
     @staticmethod
     def inject_context(protocol: str, payload: Dict[str, Any], context: str) -> Dict[str, Any]:
-        """将记忆上下文注入到系统提示词中。"""
+        """Inject memory context into system prompts."""
         if not context:
             return payload
             
         messages = payload.get("messages", [])
         
-        # 寻找系统消息
+        # Search for system message
         system_msg = next((m for m in messages if m.get("role") == "system"), None)
         
         if system_msg:
-            # 追加到现有系统消息
+            # Append to existing system message
             system_msg["content"] = f"{context}\n\n{system_msg['content']}"
         else:
-            # 插入新的系统消息到顶部
+            # Insert new system message at the top
             messages.insert(0, {"role": "system", "content": context})
             payload["messages"] = messages
             
-        # 如果是 prompt 模式 (api/generate)
+        # If in prompt mode (api/generate)
         if "prompt" in payload and not messages:
             payload["prompt"] = f"{context}\n\n{payload['prompt']}"
             
@@ -55,9 +55,9 @@ class DialectTranslator:
     @staticmethod
     def to_openai(request: StandardRequest) -> Dict[str, Any]:
         """
-        翻译为标准 OpenAI 格式。
-        2.1 准则修正：只剥离第一个前缀（网关标识），保留模型内部路径。
-        解决 LM Studio 400 错误。
+        Translate to standard OpenAI format.
+        Rule 2.1 Correction: Only strip the first prefix (gateway identifier), keeping the model's internal path.
+        Resolves LM Studio 400 errors.
         """
         payload = request.model_dump(exclude_none=True)
         model_name = payload.get("model", "")
@@ -70,7 +70,7 @@ class DialectTranslator:
 
     @staticmethod
     def to_anthropic(request: StandardRequest) -> Dict[str, Any]:
-        """翻译为 Anthropic (Claude) 格式"""
+        """Translate to Anthropic (Claude) format."""
         raw = request.model_dump(exclude_none=True)
         messages = raw.get("messages", [])
         
@@ -86,7 +86,7 @@ class DialectTranslator:
                 else:
                     normalized.append({"role": msg["role"], "content": msg.get("content", "")})
         
-        # 2.1 准则修正：只剥离第一个前缀
+        # Rule 2.1 Correction: Only strip the first prefix
         model_name = raw.get("model", "")
         target_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
 
@@ -102,7 +102,7 @@ class DialectTranslator:
 
     @staticmethod
     def to_google(request: StandardRequest) -> Dict[str, Any]:
-        """翻译为 Google Gemini 格式"""
+        """Translate to Google Gemini format."""
         raw = request.model_dump(exclude_none=True)
         messages = raw.get("messages", [])
         
