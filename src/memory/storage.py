@@ -40,6 +40,7 @@ class Hippocampus:
             self.traces_col = self.client.get_or_create_collection(name="traces", metadata={"hnsw:space": "cosine"})
             self.wm_col = self.client.get_or_create_collection(name="wm_state")
             self.entities_col = self.client.get_or_create_collection(name="entities")
+            self.thoughts_col = self.client.get_or_create_collection(name="thoughts", metadata={"hnsw:space": "cosine"})
             logger.info("[HIPPO] Storage stabilized (session_id unified).")
             self._startup_cleanup()
         except Exception as e:
@@ -219,3 +220,50 @@ class Hippocampus:
         if not entities: return []
         res = self.entities_col.get(where={"$and": [{"session_id": session_id}, {"entity": {"$in": entities}}]})
         return [{"entity": m["entity"], "key": m["key"], "value": d, "timestamp": m["timestamp"]} for d, m in zip(res["documents"], res["metadatas"])] if res else []
+
+    def upsert_thought(self, session_id: str, thought: str, source_traces: List[str], confidence: float = 1.0) -> str:
+        """v0.2: Store a high-level thought with root source mapping."""
+        # Use a hash of the thought text as ID to prevent duplicates per session
+        tid = f"{session_id}_{hashlib.md5(thought.encode()).hexdigest()}"
+        self.thoughts_col.upsert(
+            ids=[tid],
+            documents=[thought],
+            metadatas=[{
+                "session_id": session_id,
+                "source_traces": json.dumps(source_traces),
+                "confidence": confidence,
+                "timestamp": time.time()
+            }]
+        )
+        return tid
+
+    def search_thoughts(self, query: str, session_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """v0.2: Search for high-level thoughts."""
+        res = self.thoughts_col.query(query_texts=[query], n_results=limit, where={"session_id": session_id})
+        if not res or not res["ids"] or not res["ids"][0]: return []
+        
+        thoughts = []
+        for i in range(len(res["ids"][0])):
+            m = res["metadatas"][0][i]
+            thoughts.append({
+                "id": res["ids"][0][i],
+                "thought": res["documents"][0][i],
+                "source_traces": json.loads(m.get("source_traces", "[]")),
+                "confidence": m.get("confidence", 1.0),
+                "distance": res["distances"][0][i] if "distances" in res else 0.0
+            })
+        return thoughts
+
+    def get_traces_by_ids(self, trace_ids: List[str]) -> List[Dict[str, Any]]:
+        """v0.2: Batch retrieval of full payloads for Root Source Mapping."""
+        if not trace_ids: return []
+        
+        traces = []
+        for tid in trace_ids:
+            p = self.get_full_payload(tid)
+            if p:
+                traces.append({
+                    "trace_id": tid,
+                    "payload": p
+                })
+        return traces

@@ -6,7 +6,7 @@ import time
 import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from src.memory.storage import get_chroma_client
+from src.memory.storage import get_chroma_client, Hippocampus
 
 class Neocortex:
     """
@@ -27,6 +27,9 @@ class Neocortex:
         self.client = get_chroma_client(self.chroma_path)
         self.summary_col = self.client.get_or_create_collection(name="summaries")
         
+        # v0.2: Storage handle for thoughts
+        self.hippo = Hippocampus(str(self.db_dir))
+        
         # Legacy DB path
         self.db_path = self.db_dir / "hippocampus.db"
         
@@ -39,44 +42,39 @@ class Neocortex:
         self.http_client = client
 
     async def distill(self, session_id: str, traces: List[Dict[str, Any]]) -> str:
-        """§2.2: Async distillation logic with recursive knowledge merging (Phase 40)."""
+        """v0.2: Extract granular 'Thoughts' from dialogue with Root Source Mapping."""
         corpus = []
+        trace_ids = []
         for t in traces:
-            # P47: Robust extraction from stimulus (ingest) or top-level (direct)
-            msgs = t.get("messages", []) or t.get("stimulus", {}).get("messages", [])
+            trace_id = t.get("trace_id")
+            if not trace_id: continue
+            trace_ids.append(trace_id)
+            
+            p = t.get("payload") or t
+            msgs = p.get("messages", []) or p.get("stimulus", {}).get("messages", [])
             for m in msgs:
-                corpus.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
+                corpus.append(f"[{trace_id}] {m.get('role', 'user')}: {m.get('content', '')}")
         
         if not corpus:
             return "[Error] No dialogue to distill."
 
         full_text = "\n".join(corpus)
-        existing_summary = self.get_summary(session_id) or "(No existing summary)"
         
-        # Phase 40: Recursive Summarization Instruction
+        # v0.2: Thought-Retriever Instruction
         instruction = (
-            "You are a professional Memory Distiller for an AI Agent. "
-            "Your goal is to extract critical information from a NEW dialogue and MERGE it into the EXISTING summary.\n\n"
+            "You are a professional Memory Processor (Neocortex). "
+            "Your goal is to extract high-level 'Thoughts' and 'Insights' from the provided dialogue.\n\n"
             "STRICT GUIDELINES:\n"
-            "1. PRESERVE TECHNICAL IDENTIFIERS: Always keep exact FQDNs, IP addresses, Port numbers, and Database names.\n"
-            "2. STATEFUL MERGE: Integrate new facts from the dialogue into the existing summary below. "
-            "Do not drop old facts unless they are explicitly contradicted/updated by the new dialogue.\n"
-            "3. REQUIRED TEMPLATE: You MUST output the summary strictly using the following Markdown template. "
-            "Do not output categories that have no facts.\n\n"
-            "   ### Technical Decisions\n"
-            "   - [Technical details, URLs, IPs, architecture]\n"
-            "   ### User Preferences\n"
-            "   - [User preferences, workflow habits, styling]\n"
-            "   ### Project Context\n"
-            "   - [General context, names, goals]\n"
-            "   ### Relationships\n"
-            "   - [People, roles, teams]\n\n"
-            "4. BE CONCISE: Use Bullet Points. Max total length: 1500 characters.\n"
-            "5. EVOLUTION: If a fact is updated in the dialogue, only preserve the NEWEST value."
+            "1. EXTRACT GRANULAR THOUGHTS: Identify user preferences, technical decisions, and project context.\n"
+            "2. ROOT SOURCE MAPPING: Every thought MUST be mapped to the exact trace IDs (e.g., [trace-123]) that support it.\n"
+            "3. JSON OUTPUT ONLY: You MUST return a JSON list of objects.\n\n"
+            "   [{\"thought\": \"User prefers Python over Java\", \"source_traces\": [\"trace-1\"], \"confidence\": 0.9}, ...]\n\n"
+            "4. BE CONCISE: Only extract critical insights. If no new insights are found, return an empty list [].\n"
+            "5. DO NOT provide any explanation outside the JSON."
         )
         prompt = (f"{instruction}\n\n"
-                  f"--- EXISTING SUMMARY ---\n{existing_summary}\n\n"
-                  f"--- NEW DIALOGUE TO DISTILL ---\n{full_text}")
+                  f"--- NEW DIALOGUE TO PROCESS ---\n{full_text}\n\n"
+                  f"JSON Output:")
         
         try:
             headers = {}
@@ -100,7 +98,8 @@ class Neocortex:
                 resp = await client.post(url, headers=headers, json={
                     "model": self.distill_model,
                     "prompt": prompt,
-                    "stream": False
+                    "stream": False,
+                    "format": "json"
                 })
             else:
                 # Ensure URL is correctly formatted for OpenAI /chat/completions
@@ -108,9 +107,10 @@ class Neocortex:
                 resp = await client.post(url, headers=headers, json={
                     "model": self.distill_model,
                     "messages": [
-                        {"role": "system", "content": "You are a professional memory distiller."},
+                        {"role": "system", "content": "You are a professional memory distiller. Output JSON only."},
                         {"role": "user", "content": prompt}
                     ],
+                    "response_format": {"type": "json_object"},
                     "stream": False
                 })
             
@@ -118,14 +118,31 @@ class Neocortex:
                 return f"[Error] Distillation failed ({resp.status_code}): {resp.text}"
             
             if self.distill_provider == "ollama":
-                summary = resp.json().get("response", "")
+                raw_response = resp.json().get("response", "[]")
             else:
-                summary = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+                raw_response = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "[]")
 
-            if summary:
-                self._save_summary(session_id, summary)
-                return summary
-            return "[Error] Empty summary returned from provider."
+            try:
+                import json
+                import re
+                # Clean potential markdown
+                clean_text = re.sub(r'```json\s*|\s*```', '', raw_response).strip()
+                thoughts = json.loads(clean_text)
+                if isinstance(thoughts, dict) and "thoughts" in thoughts:
+                    thoughts = thoughts["thoughts"]
+                
+                if isinstance(thoughts, list):
+                    for t in thoughts:
+                        thought_text = t.get("thought")
+                        sources = t.get("source_traces", [])
+                        conf = t.get("confidence", 1.0)
+                        if thought_text and sources:
+                            self.hippo.upsert_thought(session_id, thought_text, sources, conf)
+                    return f"Successfully extracted {len(thoughts)} thoughts."
+            except Exception as e:
+                return f"[Error] JSON parsing failed: {e} | Raw: {raw_response}"
+                
+            return "[Error] Empty or invalid thoughts returned from provider."
         except Exception as e:
             return f"[Error] Distillation connection error: {str(e)}"
 

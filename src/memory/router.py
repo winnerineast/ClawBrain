@@ -66,6 +66,11 @@ class MemoryRouter:
         self._session_locks: Dict[str, asyncio.Lock] = {}
         self._last_injections: Dict[str, Any] = {}
         
+        # v0.2: Breathing Brain state
+        self._dirty_sessions = set() # Sessions needing distillation
+        self._pending_trace_extractions = [] # List of (session_id, trace_id) for entity extraction
+        self.heartbeat_interval = int(os.getenv("CLAWBRAIN_HEARTBEAT_SECONDS", 30))
+        
         # P56: Configurable Circuit Breakers
         self.cb_max_failures = int(os.getenv("CLAWBRAIN_CB_MAX_FAILURES", cb_max_failures or 3))
         self.cb_backoff = int(os.getenv("CLAWBRAIN_CB_BACKOFF", cb_backoff or 60))
@@ -92,6 +97,9 @@ class MemoryRouter:
                 self.vault_indexer = VaultIndexer(self.vault_path, self.db_dir, client=self.hippo.client)
                 if self.enable_auto_scan:
                     asyncio.create_task(self._vault_scan_loop())
+            
+            # v0.2: Start the background heartbeat
+            asyncio.create_task(self._cognitive_heartbeat_loop())
                 
             logger.info("[COGNITIVE] Intelligence layer stabilized.")
         except Exception as e:
@@ -157,19 +165,22 @@ class MemoryRouter:
             self.hippo.save_trace(trace_id, stimulus, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
             self.hippo.save_wm_state(session_id, wm.items)
             
+            # v0.2: Queue for background brain (Heartbeat)
             self._trace_counters[session_id] = self._trace_counters.get(session_id, 0) + 1
             if self._trace_counters[session_id] >= self.distill_threshold or sync_distill:
-                self._trace_counters[session_id] = 0
-                if sync_distill: await self._auto_distill_worker(session_id)
-                else: asyncio.create_task(self._auto_distill_worker(session_id))
+                if sync_distill: 
+                    await self._auto_distill_worker(session_id)
+                    self._trace_counters[session_id] = 0
+                else:
+                    self._dirty_sessions.add(session_id)
             
-            # Phase 34: Background Room Detection
+            # Phase 34: Background Room Detection (Kept as separate task for focus)
             if self.enable_room_detection:
                 asyncio.create_task(self._auto_room_worker(session_id, search_text))
             
-            # Phase 56: Background Entity Extraction
+            # v0.2: Queue entity extraction for Heartbeat
             if self.entity_extractor:
-                asyncio.create_task(self._auto_entity_worker(session_id, trace_id))
+                self._pending_trace_extractions.append((session_id, trace_id))
             
             return trace_id
 
@@ -204,9 +215,9 @@ class MemoryRouter:
             
             self.hippo.save_wm_state(session_id, wm.items)
             
-            # Phase 56: Background Entity Extraction
+            # v0.2: Queue entity extraction for Heartbeat
             if self.entity_extractor:
-                asyncio.create_task(self._auto_entity_worker(session_id, trace_id))
+                self._pending_trace_extractions.append((session_id, trace_id))
 
     async def orphan_turn(self, trace_id: str, payload: Dict[str, Any], error: str, session_id: str):
         await self.wait_until_ready()
@@ -275,32 +286,31 @@ class MemoryRouter:
                 score = (anchor_hits * 150.0) + (subject_coverage * 60.0) + (similarity * 15.0)
                 return is_ok, score
 
-            # --- Unified Processing ---
-            sem_results = self.hippo.search(query, session_id, self._get_current_room(session_id), limit=25, include_distances=True)
-            lex_ids = self.hippo.search_lexical(list(hard_anchors) + core_subjects[:5], session_id, limit=25)
+            # --- Phase 56: Thought-Driven Retrieval (v0.2) ---
+            # 1. Search for High-level Thoughts
+            thoughts = self.hippo.search_thoughts(query, session_id, limit=5)
             
-            candidate_map = {c["id"]: c["distance"] for c in sem_results}
-            for lid in lex_ids:
-                if lid not in candidate_map: candidate_map[lid] = 1.0 
+            # 2. Resolve Root Sources for found thoughts
+            thought_evidence = []
+            source_trace_ids = []
+            for t in thoughts:
+                source_trace_ids.extend(t["source_traces"])
             
-            reranked_items = []
-            seen_contents = set()
-            for tid, distance in candidate_map.items():
-                p = self.hippo.get_full_payload(tid)
-                if not p: continue
-                msgs = p.get("messages", []) or p.get("stimulus", {}).get("messages", [])
-                content_str = " | ".join([f"{m.get('role','user')}: {m.get('content','')}" for m in msgs])
-                if content_str in seen_contents: continue 
-                
-                is_ok, score = _is_constraint_satisfied(content_str, distance)
-                if is_ok:
-                    reranked_items.append({"content": content_str, "score": score})
-                    seen_contents.add(content_str)
+            if source_trace_ids:
+                # Deduplicate and limit source traces
+                source_trace_ids = list(set(source_trace_ids))[:10]
+                resolved = self.hippo.get_traces_by_ids(source_trace_ids)
+                for r in resolved:
+                    p = r["payload"]
+                    msgs = p.get("messages", []) or p.get("stimulus", {}).get("messages", [])
+                    content_str = " | ".join([f"{m.get('role','user')}: {m.get('content','')}" for m in msgs])
+                    thought_evidence.append(content_str)
 
-            reranked_items.sort(key=lambda x: x["score"], reverse=True)
-            l2_contents = [it["content"] for it in reranked_items]
+            # 3. Search for Entities
+            potential_entities = re.findall(r'\b[A-Z][a-z0-9]+\b|\b[a-z0-9]+\.[a-z0-9]+\b', query or "")
+            entity_facts = self.hippo.get_facts_for_entities(session_id, list(set(potential_entities)))
 
-            # --- Vault (External Knowledge) ---
+            # 4. Search Vault
             vault_results = []
             if self.vault_indexer:
                 raw_vault = self.vault_indexer.search(query, limit=5)
@@ -310,39 +320,39 @@ class MemoryRouter:
                         vault_results.append({"title": r["title"], "content": r["content"], "score": score})
                 vault_results.sort(key=lambda x: x["score"], reverse=True)
 
-            potential_entities = re.findall(r'\b[A-Z][a-z0-9]+\b|\b[a-z0-9]+\.[a-z0-9]+\b', query or "")
-            entity_facts = self.hippo.get_facts_for_entities(session_id, list(set(potential_entities)))
-            
-            # Phase 55: Contextual Silence & Cognitive Verification (v1.23)
-            # 1. Heuristic Check
-            has_long_term_gain = any([l3_summary, entity_facts, vault_results, l2_contents])
+            # 5. L2 Fallback (Only if no high-level gains found)
+            l2_contents = []
+            if not thoughts and not entity_facts:
+                sem_results = self.hippo.search(query, session_id, self._get_current_room(session_id), limit=25, include_distances=True)
+                lex_ids = self.hippo.search_lexical(list(hard_anchors) + core_subjects[:5], session_id, limit=25)
+                
+                candidate_map = {c["id"]: c["distance"] for c in sem_results}
+                for lid in lex_ids:
+                    if lid not in candidate_map: candidate_map[lid] = 1.0 
+                
+                reranked_items = []
+                seen_contents = set()
+                for tid, distance in candidate_map.items():
+                    p = self.hippo.get_full_payload(tid)
+                    if not p: continue
+                    msgs = p.get("messages", []) or p.get("stimulus", {}).get("messages", [])
+                    content_str = " | ".join([f"{m.get('role','user')}: {m.get('content','')}" for m in msgs])
+                    if content_str in seen_contents: continue 
+                    
+                    is_ok, score = _is_constraint_satisfied(content_str, distance)
+                    if is_ok:
+                        reranked_items.append({"content": content_str, "score": score})
+                        seen_contents.add(content_str)
+
+                reranked_items.sort(key=lambda x: x["score"], reverse=True)
+                l2_contents = [it["content"] for it in reranked_items]
+
+            # Phase 55: Contextual Silence (v1.23)
+            has_long_term_gain = any([thoughts, entity_facts, vault_results, l2_contents])
             if not has_long_term_gain:
                 return ""
             
-            # 2. Cognitive Final Verification (The Judge)
-            # We pick the top signal from Hippo or Vault as a sample for the judge
-            sample_parts = []
-            if l3_summary: sample_parts.append(l3_summary)
-            if l2_contents: sample_parts.append(l2_contents[0])
-            if vault_results: sample_parts.append(vault_results[0]["content"])
-            
-            context_sample = "\n".join(sample_parts)
-            try:
-                is_truly_relevant = await asyncio.wait_for(
-                    self.neo.verify_relevance(query, context_sample),
-                    timeout=self.judge_timeout
-                )
-            except asyncio.TimeoutError:
-                logger.warning(f"[ROUTER] Cognitive Judge timed out for query: '{query}'. Failing open.")
-                is_truly_relevant = True
-            except Exception as e:
-                logger.warning(f"[ROUTER] Cognitive Judge error: {e}. Failing open.")
-                is_truly_relevant = True
-            
-            if not is_truly_relevant:
-                logger.info(f"[ROUTER] Cognitive Judge rejected context for query: '{query}'")
-                return ""
-
+            # --- CONTEXT ASSEMBLY (Strict Read-Only) ---
             output_parts = []
             current_len = 0
             
@@ -372,7 +382,14 @@ class MemoryRouter:
                     current_len += len(full_section)
 
             # Design v1.14 Priority: L3 -> L1 -> Vault -> L2
-            if l3_summary: try_add("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary])
+            if thoughts:
+                thought_lines = [f"{t['thought']} (Confidence: {t['confidence']})" for t in thoughts]
+                try_add("VERIFIED THOUGHTS (NEOCORTEX)", thought_lines)
+                if thought_evidence:
+                    try_add("SUPPORTING EVIDENCE (ROOT SOURCES)", thought_evidence)
+            elif l3_summary:
+                try_add("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary])
+
             try_add("ACTIVE CONVERSATION (WORKING MEMORY)", working_contents)
             
             # Entities and Vault
@@ -380,7 +397,8 @@ class MemoryRouter:
             if vault_results: try_add("EXTERNAL KNOWLEDGE (VAULT)", vault_results)
             
             # L2: Hippocampus (Episodic)
-            try_add("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents, prefix="") 
+            if l2_contents:
+                try_add("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents, prefix="") 
 
             coupling = "\n\n[COGNITIVE COUPLING]: Cross-reference above facts. Prioritize NEOCORTEX."
             final_output = "[CLAWBRAIN MEMORY]" + "".join(output_parts)
@@ -432,6 +450,36 @@ class MemoryRouter:
                 if self.vault_indexer.index_all()["indexed"] > 0: logger.info("Vault Indexed.")
             except: pass
             await asyncio.sleep(300)
+
+    async def _cognitive_heartbeat_loop(self):
+        """v0.2: The Breathing Brain - Autonomous background processing."""
+        logger.info(f"[ROUTER] Cognitive heartbeat started (Interval: {self.heartbeat_interval}s)")
+        while True:
+            try:
+                await asyncio.sleep(self.heartbeat_interval)
+                
+                # 1. Process pending entity extractions
+                if self._pending_trace_extractions:
+                    to_process = self._pending_trace_extractions[:]
+                    self._pending_trace_extractions = []
+                    logger.info(f"[HEARTBEAT] Processing {len(to_process)} pending extractions.")
+                    for sid, tid in to_process:
+                        await self._auto_entity_worker(sid, tid)
+                        await asyncio.sleep(0.1) # Breather
+                
+                # 2. Process dirty sessions (Distillation)
+                if self._dirty_sessions:
+                    to_distill = list(self._dirty_sessions)
+                    self._dirty_sessions.clear()
+                    for sid in to_distill:
+                        logger.info(f"[HEARTBEAT] Distilling session: {sid}")
+                        await self._auto_distill_worker(sid)
+                        await asyncio.sleep(0.5)
+                        
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"[HEARTBEAT] Loop error: {e}")
 
     async def aclose(self):
         logger.info("[ROUTER] Closing memory engine connections...")
