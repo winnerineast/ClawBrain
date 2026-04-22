@@ -1,52 +1,37 @@
-# design/memory_neocortex.md v1.2
+# design/memory_neocortex.md v2.0 (v0.2.0 - Thought-Retriever)
 
 ## 1. Objective
-Implement the **ClawBrain Neocortex** engine from scratch. This engine is responsible for asynchronously consolidating verbose episodic memories from the Hippocampus into refined semantic memories (knowledge summaries), while providing "visible semantic audit" capability.
+Implement the **ClawBrain Neocortex v2** — a high-level cognitive processor that transforms verbose episodic interactions (L2) into granular, grounded "Thoughts" (L3). It employs **Root Source Mapping** to ensure every insight is traceable to its original interaction, solving the "Multi-Fact Join" problem.
 
 ## 2. Architecture
 
-### 2.1 Data & Storage Model
-- **Dependencies**: 
-  - `db_dir`: Directory for SQLite storage.
-  - `distill_url`: Base URL for the distillation provider (default: `http://127.0.0.1:11434` for Ollama or `http://127.0.0.1:8080/v1` for OpenAI-compatible local servers).
-  - `distill_model`: Model name for distillation.
-  - `distill_provider`: Protocol type (`ollama` or `openai-compatible`).
-- **Storage table (`neocortex_summaries`)**:
-  - `session_id` (TEXT PRIMARY KEY)
-  - `summary_text` (TEXT)
-  - `last_updated` (REAL)
-  - `hebbian_weight` (REAL DEFAULT 1.0)
+### 2.1 Thought Data Model
+- **Storage**: ChromaDB `thoughts` collection (Vector search enabled).
+- **Thought Schema (JSON)**:
+  - `thought`: The distilled insight or fact (TEXT).
+  - `source_traces`: List of trace IDs supporting this thought (LIST[TEXT]).
+  - `confidence`: Confidence score (0.0 to 1.0).
+  - `metadata`: `session_id`, `timestamp`.
 
-### 2.2 Semantic Distillation Engine
+### 2.2 Thought Distillation Engine (v2.0)
 - **Method signature**: `async def distill(session_id: str, traces: List[Dict[str, Any]]) -> str`
-- **Config priority**:
-  1. URL: Env `CLAWBRAIN_DISTILL_URL` -> Constructor `distill_url`.
-  2. Model: Env `CLAWBRAIN_DISTILL_MODEL` -> Constructor `distill_model`.
-  3. API Key: Env `CLAWBRAIN_DISTILL_API_KEY` (optional).
-  4. Provider: Env `CLAWBRAIN_DISTILL_PROVIDER` (default: `openai-compatible`).
-- **Protocol Dispatch**:
-  - **Ollama**: Call `distill_url/api/generate` with `prompt`. Extract `response`.
-  - **OpenAI-compatible**: Call `distill_url/chat/completions` with `messages`. Extract `choices[0].message.content`.
+- **Rhythm**: Triggered by the **Breathing Brain** heartbeat loop (Background).
 - **Logic flow**:
-  1. Iterate `traces` to build a conversation corpus.
-  2. Construct the summarization prompt. The prompt MUST be template-based and strictly categorize extracted facts into 'Technical Decisions', 'User Preferences', and 'Project Context' to optimize for specific test dimensions (ISSUE-007).
-  3. Dispatch to the selected provider.
-  4. Upsert result into `neocortex_summaries`.
+  1. Iterate `traces` and prefix messages with their `[trace_id]`.
+  2. Prompt LLM to extract granular insights in **JSON format**.
+  3. **Strict Requirement**: Every thought MUST include the `source_traces` list containing the relevant trace IDs from the prompt.
+  4. Upsert individual thoughts into ChromaDB `thoughts` collection.
 
-### 2.3 Memory Recall Interface
-- **Method signature**: `def get_summary(session_id: str) -> Optional[str]`
-- Reads and returns the latest summary for the given session from SQLite.
+### 2.3 Grounded Recall Interface
+- **Method signature**: `search_thoughts(query: str, session_id: str) -> List[Dict]`
+- Returns thoughts matching the query, including their `source_traces`.
+- **Root Source Resolution**: The caller (MemoryRouter) uses these trace IDs to fetch raw interaction payloads from the Hippocampus to provide "Evidence" in the final prompt.
 
-## 3. Test Specification (High-Fidelity TDD)
-
-All tests must be in `tests/test_p9_neocortex.py` with highly structured semantic comparison logs.
-
-### 3.1 Core Fact Distillation Audit (Semantic Delta)
-- **Test data**: Provide an interaction array containing 3 trivial exchanges and 1 core fact (e.g., `"Database version is 15.2"` or a similar unique parameter).
-- **Audit requirements**:
-  - **Precise assertion**: The test must not only check whether the summary is shorter, but also verify against a predefined set of "canary fact keywords" that no key fact is omitted.
-  - **Log display**: Side-by-Side format — left column `EXPECTED EVIDENCE` lists required key facts; right column `ACTUAL EVIDENCE` shows confirmation markers (`[x]` or `[ ]`) for each fact in the summary.
+## 3. Test Specification (v2.0)
+- **Root Mapping Audit**: Verify that for a given "Thought", the resolved "Evidence" contains the actual keywords from the original interaction.
+- **Deduplication Audit**: (v0.3) Verify that similar thoughts are merged rather than duplicated.
 
 ## 4. Output Targets
-1. `src/memory/neocortex.py`: Neocortex logic and storage.
-2. `tests/test_p9_neocortex.py`: Robust semantic validation with high-fidelity output.
+1. `src/memory/neocortex.py`: Thought extraction and JSON parsing logic.
+2. `src/memory/storage.py`: `thoughts_col` and Root Source Resolution methods.
+3. `tests/test_p50_thoughts.py`: Lifecycle verification.

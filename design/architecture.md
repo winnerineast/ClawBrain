@@ -1,24 +1,36 @@
-# design/architecture.md v1.1
+# design/architecture.md v1.2 (Phase 56 - v0.2.0)
 
 ## 1. Project Vision
 ClawBrain is more than a gateway — it is a universal LLM enhancement engine with "brain-like memory" capabilities.
 
-## 2. Core System Modules
+## 2. Dual-Process Cognitive Architecture (The Breathing Brain)
+Inspired by the Thought-Retriever framework, ClawBrain v0.2 split memory operations into two decoupled rhythms:
 
-### Modules A, B, C (Gateway & Optimizer)
-[Accepted and complete]
+### 2.1 The Foreground Reflex (On-Demand Context)
+- **Rhythm**: Triggered by user request.
+- **Responsibility**: Instantaneous context assembly.
+- **Constraint**: **Strict Read-Only**. It must not trigger any LLM calls or heavy processing.
+- **Logic**: Retrieve granular "Thoughts" from Neocortex and immediately pull "Root Evidence" from Hippocampus.
 
-### Module D: Third-Generation Neural Memory Engine
-- **Hippocampus**: Episodic memory. A write-once system keyed by time with semantic vector retrieval via ChromaDB.
-- **Neocortex**: Semantic memory. Slow-integration distillation with async background workers.
-- **Working Memory**: Active cache. Priority queue driven by Attractor dynamics with rapid decay.
+### 2.2 The Background Breathing (Heartbeat Loop)
+- **Rhythm**: Autonomous heartbeat (default 30s).
+- **Responsibility**: Memory digestion, Entity Extraction, Thought Distillation.
+- **Constraint**: Self-paced via `CircuitBreaker`. It operates on the **Cognitive Plane**.
 
-## 3. Reliability & Robustness: Dual-Channel Isolation
-To ensure high availability and non-blocking performance, ClawBrain employs **Network Plane Isolation**:
-1. **The Relay Plane**: A high-concurrency HTTP client dedicated solely to upstream LLM traffic. This plane is performance-optimized and has strict isolation from internal tasks.
-2. **The Cognitive Plane**: An independent, internal HTTP client owned by the `MemoryRouter`. It handles background "thinking" tasks (Room Detection, Fact Distillation) without competing for the Relay Plane's connection pool or bandwidth.
+## 3. Core System Modules
 
-## 3. Implementation Roadmap (Updated)
-- **Phase 1–5**: Core gateway and protocol stack [Complete]
-- **Phase 6–11**: Neural memory system development [Launched]
-- **Phase 12**: Final integration and production mounting
+### Module D: Neural Memory Engine
+- **Hippocampus (L2)**: Episodic memory. Permanent interaction traces + Root Source Mapping (Trace ID indexing).
+- **Neocortex (L3)**: Semantic memory. Extracts granular "Thoughts" (Insights) instead of monolithic summaries.
+- **Working Memory (L1)**: Short-term cache. Priority queue driven by Attractor dynamics with rapid decay.
+
+## 4. Reliability & Robustness: Dual-Channel Isolation
+ClawBrain employs strict **Plane Isolation**:
+1. **The Relay Plane**: High-concurrency HTTP client for upstream traffic.
+2. **The Cognitive Plane**: Independent, internal client for background tasks (Room Detection, Thought Extraction).
+
+## 5. Implementation Roadmap (Updated)
+- **Phase 1–11**: Neural memory core [Complete]
+- **Phase 12**: v0.1.1 Entity Awareness [Complete]
+- **Phase 56**: v0.2.0 Thought-Retriever & Breathing Brain [Complete]
+- **Phase 60**: v0.3.0 Thought Consolidation & Merging [Planned]
