@@ -43,7 +43,8 @@ class MemoryRouter:
     """
     def __init__(self, db_dir: str, distill_url: str = None, distill_model: str = None, distill_provider: str = "ollama", 
                  enable_room_detection: bool = True, distill_threshold: int = 10, enable_auto_scan: bool = True,
-                 cb_max_failures: int = None, cb_backoff: int = None, judge_timeout: float = 2.0):
+                 cb_max_failures: int = None, cb_backoff: int = None, judge_timeout: float = 2.0,
+                 heartbeat_interval: int = None):
         self.db_dir = Path(db_dir)
         self.ready_event = asyncio.Event()
         self.hippo = None
@@ -69,7 +70,8 @@ class MemoryRouter:
         # v0.2: Breathing Brain state
         self._dirty_sessions = set() # Sessions needing distillation
         self._pending_trace_extractions = [] # List of (session_id, trace_id) for entity extraction
-        self.heartbeat_interval = int(os.getenv("CLAWBRAIN_HEARTBEAT_SECONDS", 30))
+        self.heartbeat_interval = int(os.getenv("CLAWBRAIN_HEARTBEAT_SECONDS", heartbeat_interval or 30))
+        self._nudge_event = asyncio.Event() # v0.2.1: Manual nudge for testing
         
         # P56: Configurable Circuit Breakers
         self.cb_max_failures = int(os.getenv("CLAWBRAIN_CB_MAX_FAILURES", cb_max_failures or 3))
@@ -451,30 +453,43 @@ class MemoryRouter:
             except: pass
             await asyncio.sleep(300)
 
+    async def nudge(self):
+        """v0.2.1: Force the brain to breathe immediately (useful for testing)."""
+        self._nudge_event.set()
+
+    async def breathe(self):
+        """v0.2.1: Execute one cycle of memory processing."""
+        # 1. Process pending entity extractions
+        if self._pending_trace_extractions:
+            to_process = self._pending_trace_extractions[:]
+            self._pending_trace_extractions = []
+            logger.info(f"[BREATHE] Processing {len(to_process)} pending extractions.")
+            for sid, tid in to_process:
+                await self._auto_entity_worker(sid, tid)
+                await asyncio.sleep(0.01) # Tiny gap
+        
+        # 2. Process dirty sessions (Distillation)
+        if self._dirty_sessions:
+            to_distill = list(self._dirty_sessions)
+            self._dirty_sessions.clear()
+            for sid in to_distill:
+                logger.info(f"[BREATHE] Distilling session: {sid}")
+                await self._auto_distill_worker(sid)
+                await asyncio.sleep(0.01)
+
     async def _cognitive_heartbeat_loop(self):
         """v0.2: The Breathing Brain - Autonomous background processing."""
         logger.info(f"[ROUTER] Cognitive heartbeat started (Interval: {self.heartbeat_interval}s)")
         while True:
             try:
-                await asyncio.sleep(self.heartbeat_interval)
+                # Wait for interval OR manual nudge
+                try:
+                    await asyncio.wait_for(self._nudge_event.wait(), timeout=self.heartbeat_interval)
+                except asyncio.TimeoutError:
+                    pass # Regular interval reached
                 
-                # 1. Process pending entity extractions
-                if self._pending_trace_extractions:
-                    to_process = self._pending_trace_extractions[:]
-                    self._pending_trace_extractions = []
-                    logger.info(f"[HEARTBEAT] Processing {len(to_process)} pending extractions.")
-                    for sid, tid in to_process:
-                        await self._auto_entity_worker(sid, tid)
-                        await asyncio.sleep(0.1) # Breather
-                
-                # 2. Process dirty sessions (Distillation)
-                if self._dirty_sessions:
-                    to_distill = list(self._dirty_sessions)
-                    self._dirty_sessions.clear()
-                    for sid in to_distill:
-                        logger.info(f"[HEARTBEAT] Distilling session: {sid}")
-                        await self._auto_distill_worker(sid)
-                        await asyncio.sleep(0.5)
+                self._nudge_event.clear()
+                await self.breathe()
                         
             except asyncio.CancelledError:
                 break

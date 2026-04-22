@@ -1,10 +1,9 @@
-# 🦞 ClawBrain: Active Issues & Paused Tasks (April 22, 2026 - v0.2.0 Dev)
+# 🦞 ClawBrain: Active Issues & Paused Tasks (April 22, 2026 - v0.2.1 Stable)
 
-## ✅ Recently Resolved (v0.2.0 Breakthrough)
-- **The Breathing Brain**: Decoupled cognitive processing from the relay plane using an autonomous background heartbeat loop (`CLAWBRAIN_HEARTBEAT_SECONDS`).
-- **Thought-Retriever Framework**: Implemented granular "Thought" extraction in Neocortex with **Root Source Mapping** (mapping high-level insights back to raw L2 traces).
-- **Near-Zero Latency Assembly**: Refactored `get_combined_context` into a strict read-only pipeline, eliminating the synchronous Cognitive Judge for pre-verified thoughts.
-- **Root Source Resolver**: Added batch retrieval of full payloads in Hippocampus to provide grounded evidence for every retrieved thought.
+## ✅ Recently Resolved (v0.2.1 Accelerated Brain)
+- **Nudge & Breathe Mechanism**: Introduced manual `nudge()` and `breathe()` methods in `MemoryRouter`, allowing real-system cognitive processing to be triggered instantly for testing.
+- **Accelerated Verification**: Successfully verified the "Breathing Brain" logic without waiting for real-time heartbeat intervals using 100% real logic.
+- **Configuration Hardening**: Added `heartbeat_interval` to `MemoryRouter.__init__` for better runtime control.
 
 ## 🧠 Cognitive Progress Report (v0.2.x)
 - **Duality of Process**: The system now has a distinct "Foreground Reflex" (On-demand context) and "Background Meditation" (Heartbeat distillation).
@@ -17,7 +16,7 @@
 ## 📅 Plan for Tomorrow (v0.3 Focus)
 1. **Thought Consolidation**: Implement a "Thought Merging" worker that collapses similar insights and updates confidence scores.
 2. **Tier 1 Verification**: Execute full AcademicEval-style benchmark to quantify the gain from Root Source Mapping.
-3. **Registry Hardening**: Ensure Entity extraction and Thought extraction don't collide when updating the L2 metadata.
+3. **Signal Refinement**: Enhance `SignalDecomposer` to handle nested protocol structures in complex agentic workflows.
 
 ---
-*Status: DUAL-PROCESS COGNITIVE ENGINE. Breathing active. Thoughts grounded in evidence.*
+*Status: DUAL-PROCESS COGNITIVE ENGINE. Breathing active. Accelerated testing verified.*
