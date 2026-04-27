@@ -67,3 +67,5 @@ async def test_memory_router_ingest_resilience():
     
     assert "Keep this alive" in str(active_items)
     assert "Keep this alive" in str(content)
+    
+    await router.aclose()

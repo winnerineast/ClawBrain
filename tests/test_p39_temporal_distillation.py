@@ -15,7 +15,13 @@ async def test_temporal_distillation_logic(tmp_path):
     db_dir = str(tmp_path)
     
     # Use a small threshold for testing
-    router = MemoryRouter(db_dir=db_dir, distill_threshold=5, enable_room_detection=False)
+    router = MemoryRouter(
+        db_dir=db_dir, 
+        distill_threshold=5, 
+        enable_room_detection=False,
+        enable_auto_scan=False,
+        enable_cognitive_plane=True
+    )
     await router.wait_until_ready()
     
     session_id = "temporal-audit-session"
@@ -38,33 +44,28 @@ async def test_temporal_distillation_logic(tmp_path):
             await router.ingest({"messages": [{"role": "user", "content": turn}]}, session_id=session_id)
             
     # The 5th turn should have triggered distillation (threshold=5)
-    # Since it's async, we poll for the summary (using REAL time)
-    print("\n[TEMPORAL TEST] Ingested 5 turns. Polling for summary...")
+    # Force the heartbeat to run immediately
+    router.nudge()
+    print("\n[TEMPORAL TEST] Ingested 5 turns. Polling for thoughts...")
     
     start_poll = time.monotonic()
-    safety_limit = 300 # 5 minutes for slow hardware
-    summary = None
+    safety_limit = 120 # 2 minutes
+    thoughts = []
     while time.monotonic() - start_poll < safety_limit:
-        summary = router.neo.get_summary(session_id)
-        if summary and not summary.startswith("[Error]"):
-            print(f"Success! Summary generated in {int(time.monotonic() - start_poll)}s")
+        thoughts = router.hippo.search_thoughts("", session_id=session_id)
+        if thoughts:
+            print(f"Success! {len(thoughts)} thoughts generated in {int(time.monotonic() - start_poll)}s")
             break
-        
-        if summary and summary.startswith("[Error]"):
-            # Check if it's a transient connection error
-            if "connection error" in summary.lower():
-                pass # Continue polling
-            else:
-                pytest.fail(f"Distillation failed with critical error: {summary}")
-                
-        await asyncio.sleep(5)
+        await asyncio.sleep(2)
     
-    assert summary is not None, f"Distillation failed to produce a summary within {safety_limit}s"
-    print(f"Resulting Summary:\n{summary}")
+    assert len(thoughts) > 0, f"Distillation failed to produce thoughts within {safety_limit}s"
     
-    # Verify that critical facts were preserved despite the "noise" and temporal spread
-    # We look for keywords that should be in the distilled summary
-    assert "Minecraft" in summary or "house" in summary
-    assert "oak" in summary.lower() or "wood" in summary.lower()
-    assert "cobblestone" in summary.lower()
-    assert "blue bed" in summary.lower() or "bedroom" in summary.lower()
+    combined_thoughts = " ".join([t["thought"] for t in thoughts]).lower()
+    print(f"Resulting Thoughts:\n{combined_thoughts}")
+    
+    # Verify that critical facts were preserved
+    assert "minecraft" in combined_thoughts or "house" in combined_thoughts
+    assert "oak" in combined_thoughts or "wood" in combined_thoughts
+    assert "cobblestone" in combined_thoughts
+    assert "blue bed" in combined_thoughts or "bedroom" in combined_thoughts
+    await router.aclose()

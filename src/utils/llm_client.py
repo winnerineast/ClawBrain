@@ -68,6 +68,8 @@ class HardwareProfiler:
 
 class LLMClient:
     """Base class for all LLM providers."""
+    _client_instance: Optional[httpx.AsyncClient] = None
+
     def __init__(self, url: str, model: str, api_key: str = "", timeout: float = 60.0):
         self.url = url.rstrip('/')
         self.model = model
@@ -79,6 +81,18 @@ class LLMClient:
 
     async def chat(self, messages: List[Dict[str, str]]) -> str:
         raise NotImplementedError
+
+    @classmethod
+    async def aclose(cls):
+        if cls._client_instance:
+            try:
+                if not cls._client_instance.is_closed:
+                    await cls._client_instance.aclose()
+            except RuntimeError:
+                # Loop might already be closed
+                pass
+            finally:
+                cls._client_instance = None
 
 class OllamaClient(LLMClient):
     """Ollama-specific implementation."""

@@ -166,22 +166,6 @@ class MemoryRouter:
             
             return trace_id
 
-    async def _auto_room_worker(self, session_id: str, current_turn: str):
-        if self.cb_room.is_open(): return
-        try:
-            wm = self._get_wm(session_id)
-            history = [it.content for it in wm.items[-5:]]
-            existing = list(set(self._current_rooms.values()))
-            
-            new_room = await self.room_detector.detect_room(history, current_turn, existing)
-            if new_room and new_room != self._current_rooms.get(session_id):
-                logger.info(f"[ROUTER] Topic shift detected in {session_id}: -> {new_room}")
-                self._current_rooms[session_id] = new_room
-            self.cb_room.record_success()
-        except Exception as e:
-            logger.warning(f"[ROUTER] Room detection background fail: {e}")
-            self.cb_room.record_failure()
-
     async def commit_turn(self, trace_id: str, payload: Dict[str, Any], reaction: Dict[str, Any], session_id: str, sync_distill: bool = False, offload_threshold: int = None):
         await self.wait_until_ready()
         async with self._get_session_lock(session_id):
@@ -340,7 +324,6 @@ class MemoryRouter:
                 return ""
             
             # 2. Cognitive Final Verification (The Judge)
-            # We pick the top signal from Hippo or Vault as a sample for the judge
             sample_parts = []
             if l3_summary: sample_parts.append(l3_summary)
             if l2_contents: sample_parts.append(l2_contents[0])
@@ -354,40 +337,31 @@ class MemoryRouter:
                 logger.info(f"[ROUTER] Cognitive Judge rejected context for query: '{query}'")
                 return ""
 
-            output_parts = []
-            current_len = 0
-            
-            # P31: Strict Header + Safety Margin checks (as per design/memory_router.md §2.6)
+            # Assembly
+            output_parts, current_len = [], 0
             def try_add(header, contents, prefix="- "):
                 nonlocal current_len
                 if not contents: return
-                header_text = f"\n\n=== {header} ===\n"
-                
-                if current_len + len(header_text) + 20 > max_chars:
-                    return
-
-                section_lines = []
+                ht = f"\n\n=== {header} ===\n"
+                safety = 10 
+                sl, tr = [], False
                 for it in contents:
-                    # Support for structured results (Vault uses dicts)
-                    content_val = it["content"] if isinstance(it, dict) else it
-                    line = f"{prefix}{content_val}"
-                    potential_full = header_text + "\n".join(section_lines + [line])
-                    if current_len + len(potential_full) <= max_chars:
-                        section_lines.append(line)
+                    line = f"{prefix}{it['content'] if isinstance(it, dict) else it}"
+                    if current_len + len(ht) + len(line) + safety <= max_chars:
+                        sl.append(line)
                     else:
-                        break
-                
-                if section_lines:
-                    full_section = header_text + "\n".join(section_lines)
-                    output_parts.append(full_section)
-                    current_len += len(full_section)
+                        tr = True; break
+                if sl:
+                    if tr: sl.append(f"{prefix}...")
+                    fs = ht + "\n".join(sl)
+                    if current_len + len(fs) + safety <= max_chars:
+                        output_parts.append(fs); current_len += len(fs)
 
-            # Design v1.14 Priority: L3 -> L1 -> Vault -> L2
+            # Priority: L3 -> L1 -> Vault -> L2
             if l3_summary: try_add("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary])
             try_add("ACTIVE CONVERSATION (WORKING MEMORY)", working_contents)
             if vault_results: try_add("EXTERNAL KNOWLEDGE (VAULT)", vault_results)
             
-            # L2: Hippocampus (Episodic) - Unified section for benchmark isolation check
             all_l2 = []
             if entity_facts:
                 all_l2.extend([f"VERIFIED FACT: {f['entity']} > {f['key']}: {f['value']}" for f in entity_facts])
@@ -442,3 +416,4 @@ class MemoryRouter:
     async def aclose(self):
         logger.info("[ROUTER] Closing memory engine connections...")
         clear_chroma_clients()
+        await LLMClient.aclose()
