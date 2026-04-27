@@ -1,7 +1,7 @@
-# design/memory_router.md v1.4 (Phase 60)
+# design/memory_router.md v1.5 (Phase 61)
 
 ## 1. Objective
-Implement the **ClawBrain MemoryRouter** — the central memory hub that orchestrates the three-layer memory system. It must provide an **Asynchronous Sequential Gate** to ensure that memory ingestion, distillation, and assembly for any given session occur in a consistent logical order without race conditions.
+Implement the **ClawBrain MemoryRouter v2** — the central cognitive hub that orchestrates the "Breathing Brain" architecture. It must provide an **Asynchronous Sequential Gate** to ensure that memory ingestion, distillation, and assembly for any given session occur in a consistent logical order without race conditions, while decoupling background processing from real-time response generation.
 
 ## 2. Architecture & Logic
 
@@ -37,6 +37,24 @@ Context is assembled in order of "Knowledge Density":
 - **Env var `CLAWBRAIN_MAX_CONTEXT_CHARS`**: Default `2000`.
 - **Header Safety**: Budget checked against the header length plus a 20-character safety margin.
 - **Log point**: `[CTX_BUDGET] Budget: N | Used(L3): N | Used(L1): N | Used(L2): N | Session: ctx`.
+
+### 2.5 The Breathing Brain (Heartbeat Loop)
+- **Core Concept**: Cognitive background tasks are decoupled from real-time ingestion.
+- **Method**: `async def _cognitive_heartbeat_loop()`
+  - **Rhythm**: Orchestrated by `CLAWBRAIN_HEARTBEAT_SECONDS` (default: 30s).
+  - **Task Queues**:
+    - `_dirty_sessions: Set[str]`: Sessions that have had enough interaction to warrant a new L3 distillation.
+    - `_pending_trace_extractions: List[str]`: Trace IDs that require deep entity attribute extraction.
+- **Execution Logic**:
+  1. At every pulse, check if the top-level `CircuitBreaker` is open.
+  2. For each `trace_id` in `_pending_trace_extractions`:
+     - Dispatch to `EntityExtractor` for attribute mining.
+     - Move from pending to processed.
+  3. For each `session_id` in `_dirty_sessions`:
+     - Acquire session lock.
+     - Trigger `Neocortex.distill()`.
+     - Remove from dirty set.
+  4. Perform periodic `hippo` cleanup and maintenance.
 
 ## 4. Output Targets
 - `src/memory/router.py`, `src/memory/storage.py`, `src/main.py`, `tests/test_p22_wm_persistence.py`.

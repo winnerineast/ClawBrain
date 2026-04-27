@@ -70,7 +70,7 @@ class Pipeline:
                     assistant_content = choices[0].get("message", {}).get("content", "")
 
             if not assistant_content:
-                # Rule 12: Use session_id instead of context_id
+                # Rule 12: Use session_id exclusively
                 await mr.commit_turn(trace_id, original_body, {"message": {"role": "assistant", "content": ""}}, session_id=session_id)
                 return
 
