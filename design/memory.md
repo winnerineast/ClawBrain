@@ -15,6 +15,7 @@ Generate the **ClawBrain Neural Memory System**. This system achieves symmetric 
 ### 2.2 Signal Decomposer
 - **Schema Fingerprinting**: Identifies repeated protocol templates by computing an MD5 hash of the request structure (excluding message content).
 - **Core Intent Extraction**: Precisely extracts the text content of the last `role: user` entry from the `messages` array.
+- **Entity-Aware Signaling (v1.9)**: Automatically extracts "Primary Signals" (Technical identifiers, IP addresses, Proper Nouns, and version numbers) to be used as hard anchors in L2 metadata for precise, non-semantic retrieval.
 
 ### 2.3 Storage Layers & Lifecycle
 - **Working Memory (L1)**: In-memory `OrderedDict` with time-constant-based weight decay.

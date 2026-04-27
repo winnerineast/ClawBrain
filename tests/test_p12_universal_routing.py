@@ -31,8 +31,8 @@ async def test_universal_routing_lmstudio():
         "messages": [{"role": "user", "content": "Hello"}]
     }
     
-    # 精准拦截：只拦截发往 LMStudio 的请求
-    route = respx.post("http://127.0.0.1:1234/v1/chat/completions").mock(
+    # 精准拦截：只拦截发往 LMStudio 的请求 (使用 localhost 确保与 registry 匹配)
+    route = respx.post("http://localhost:1234/v1/chat/completions").mock(
         return_value=Response(200, json={"choices": [{"message": {"content": "mock"}}]})
     )
     

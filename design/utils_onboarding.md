@@ -1,7 +1,7 @@
-# design/utils_onboarding.md v1.0
+# design/utils_onboarding.md v1.1
 
 ## 1. Objective
-Transform ClawBrain from a manual experimental project into a user-friendly tool by providing automated installation, environment discovery, and configuration. The goal is to allow a new user to go from `git clone` to a fully running server in under 60 seconds.
+Transform ClawBrain from a manual experimental project into a user-friendly tool by providing automated installation, environment discovery, and configuration. The goal is to allow a new user to go from `git clone` to a fully running server in under 60 seconds on any supported platform (Ubuntu/macOS).
 
 ## 2. Functional Components
 
@@ -20,21 +20,24 @@ A Python-based utility (`src/utils/setup_scout.py`) that performs deep environme
 - **Model Intelligence**: Retrieves the list of loaded models and identifies the best candidate for distillation (L3).
 - **Knowledge Base Locating**: Searches standard directories for existing Obsidian Vaults to suggest for `CLAWBRAIN_VAULT_PATH`.
 - **Resource Profiling**: Measures available system RAM and VRAM to suggest optimal `distill_threshold` and `max_context_chars`.
+- **Cross-Platform Path Validation**: When parsing an existing `.env` file, the Scout must detect if paths are valid for the current OS. If a path begins with a root prefix that is invalid (e.g., `/home` on macOS or `/Users` on Linux) or if the directory is unreachable, it MUST be recalculated and updated.
 
 ### 2.3 Auto-Configuration Engine
 - Generates a `.env` file based on Scout's findings.
-- **Idempotency**: Respects existing `.env` values, only appending or suggesting updates for missing critical keys.
+- **Shell Compatibility**: All values in the `.env` file MUST be wrapped in double quotes (e.g., `KEY="VALUE"`) to ensure the file can be safely sourced by shell scripts even if values contain spaces.
+- **Intelligent Idempotency**: Respects existing `.env` values, but overwrites paths that are invalid for the current OS or explicitly unreachable.
 
 ### 2.4 ClawBrain Doctor (Diagnostics)
 A command-line tool to verify system health:
 - Tests connectivity to the Relay Plane and Cognitive Plane.
 - Validates ChromaDB collection integrity.
 - Outputs a high-fidelity environment report using the **Rule 3** Side-by-Side layout.
+- Suggests fixes for cross-platform migration errors (e.g., path mismatches).
 
 ## 3. User Journey
 1. User runs `./install.sh`.
 2. Script detects Ollama and an Obsidian Vault in `~/Documents`.
-3. Script configures `.env` automatically.
+3. Script configures `.env` automatically, correcting any invalid legacy paths from previous OS installations.
 4. User is presented with a "Ready to Launch" message and the final run command.
 
 ## 4. Test & Verification Specification
@@ -43,6 +46,7 @@ A command-line tool to verify system health:
 Verify that `setup_scout.py` behaves correctly in various environments:
 - **Empty Environment**: Gracefully falls back to manual input prompts.
 - **Multi-Service Environment**: Correctly prioritizes or lists multiple LLM providers.
+- **Cross-Platform Migration**: Verify that Linux-style paths in an existing `.env` are corrected when running on macOS.
 
 ### 4.2 Installation Stability
 - **Idempotency**: Running `install.sh` multiple times must not corrupt data or double-install packages.

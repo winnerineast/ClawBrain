@@ -1,10 +1,15 @@
 import pytest
 import os
 import asyncio
-import httpx
-import time
+import pytest
+import os
+import logging
 from src.memory.router import MemoryRouter
 from src.memory.storage import clear_chroma_clients
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 async def is_ollama_ready():
     try:

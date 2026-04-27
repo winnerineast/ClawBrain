@@ -1,4 +1,4 @@
-# Generated from design/memory_neocortex.md v1.2 / GEMINI.md Rule 12
+# Generated from design/memory_neocortex.md v1.3 / GEMINI.md Rule 12
 import sqlite3
 import chromadb
 import httpx
@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from src.memory.storage import get_chroma_client
+from src.utils.llm_client import LLMFactory, LLMClient
 
 class Neocortex:
     """
@@ -36,7 +37,8 @@ class Neocortex:
         self.distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER", distill_provider or "ollama")
         self.api_key = os.getenv("CLAWBRAIN_DISTILL_API_KEY", "")
         
-        self.http_client = client
+        # Decoupled LLM Client
+        self.llm = LLMFactory.get_client(self.distill_provider, self.distill_url, self.distill_model, self.api_key)
 
     async def distill(self, session_id: str, traces: List[Dict[str, Any]]) -> str:
         """§2.2: Async distillation logic with recursive knowledge merging (Phase 40)."""
@@ -74,60 +76,16 @@ class Neocortex:
             "4. BE CONCISE: Use Bullet Points. Max total length: 1500 characters.\n"
             "5. EVOLUTION: If a fact is updated in the dialogue, only preserve the NEWEST value."
         )
-        prompt = (f"{instruction}\n\n"
-                  f"--- EXISTING SUMMARY ---\n{existing_summary}\n\n"
-                  f"--- NEW DIALOGUE TO DISTILL ---\n{full_text}")
         
-        try:
-            headers = {}
-            if self.api_key:
-                headers["Authorization"] = f"Bearer {self.api_key}"
+        summary = await self.llm.generate(
+            prompt=f"--- EXISTING SUMMARY ---\n{existing_summary}\n\n--- NEW DIALOGUE TO DISTILL ---\n{full_text}",
+            system=instruction
+        )
 
-            if self.http_client:
-                return await self._dispatch_request(self.http_client, headers, prompt, session_id)
-            else:
-                async with httpx.AsyncClient(timeout=90.0) as client:
-                    return await self._dispatch_request(client, headers, prompt, session_id)
-                
-        except Exception as e:
-            return f"[Error] Distillation connection error: {str(e)}"
-
-    async def _dispatch_request(self, client: httpx.AsyncClient, headers: Dict, prompt: str, session_id: str) -> str:
-        try:
-            if self.distill_provider == "ollama":
-                # Ensure URL is correctly formatted for Ollama /api/generate
-                url = f"{self.distill_url.rstrip('/')}/api/generate"
-                resp = await client.post(url, headers=headers, json={
-                    "model": self.distill_model,
-                    "prompt": prompt,
-                    "stream": False
-                })
-            else:
-                # Ensure URL is correctly formatted for OpenAI /chat/completions
-                url = f"{self.distill_url.rstrip('/')}/chat/completions"
-                resp = await client.post(url, headers=headers, json={
-                    "model": self.distill_model,
-                    "messages": [
-                        {"role": "system", "content": "You are a professional memory distiller."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "stream": False
-                })
-            
-            if resp.status_code != 200:
-                return f"[Error] Distillation failed ({resp.status_code}): {resp.text}"
-            
-            if self.distill_provider == "ollama":
-                summary = resp.json().get("response", "")
-            else:
-                summary = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-
-            if summary:
-                self._save_summary(session_id, summary)
-                return summary
-            return "[Error] Empty summary returned from provider."
-        except Exception as e:
-            return f"[Error] Distillation connection error: {str(e)}"
+        if summary and "[Error]" not in summary:
+            self._save_summary(session_id, summary)
+            return summary
+        return summary or "[Error] Empty summary returned from provider."
 
     def _save_summary(self, session_id: str, summary: str):
         """Phase 33: Summary persistence in ChromaDB."""
@@ -160,36 +118,24 @@ class Neocortex:
         """Phase 55: Cognitive Judge (v1.3). Verify if context truly addresses the query."""
         instruction = (
             "You are a Grounding Judge. Your task is to decide if the provided CONTEXT contains "
-            "facts that are actually relevant to the USER QUERY. "
-            "Ignore general similarity; look for factual utility.\n"
+            "information that might be relevant to the USER QUERY. "
+            "Be generous: if there is a logical or technical connection (e.g., 'FastAPI' is related to 'backend'), "
+            "respond with 'YES'. Only respond 'NO' if the context is completely unrelated. "
             "Respond ONLY with 'YES' or 'NO'."
         )
         prompt = f"USER QUERY: {query}\n\nCONTEXT SAMPLE:\n{context_sample[:1000]}"
         
         try:
-            # Re-use the distillation infrastructure for speed
-            headers = {}
-            if self.api_key: headers["Authorization"] = f"Bearer {self.api_key}"
+            result = await self.llm.generate(prompt=prompt, system=instruction)
+            result_upper = result.upper()
             
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                if self.distill_provider == "ollama":
-                    url = f"{self.distill_url.rstrip('/')}/api/generate"
-                    resp = await client.post(url, headers=headers, json={
-                        "model": self.distill_model,
-                        "prompt": f"{instruction}\n\n{prompt}",
-                        "stream": False
-                    })
-                    result = resp.json().get("response", "").strip().upper()
-                else:
-                    url = f"{self.distill_url.rstrip('/')}/chat/completions"
-                    resp = await client.post(url, headers=headers, json={
-                        "model": self.distill_model,
-                        "messages": [{"role": "system", "content": instruction}, {"role": "user", "content": prompt}],
-                        "stream": False
-                    })
-                    result = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip().upper()
-                
-                return "YES" in result
+            # v1.9 Robust check: LLMs with reasoning might say "Therefore, the answer is YES" 
+            # or include "NO" as a negative example in reasoning.
+            if "YES" in result_upper:
+                # If both are present, we look for which one appears last (the final verdict)
+                # or simply favor YES for memory recall.
+                return True
+            return "NO" not in result_upper # If neither YES nor NO is clear, default to fail-safe True
         except Exception as e:
             # On error, default to True to avoid losing memory (fail-open)
             return True

@@ -27,3 +27,5 @@
 
 12. **Unified Identity Terminology**: To avoid semantic ambiguity and NameErrors, the project MUST use `session_id` exclusively to identify independent memory contexts. The legacy term `context_id` is deprecated and prohibited in design documents, internal logic, storage keys, and API parameters. Refactor all layers to use `session_id` as the canonical identifier.
 
+13. **Functional Integrity Over Test Optics**: NEVER introduce "fail-open" logic, default success values, or any code-level compromises solely to make tests pass. Tests are a mirror of the functional design; if they fail, the system is objectively incomplete or broken. The root cause must be diagnosed and fixed in the design or environment without sacrificing deterministic logic.
+

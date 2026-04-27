@@ -40,6 +40,11 @@ async def test_p11_full_chain_memory_echo_real():
         "message": {"role": "assistant", "content": "Secret recorded."}
     }))
     
+    # Mock Judge (Cognitive Judge v1.4)
+    respx.post("http://localhost:1234/chat/completions").mock(return_value=Response(200, json={
+        "choices": [{"message": {"content": "YES"}}]
+    }))
+    
     with TestClient(app) as client:
         # Round 1: Plant secret
         payload1 = {

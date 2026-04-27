@@ -1,10 +1,37 @@
-# Generated from design/utils_onboarding.md v1.0
+# Generated from design/utils_onboarding.md v1.1
 import pytest
 import os
 import respx
+import platform
 from httpx import Response
 from pathlib import Path
 from src.utils.setup_scout import SetupScout
+
+@pytest.mark.asyncio
+async def test_scout_cross_platform_correction(tmp_path, monkeypatch):
+    """Verify that invalid OS paths in .env are corrected."""
+    # Ensure we use the tmp_path for the .env file
+    monkeypatch.chdir(tmp_path)
+    env_file = tmp_path / ".env"
+    
+    current_os = platform.system()
+    if current_os == "Darwin":
+        legacy_path = "/home/user/data"
+    else:
+        legacy_path = "/Users/user/data"
+        
+    expected_path = str(tmp_path / "data")
+
+    env_file.write_text(f"CLAWBRAIN_DB_DIR={legacy_path}\n")
+    
+    scout = SetupScout()
+    scout.findings["db_dir"] = expected_path
+    
+    scout.generate_env()
+    
+    content = env_file.read_text()
+    assert f'CLAWBRAIN_DB_DIR="{expected_path}"' in content
+    assert legacy_path not in content
 
 @pytest.mark.asyncio
 @respx.mock
@@ -81,14 +108,14 @@ async def test_scout_env_generation(tmp_path):
     env_file = tmp_path / ".env"
     assert env_file.exists()
     content = env_file.read_text()
-    assert "CLAWBRAIN_DISTILL_URL=http://test-url" in content
+    assert 'CLAWBRAIN_DISTILL_URL="http://test-url"' in content
     
     # 2. Idempotency: Manually change a value
-    env_file.write_text("CLAWBRAIN_MAX_CONTEXT_CHARS=5000\nCLAWBRAIN_DISTILL_MODEL=manual-model")
+    env_file.write_text('CLAWBRAIN_MAX_CONTEXT_CHARS="5000"\nCLAWBRAIN_DISTILL_MODEL="manual-model"')
     scout.generate_env()
     content_v2 = env_file.read_text()
     # Should keep manual-model and 5000
-    assert "CLAWBRAIN_DISTILL_MODEL=manual-model" in content_v2
-    assert "CLAWBRAIN_MAX_CONTEXT_CHARS=5000" in content_v2
+    assert 'CLAWBRAIN_DISTILL_MODEL="manual-model"' in content_v2
+    assert 'CLAWBRAIN_MAX_CONTEXT_CHARS="5000"' in content_v2
     # Should still have the others
-    assert "CLAWBRAIN_VAULT_PATH=/test/vault" in content_v2
+    assert 'CLAWBRAIN_VAULT_PATH="/test/vault"' in content_v2

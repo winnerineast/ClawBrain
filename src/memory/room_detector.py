@@ -1,7 +1,8 @@
-# Generated from design/memory_rooms.md v1.0
+# Generated from design/memory_rooms.md v1.1
 import httpx
 import logging
 from typing import List, Dict, Any, Optional
+from src.utils.llm_client import LLMFactory, LLMClient
 
 logger = logging.getLogger("GATEWAY.MEMORY.ROOMS")
 
@@ -28,7 +29,9 @@ class RoomDetector:
         self.model = model
         self.provider = provider
         self.api_key = api_key
-        self.http_client = client
+        
+        # Decoupled LLM Client
+        self.llm = LLMFactory.get_client(self.provider, self.url, self.model, self.api_key, timeout=60.0)
 
     async def detect_room(self, history: List[str], current_turn: str, existing_rooms: List[str]) -> str:
         """
@@ -42,46 +45,15 @@ class RoomDetector:
         prompt += "Detected Room Name:"
 
         try:
-            # Phase 34: Use Cognitive Plane client with generous timeout for slow hardware
-            # Condition-based: We wait up to 60s which is the typical max for local inference on low-end GPUs
-            timeout = 60.0
+            result = await self.llm.generate(prompt=prompt, system=self.SYSTEM_PROMPT)
             
-            if self.http_client:
-                return await self._dispatch_detect(self.http_client, prompt)
-            else:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    return await self._dispatch_detect(client, prompt)
+            if "[Error]" in result:
+                raise Exception(result)
+                
+            # Sanitize: max 3 words, lowercase
+            sanitized = "-".join(result.strip().lower().split()[:3]).replace("'", "").replace('"', "")
+            return sanitized or "general"
                 
         except Exception as e:
             logger.warning(f"[ROOM_DETECTOR] Failed to detect room: {e}. Falling back to 'general'.")
             return "general"
-
-    async def _dispatch_detect(self, client: httpx.AsyncClient, prompt: str) -> str:
-        if self.provider == "ollama":
-            resp = await client.post(
-                f"{self.url}/api/generate",
-                json={"model": self.model, "prompt": self.SYSTEM_PROMPT + "\n\n" + prompt, "stream": False}
-            )
-            resp.raise_for_status()
-            result = resp.json().get("response", "general").strip().lower()
-        else:
-            # OpenAI compatible
-            headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-            resp = await client.post(
-                f"{self.url}/chat/completions",
-                headers=headers,
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": self.SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.0
-                }
-            )
-            resp.raise_for_status()
-            result = resp.json()["choices"][0]["message"]["content"].strip().lower()
-        
-        # Sanitize: max 3 words, lowercase
-        sanitized = "-".join(result.split()[:3]).replace("'", "").replace('"', "")
-        return sanitized or "general"

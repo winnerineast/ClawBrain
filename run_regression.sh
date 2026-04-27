@@ -11,6 +11,12 @@ source venv/bin/activate
 
 # 1. Sanitize Environment (Rule 10: Deterministic Integrity)
 echo "[CLEANUP] Reaping orphaned server and test processes..."
+if [ -f .env ]; then
+    echo "[ENV] Loading configuration from .env..."
+    set -a
+    source .env
+    set +a
+fi
 ps aux | grep -E "uvicorn|pytest" | grep -v grep | awk '{print $2}' | xargs kill -9 || true
 sleep 1
 

@@ -133,9 +133,11 @@ class Hippocampus:
         traces = []
         for i in range(len(res["ids"])):
             m = res["metadatas"][i]
+            # Use raw_content from metadata if available, otherwise fallback to document
+            content = m.get("raw_content") or res["documents"][i]
             traces.append({
                 "trace_id": res["ids"][i], "timestamp": m.get("timestamp") or 0,
-                "model": m.get("model"), "raw_content": res["documents"][i],
+                "model": m.get("model"), "raw_content": content,
                 "session_id": m.get("session_id"), "room_id": m.get("room_id", "general")
             })
         return sorted(traces, key=lambda x: x["timestamp"], reverse=True)[:limit]
@@ -197,9 +199,9 @@ class Hippocampus:
             except: pass
         
         # Path 2: Brute-force substring match on recent history (Fallback for precision)
-        # If we still have room, scan the last 50 traces manually
+        # If we still have room, scan the last 100 traces manually for this session
         if len(results) < limit:
-            recent = self.get_recent_traces(limit=50, session_id=session_id)
+            recent = self.get_recent_traces(limit=100, session_id=session_id)
             for row in recent:
                 content = str(row.get("raw_content", "")).upper()
                 for t in tokens:
@@ -212,7 +214,12 @@ class Hippocampus:
 
     def upsert_fact(self, session_id: str, entity: str, key: str, value: str, trace_id: str = None) -> str:
         fid = f"{session_id}_{entity}_{key}".replace(" ", "_")
-        self.entities_col.upsert(ids=[fid], documents=[value], metadatas=[{"session_id": session_id, "entity": entity, "key": key, "timestamp": time.time(), "trace_id": trace_id or "manual"}])
+        # Phase 60: Ensure fact evolution by overwriting the old document for this unique ID
+        self.entities_col.upsert(
+            ids=[fid], 
+            documents=[value], 
+            metadatas=[{"session_id": session_id, "entity": entity, "key": key, "timestamp": time.time(), "trace_id": trace_id or "manual"}]
+        )
         return fid
 
     def get_facts_for_entities(self, session_id: str, entities: List[str]) -> List[Dict[str, Any]]:

@@ -1,4 +1,4 @@
-# Generated from design/utils_onboarding.md v1.0
+# Generated from design/utils_onboarding.md v1.1
 import os
 import httpx
 import asyncio
