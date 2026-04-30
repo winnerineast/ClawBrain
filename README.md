@@ -90,6 +90,9 @@ source venv/bin/activate
 python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435
 ```
 
+> [!NOTE]
+> **Multi-Platform Sync**: ClawBrain supports synchronized settings for macOS and Ubuntu in a single `.env` file. Use `DARWIN_` or `LINUX_` prefixes for platform-specific overrides (e.g., `LINUX_CLAWBRAIN_DB_DIR`).
+
 ---
 
 ## 🔌 Integration & Usage

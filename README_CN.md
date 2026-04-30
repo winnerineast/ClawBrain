@@ -90,6 +90,9 @@ source venv/bin/activate
 python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435
 ```
 
+> [!NOTE]
+> **多平台同步**：ClawBrain 支持在单个 `.env` 文件中同步 macOS 和 Ubuntu 的设置。通过 `DARWIN_` 或 `LINUX_` 前缀可实现平台特定覆盖（例如 `LINUX_CLAWBRAIN_DB_DIR`）。
+
 ---
 
 ## 🔌 集成与使用
