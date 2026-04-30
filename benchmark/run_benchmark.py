@@ -82,7 +82,8 @@ def cmd_run(args: argparse.Namespace) -> None:
     from evaluate import summarize, format_report, score_case
     import subprocess
 
-    _cleanup_env()
+    if not args.no_cleanup:
+        _cleanup_env()
     _ensure_data()
 
     cases = load_generated(dim=args.dim)
@@ -206,6 +207,7 @@ def main() -> None:
     p_run.add_argument("--tier", choices=["1", "2"], default="2")
     p_run.add_argument("--max", type=int, default=None)
     p_run.add_argument("--dim", type=str, default=None)
+    p_run.add_argument("--no-cleanup", action="store_true", help="Skip reaping existing server processes")
     
     sub.add_parser("report")
     

@@ -41,8 +41,10 @@ def _run_turn(
     ]
     
     t0 = time.monotonic()
+    print(f"    [WAIT] Model thinking for Turn {turn_num}...", end="", flush=True)
     # P47: Increased timeout for large reasoning models
-    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=60.0)
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=120.0)
+    print(" Done.")
     latency = (time.monotonic() - t0) * 1000
 
     if proc.returncode != 0:
