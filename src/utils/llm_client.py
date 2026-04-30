@@ -5,6 +5,7 @@ import logging
 import platform
 import subprocess
 from typing import List, Dict, Any, Optional
+from src.utils.config import get_env
 
 try:
     import psutil
@@ -165,8 +166,8 @@ class LLMFactory:
     @staticmethod
     def from_env() -> LLMClient:
         """Create a client from environment variables."""
-        provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
-        url = os.getenv("CLAWBRAIN_DISTILL_URL", "http://localhost:11434")
-        model = os.getenv("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
-        api_key = os.getenv("CLAWBRAIN_DISTILL_API_KEY", "")
+        provider = get_env("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
+        url = get_env("CLAWBRAIN_DISTILL_URL", "http://localhost:11434")
+        model = get_env("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
+        api_key = get_env("CLAWBRAIN_DISTILL_API_KEY", "")
         return LLMFactory.get_client(provider, url, model, api_key)

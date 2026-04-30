@@ -8,6 +8,7 @@ import hashlib
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
+from src.utils.config import get_env
 
 logger = logging.getLogger("GATEWAY.MEMORY")
 
@@ -49,7 +50,7 @@ class Hippocampus:
     def _startup_cleanup(self):
         """Phase 20: Mandatory environment sanitization."""
         try:
-            ttl_days = int(os.getenv("CLAWBRAIN_TRACE_TTL_DAYS", 30))
+            ttl_days = int(get_env("CLAWBRAIN_TRACE_TTL_DAYS", 30))
             if ttl_days > 0:
                 expiry_ts = time.time() - (ttl_days * 86400)
                 self.traces_col.delete(where={"$or": [{"timestamp": 0.0}, {"timestamp": {"$lt": expiry_ts}}]})
@@ -81,7 +82,7 @@ class Hippocampus:
     def save_trace(self, trace_id: str, payload: Dict[str, Any], search_text: str = None, session_id: str = "default", room_id: str = "general", threshold: int = None) -> Dict[str, Any]:
         """Store interaction trace."""
         raw_content = json.dumps(payload)
-        limit = threshold or int(os.getenv("CLAWBRAIN_OFFLOAD_THRESHOLD_KB", 512)) * 1024
+        limit = threshold or int(get_env("CLAWBRAIN_OFFLOAD_THRESHOLD_KB", 512)) * 1024
         
         is_blob = False
         blob_path = ""

@@ -21,6 +21,7 @@ from src.memory.vault_indexer import VaultIndexer
 from src.memory.signals import SignalDecomposer
 from src.memory.entities import EntityExtractor
 from src.utils.llm_client import LLMClient
+from src.utils.config import get_env
 
 logger = logging.getLogger("GATEWAY.MEMORY.ROUTER")
 
@@ -54,9 +55,9 @@ class MemoryRouter:
         self.room_detector = None
         self.vault_indexer = None
         
-        self.distill_url = os.getenv("CLAWBRAIN_DISTILL_URL", distill_url or "http://127.0.0.1:11434")
-        self.distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", distill_model or "gemma4:e4b")
-        self.distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER", distill_provider or "ollama")
+        self.distill_url = get_env("CLAWBRAIN_DISTILL_URL", distill_url or "http://127.0.0.1:11434")
+        self.distill_model = get_env("CLAWBRAIN_DISTILL_MODEL", distill_model or "gemma4:e4b")
+        self.distill_provider = get_env("CLAWBRAIN_DISTILL_PROVIDER", distill_provider or "ollama")
         
         # Figure Justification: distill_threshold=50 (Design §2.1) - Optimal consolidation epoch.
         self.distill_threshold = distill_threshold
@@ -74,7 +75,7 @@ class MemoryRouter:
         self._dirty_sessions: Set[str] = set()
         self._pending_trace_extractions: List[tuple[str, str]] = [] # (session_id, trace_id)
         # Figure Justification: heartbeat=30s - Balance between latency and batch efficiency.
-        self._heartbeat_seconds = int(os.getenv("CLAWBRAIN_HEARTBEAT_SECONDS", 30))
+        self._heartbeat_seconds = int(get_env("CLAWBRAIN_HEARTBEAT_SECONDS", 30))
         self._heartbeat_event = asyncio.Event()
         self._running = True
         
@@ -82,7 +83,7 @@ class MemoryRouter:
         self.cb_distill = CircuitBreaker()
         self.cb_heartbeat = CircuitBreaker()
         
-        self.vault_path = os.getenv("CLAWBRAIN_VAULT_PATH")
+        self.vault_path = get_env("CLAWBRAIN_VAULT_PATH")
         
         asyncio.create_task(self._async_init())
 
@@ -283,7 +284,7 @@ class MemoryRouter:
 
     async def get_combined_context(self, session_id: str, query: str, max_chars: int = None) -> str:
         # Figure Justification: max_chars=2000 (Design §2.4) - Standard safe bound for augmentation.
-        if max_chars is None: max_chars = int(os.getenv("CLAWBRAIN_MAX_CONTEXT_CHARS", 2000))
+        if max_chars is None: max_chars = int(get_env("CLAWBRAIN_MAX_CONTEXT_CHARS", 2000))
         await self.wait_until_ready()
         async with self._get_session_lock(session_id):
             wm = self._get_wm(session_id)

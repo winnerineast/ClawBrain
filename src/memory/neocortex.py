@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from src.memory.storage import get_chroma_client
 from src.utils.llm_client import LLMFactory, LLMClient
+from src.utils.config import get_env
 
 class Neocortex:
     """
@@ -33,10 +34,10 @@ class Neocortex:
         self.db_path = self.db_dir / "hippocampus.db"
         
         # Distillation Config
-        self.distill_url = os.getenv("CLAWBRAIN_DISTILL_URL", distill_url or "http://127.0.0.1:11434")
-        self.distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", distill_model or "gemma4:e4b")
-        self.distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER", distill_provider or "ollama")
-        self.api_key = os.getenv("CLAWBRAIN_DISTILL_API_KEY", "")
+        self.distill_url = get_env("CLAWBRAIN_DISTILL_URL", distill_url or "http://127.0.0.1:11434")
+        self.distill_model = get_env("CLAWBRAIN_DISTILL_MODEL", distill_model or "gemma4:e4b")
+        self.distill_provider = get_env("CLAWBRAIN_DISTILL_PROVIDER", distill_provider or "ollama")
+        self.api_key = get_env("CLAWBRAIN_DISTILL_API_KEY", "")
         
         # Decoupled LLM Client
         self.llm = LLMFactory.get_client(self.distill_provider, self.distill_url, self.distill_model, self.api_key)

@@ -4,6 +4,7 @@ import json
 import logging
 from typing import Dict, Any, Tuple, Optional
 from dotenv import load_dotenv
+from src.utils.config import get_env
 
 load_dotenv()
 logger = logging.getLogger("GATEWAY")
@@ -20,7 +21,7 @@ class ProviderRegistry:
     智能路由注册表。支持环境变量热扩展。
     """
     def __init__(self):
-        distill_url = os.getenv("CLAWBRAIN_DISTILL_URL")
+        distill_url = get_env("CLAWBRAIN_DISTILL_URL")
         self.providers: Dict[str, ProviderConfig] = {
             "ollama":      ProviderConfig("ollama",      distill_url if distill_url and "11434" in distill_url else "http://localhost:11434", "ollama"),
             "lmstudio":    ProviderConfig("lmstudio",    distill_url if distill_url and "1234" in distill_url else "http://localhost:1234",  "openai"),
@@ -44,7 +45,7 @@ class ProviderRegistry:
         }
 
         # P16: 环境变量扩展提供商
-        extra_providers_json = os.getenv("CLAWBRAIN_EXTRA_PROVIDERS")
+        extra_providers_json = get_env("CLAWBRAIN_EXTRA_PROVIDERS")
         if extra_providers_json:
             try:
                 extras = json.loads(extra_providers_json)
@@ -59,7 +60,7 @@ class ProviderRegistry:
                 logger.warning(f"[REGISTRY] CLAWBRAIN_EXTRA_PROVIDERS parse failed: {e}")
 
         # P16: 环境变量扩展本地模型白名单
-        extra_models_json = os.getenv("CLAWBRAIN_LOCAL_MODELS")
+        extra_models_json = get_env("CLAWBRAIN_LOCAL_MODELS")
         if extra_models_json:
             try:
                 extra_models = json.loads(extra_models_json)

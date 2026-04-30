@@ -155,31 +155,44 @@ class SetupScout:
                 logger.info(f"⚠️ Distillation endpoint {existing['CLAWBRAIN_DISTILL_URL']} is unreachable. Re-probing...")
                 force_reprobe = True
 
+        current_platform = platform.system().upper()
+        platform_prefix = f"{current_platform}_"
+        
         mapping = {
             "CLAWBRAIN_DB_DIR": self.findings["db_dir"],
             "CLAWBRAIN_DISTILL_URL": self.findings["distill_url"],
             "CLAWBRAIN_DISTILL_MODEL": self.findings["distill_model"],
             "CLAWBRAIN_DISTILL_PROVIDER": self.findings["distill_provider"],
             "CLAWBRAIN_VAULT_PATH": self.findings["vault_path"],
-            "CLAWBRAIN_PLATFORM": current_platform
+            "CLAWBRAIN_PLATFORM": platform.system()
         }
         
         for key, value in mapping.items():
-            if key not in existing or force_reprobe:
-                if value: existing[key] = value
-            elif "PATH" in key or "DIR" in key:
-                if not self.is_path_valid_for_os(existing[key]):
-                    logger.info(f"🔄 Correcting invalid path for {key}: {existing[key]} -> {value}")
-                    existing[key] = value
-            elif not existing[key] and value:
+            if key == "CLAWBRAIN_PLATFORM":
                 existing[key] = value
+                continue
+                
+            p_key = f"{platform_prefix}{key}"
+            
+            # 1. Update platform-specific key
+            if p_key not in existing or force_reprobe:
+                if value: existing[p_key] = value
+            elif "PATH" in p_key or "DIR" in p_key:
+                if not self.is_path_valid_for_os(existing[p_key]):
+                    logger.info(f"🔄 Correcting invalid platform path: {p_key}")
+                    existing[p_key] = value
+            
+            # 2. Synchronize generic key for the current platform
+            if value: existing[key] = value
         
         if "CLAWBRAIN_MAX_CONTEXT_CHARS" not in existing:
             existing["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "2000"
             
-        lines = [f'{k}="{v}"' for k, v in existing.items()]
+        # Re-sort to keep it clean (platform specific together)
+        sorted_keys = sorted(existing.keys())
+        lines = [f'{k}="{existing[k]}"' for k in sorted_keys]
         env_path.write_text("\n".join(lines) + "\n")
-        logger.info(f"✨ Updated .env with platform-optimized settings (quoted).")
+        logger.info(f"✨ Updated .env with platform-optimized settings ({current_platform} specific).")
 
 async def main():
     scout = SetupScout()

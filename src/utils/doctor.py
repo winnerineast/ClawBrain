@@ -6,15 +6,16 @@ import logging
 from pathlib import Path
 from src.memory.storage import Hippocampus, clear_chroma_clients
 from src.utils.llm_client import LLMFactory
+from src.utils.config import get_env
 
 logger = logging.getLogger("GATEWAY.UTILS.DOCTOR")
 
 class SystemDoctor:
     """ClawBrain System Diagnostic Utility."""
     def __init__(self):
-        self.db_dir = os.getenv("CLAWBRAIN_DB_DIR", "data")
-        self.distill_url = os.getenv("CLAWBRAIN_DISTILL_URL", "http://localhost:11434")
-        self.distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
+        self.db_dir = get_env("CLAWBRAIN_DB_DIR", "data")
+        self.distill_url = get_env("CLAWBRAIN_DISTILL_URL", "http://localhost:11434")
+        self.distill_provider = get_env("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
 
     async def check_connectivity(self) -> dict:
         """Check all critical backend connections."""
@@ -80,7 +81,7 @@ class SystemDoctor:
         
         # 4. LLM
         distill_ok = await self.verify_llm()
-        model = os.getenv('CLAWBRAIN_DISTILL_MODEL', 'UNKNOWN')
+        model = get_env('CLAWBRAIN_DISTILL_MODEL', 'UNKNOWN')
         report.append(("Distillation Backend", f"{'OK' if distill_ok else 'FAIL'} ({model})"))
 
         print(f"\n{'CHECK':<33} | {'STATUS'}")

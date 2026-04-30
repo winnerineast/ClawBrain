@@ -19,6 +19,7 @@ from src.gateway.detector import ProtocolDetector
 from src.gateway.translator import DialectTranslator
 from src.pipeline import Pipeline
 from src.models import Message
+from src.utils.config import get_env
 from mcp.server.sse import SseServerTransport
 from src.mcp_server import create_mcp_server
 from src.utils.dashboard_tpl import DASHBOARD_HTML
@@ -54,11 +55,11 @@ async def lifespan(app: FastAPI):
     
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        db_dir = os.getenv("CLAWBRAIN_DB_DIR", os.path.join(base_dir, "data"))
+        db_dir = get_env("CLAWBRAIN_DB_DIR", os.path.join(base_dir, "data"))
         
-        distill_url = os.getenv("CLAWBRAIN_DISTILL_URL")
-        distill_model = os.getenv("CLAWBRAIN_DISTILL_MODEL")
-        distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER")
+        distill_url = get_env("CLAWBRAIN_DISTILL_URL")
+        distill_model = get_env("CLAWBRAIN_DISTILL_MODEL")
+        distill_provider = get_env("CLAWBRAIN_DISTILL_PROVIDER")
 
         # P47: Deterministic Readiness - core engine init is now tracked
         app.state.memory_router = MemoryRouter(
