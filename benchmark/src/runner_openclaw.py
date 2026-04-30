@@ -13,8 +13,8 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any
 
-from evaluate import CaseScore, score_case
-from profiles import install_plugin, uninstall_plugin
+from benchmark.src.evaluate import CaseScore, score_case
+from benchmark.src.profiles import install_plugin, uninstall_plugin
 
 OPENCLAW_BIN = "openclaw"
 
@@ -24,20 +24,25 @@ def _run_turn(
     turn_num: int = 0
 ) -> tuple[str, float]:
     """Send one message via openclaw agent using MAIN profile."""
-    # Use 'bm_agent' (Ollama) which we assume is configured in main profile
-    # If not, the first run will fail and user should run 'openclaw agents add bm_agent'
+    # Issue #41: Inject ClawBrain settings via ENV instead of invalid config keys
+    env = os.environ.copy()
+    env["CLAWBRAIN_URL"] = "http://127.0.0.1:11435/v1"
+    env["CLAWBRAIN_TIMEOUT_MS"] = "5000"
+
     cmd = [
         OPENCLAW_BIN,
         "agent",
         "--local",
         "--json",
+        "--thinking", "off",
         "--agent", "bm_agent",
         "--session-id", session_id,
         "--message", message,
     ]
     
     t0 = time.monotonic()
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    # P47: Increased timeout for large reasoning models
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=60.0)
     latency = (time.monotonic() - t0) * 1000
 
     if proc.returncode != 0:
@@ -45,15 +50,45 @@ def _run_turn(
         raise Exception(f"openclaw exited {proc.returncode}: {error_msg}")
 
     try:
-        # P47: Robust JSON extraction
-        raw_out = proc.stdout.strip()
-        start = raw_out.find('{')
-        end = raw_out.rfind('}')
-        if start != -1 and end != -1:
-            json_str = raw_out[start:end+1]
-            data = json.loads(json_str)
-        else:
-            raise ValueError("No JSON object found in stdout")
+        # P47/61: Robust JSON extraction
+        # Some versions of OpenClaw or specific models might output the JSON to stderr
+        combined_out = proc.stdout.strip() + "\n" + proc.stderr.strip()
+        
+        # Aggressive non-greedy search for {} blocks
+        import re
+        candidate_strs = re.findall(r'\{.*?\}', combined_out, re.DOTALL)
+        
+        data = None
+        # Iterate backwards to find the actual final response object
+        for s in reversed(candidate_strs):
+            try:
+                temp = json.loads(s)
+                # Check for signature fields of an OpenClaw JSON response
+                if "payloads" in temp or "finalAssistantVisibleText" in temp or "executionTrace" in temp:
+                    data = temp
+                    break
+            except: continue
+        
+        if data is None:
+            # Fallback: Search for the largest possible JSON block in the combined output
+            # (greedy match from first { to last })
+            start = combined_out.find('{')
+            end = combined_out.rfind('}')
+            if start != -1 and end > start:
+                try: 
+                    # Try to shrink the window until it parses
+                    for i in range(start, end):
+                        if combined_out[i] == '{':
+                            try:
+                                data = json.loads(combined_out[i:end+1])
+                                if "payloads" in data or "finalAssistantVisibleText" in data:
+                                    break
+                            except: pass
+                    if not data: data = json.loads(combined_out[start:end+1])
+                except: pass
+
+        if data is None:
+            raise ValueError("No valid JSON response object found in output.")
 
         if "payloads" in data and len(data["payloads"]) > 0:
             text = data["payloads"][0].get("text", "")
@@ -61,7 +96,7 @@ def _run_turn(
             text = data.get("finalAssistantVisibleText", "")
         return text, latency
     except Exception as e:
-        raise Exception(f"Failed to parse JSON: {e}\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}")
+        raise Exception(f"Failed to parse JSON: {e}\nSTDOUT: {proc.stdout[:500]}...\nSTDERR: {proc.stderr[:500]}...")
 
 
 def _run_conversation(session_id: str, turns: list[dict]) -> tuple[str, float]:

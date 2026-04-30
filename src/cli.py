@@ -23,7 +23,8 @@ def cmd_ingest(args):
     url = f"{get_base_url()}/v1/ingest"
     payload = {
         "content": args.content,
-        "session_id": args.session
+        "session_id": args.session,
+        "sync_distill": args.sync
     }
     try:
         resp = httpx.post(url, json=payload, timeout=30.0)
@@ -105,6 +106,7 @@ def main():
     p_ingest = sub.add_parser("ingest", help="Save a fact to memory")
     p_ingest.add_argument("content", help="The text to remember")
     p_ingest.add_argument("--session", default="default", help="Session ID (default: 'default')")
+    p_ingest.add_argument("--sync", action="store_true", help="Perform synchronous extraction (blocks until done)")
 
     # Query
     p_query = sub.add_parser("query", help="Query memory for context")

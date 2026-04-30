@@ -42,7 +42,7 @@ def install_plugin() -> None:
         slots = plugins.setdefault("slots", {})
         slots["contextEngine"] = "clawbrain"
         
-        # Ensure enabled
+        # Ensure enabled and correctly configured (Env is passed via subprocess)
         entries = plugins.setdefault("entries", {})
         entries["clawbrain"] = {"enabled": True}
         

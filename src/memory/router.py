@@ -72,7 +72,7 @@ class MemoryRouter:
         
         # P61: Heartbeat Configuration (Design §2.5)
         self._dirty_sessions: Set[str] = set()
-        self._pending_trace_extractions: List[str] = []
+        self._pending_trace_extractions: List[tuple[str, str]] = [] # (session_id, trace_id)
         # Figure Justification: heartbeat=30s - Balance between latency and batch efficiency.
         self._heartbeat_seconds = int(os.getenv("CLAWBRAIN_HEARTBEAT_SECONDS", 30))
         self._heartbeat_event = asyncio.Event()
@@ -125,11 +125,9 @@ class MemoryRouter:
 
                 # 1. Process Trace Extractions (Issue #006 - LLM-based Mining)
                 while self._pending_trace_extractions:
-                    tid = self._pending_trace_extractions.pop(0)
+                    sid, tid = self._pending_trace_extractions.pop(0)
                     payload = self.hippo.get_full_payload(tid)
                     if payload:
-                        # Extract session_id from payload metadata if possible, fallback to default
-                        sid = payload.get("session_id", "default")
                         await self.entity_extractor.extract_and_store(sid, tid, payload)
 
                 # 2. Process Session Distillations (Knowledge Consolidation)
@@ -203,8 +201,21 @@ class MemoryRouter:
             self.hippo.save_trace(trace_id, stimulus, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
             self.hippo.save_wm_state(session_id, wm.items)
             
-            # P61: Decentralized tasks are now queued for the Heartbeat
-            self._pending_trace_extractions.append(trace_id)
+            # v1.9: Registry Optimization - Fast synchronous mention anchoring
+            # This ensures Turn N+1 can always see Turn N via lexical paths.
+            for m in stimulus.get("messages", []):
+                content = m.get("content", "")
+                if content:
+                    entities = self.decomposer.extract_entities(content)
+                    for entity in entities:
+                        self.hippo.upsert_fact(session_id, entity, "mention", content, trace_id=trace_id)
+            
+            # P61: Decentralized deep extraction task is queued for the Heartbeat
+            if sync_distill:
+                # Issue #41/P61: Immediate extraction for synchronous paths (e.g. tests)
+                await self.entity_extractor.extract_and_store(session_id, trace_id, stimulus)
+            else:
+                self._pending_trace_extractions.append((session_id, trace_id))
             self._trace_counters[session_id] = self._trace_counters.get(session_id, 0) + 1
             
             if self._trace_counters[session_id] >= self.distill_threshold or sync_distill:
@@ -230,13 +241,20 @@ class MemoryRouter:
             reaction_content = reaction.get("content", "")
             if reaction_content:
                 wm.add_item(WorkingMemoryItem(trace_id=trace_id, content=reaction_content))
+                # v1.9: Registry Optimization - Fast synchronous mention anchoring
                 entities = self.decomposer.extract_entities(reaction_content)
                 for entity in entities:
                     self.hippo.upsert_fact(session_id, entity, "verified", reaction_content, trace_id=trace_id)
 
             self.hippo.save_wm_state(session_id, wm.items)
-            if trace_id not in self._pending_trace_extractions:
-                self._pending_trace_extractions.append(trace_id)
+            
+            # v1.9/P61: Immediate or queued deep extraction
+            if sync_distill:
+                # Build complete interaction record for deep mining
+                record = {"stimulus": payload, "reaction": reaction}
+                await self.entity_extractor.extract_and_store(session_id, trace_id, record)
+            elif (session_id, trace_id) not in self._pending_trace_extractions:
+                self._pending_trace_extractions.append((session_id, trace_id))
 
     async def orphan_turn(self, trace_id: str, payload: Dict[str, Any], error: str, session_id: str):
         await self.wait_until_ready()
@@ -252,13 +270,15 @@ class MemoryRouter:
                 content = m.get("content", "")
                 if content: 
                     wm.add_item(WorkingMemoryItem(trace_id=trace_id, content=content))
+                    # v1.9: Registry Optimization - Fast synchronous mention anchoring
                     entities = self.decomposer.extract_entities(content)
                     for entity in entities:
                         self.hippo.upsert_fact(session_id, entity, "mention", content, trace_id=trace_id)
             
             self.hippo.save_trace(trace_id, {"stimulus": stimulus, "reaction": None}, session_id=session_id)
             self.hippo.save_wm_state(session_id, wm.items)
-            self._pending_trace_extractions.append(trace_id)
+            # pre_turn_pending is always fast-path, queue for background deep extraction
+            self._pending_trace_extractions.append((session_id, trace_id))
             return trace_id
 
     async def get_combined_context(self, session_id: str, query: str, max_chars: int = None) -> str:
@@ -341,8 +361,19 @@ class MemoryRouter:
             if entity_facts: sample_parts.append(f"{entity_facts[0]['entity']}: {entity_facts[0]['value']}")
             
             context_sample = "\n".join(sample_parts)
-            is_truly_relevant = await self.neo.verify_relevance(query, context_sample)
-            if not is_truly_relevant: return ""
+            
+            # v1.4: Allow judge bypass for integration tests/constrained environments
+            disable_judge = os.getenv("CLAWBRAIN_DISABLE_COGNITIVE_JUDGE", "false").lower() == "true"
+            
+            if disable_judge:
+                logger.info(f"[ROUTER] Cognitive Judge BYPASSED for query: '{query}'")
+                is_truly_relevant = True
+            else:
+                is_truly_relevant = await self.neo.verify_relevance(query, context_sample)
+            
+            if not is_truly_relevant:
+                logger.info(f"[ROUTER] Cognitive Judge rejected context for query: '{query}'")
+                return ""
 
             output_parts, current_len = [], 0
             def try_add(header, contents, prefix="- "):

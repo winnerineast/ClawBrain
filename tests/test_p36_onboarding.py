@@ -3,9 +3,11 @@ import pytest
 import os
 import respx
 import platform
+import httpx
 from httpx import Response
 from pathlib import Path
 from src.utils.setup_scout import SetupScout
+from src.utils.doctor import SystemDoctor
 
 @pytest.mark.asyncio
 async def test_scout_cross_platform_correction(tmp_path, monkeypatch):
@@ -60,7 +62,7 @@ async def test_scout_lmstudio_detection():
     scout = SetupScout()
     
     # Mock Ollama fail
-    respx.get("http://localhost:11434/api/tags").mock(side_effect=Exception("Connection refused"))
+    respx.get("http://localhost:11434/api/tags").mock(side_effect=httpx.ConnectError("Refused"))
     # Mock LM Studio success
     respx.get("http://localhost:1234/v1/models").mock(return_value=Response(200, json={
         "data": [{"id": "mock-llama-3"}]
@@ -73,22 +75,34 @@ async def test_scout_lmstudio_detection():
     assert scout.findings["distill_model"] == "mock-llama-3"
     assert scout.findings["distill_url"] == "http://localhost:1234"
 
-def test_scout_vault_detection(tmp_path):
-    """Verify scout can find an Obsidian vault by looking for .obsidian folder."""
-    scout = SetupScout()
+@pytest.mark.asyncio
+@respx.mock
+async def test_doctor_connectivity():
+    """Verify that doctor can detect online/offline services."""
+    # Mock LM Studio success
+    respx.get("http://localhost:1234/v1/models").mock(return_value=Response(200, json={"data": []}))
+    # Mock Ollama fail
+    respx.get("http://localhost:11434/api/tags").mock(side_effect=httpx.ConnectError("Refused"))
     
-    # Create a mock vault structure
-    vault_dir = tmp_path / "MyVault"
-    obsidian_dir = vault_dir / ".obsidian"
-    obsidian_dir.mkdir(parents=True)
-    (vault_dir / "note.md").write_text("# Test")
+    doctor = SystemDoctor()
+    status = await doctor.check_connectivity()
+
+    assert status["lmstudio"] == "ONLINE"
+    assert status["ollama"] == "OFFLINE"
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_doctor_llm_verification(monkeypatch):
+    """Verify doctor can perform a test generation with the backend."""
+    monkeypatch.setenv("CLAWBRAIN_DISABLE_COGNITIVE_JUDGE", "true")
+    # Mock Judge (Cognitive Judge v1.4)
+    respx.post("http://localhost:1234/chat/completions").mock(return_value=Response(200, json={
+        "choices": [{"message": {"content": "YES"}}]
+    }))
     
-    # We need to mock Path.home() or search paths in SetupScout. 
-    # For testing, let's inject search paths or just test the logic with a specific base.
-    
-    # Let's slightly modify SetupScout to accept search roots for easier testing
-    # Or just use monkeypatch
-    pass
+    doctor = SystemDoctor()
+    res = await doctor.verify_llm()
+    assert res is True
 
 @pytest.mark.asyncio
 async def test_scout_env_generation(tmp_path):
@@ -111,11 +125,13 @@ async def test_scout_env_generation(tmp_path):
     assert 'CLAWBRAIN_DISTILL_URL="http://test-url"' in content
     
     # 2. Idempotency: Manually change a value
-    env_file.write_text('CLAWBRAIN_MAX_CONTEXT_CHARS="5000"\nCLAWBRAIN_DISTILL_MODEL="manual-model"')
+    env_file.write_text('CLAWBRAIN_MAX_CONTEXT_CHARS="5000"\nCLAWBRAIN_DISTILL_MODEL="manual-model"\n')
     scout.generate_env()
     content_v2 = env_file.read_text()
+    
     # Should keep manual-model and 5000
     assert 'CLAWBRAIN_DISTILL_MODEL="manual-model"' in content_v2
     assert 'CLAWBRAIN_MAX_CONTEXT_CHARS="5000"' in content_v2
     # Should still have the others
     assert 'CLAWBRAIN_VAULT_PATH="/test/vault"' in content_v2
+    assert 'CLAWBRAIN_DISTILL_URL="http://test-url"' in content_v2

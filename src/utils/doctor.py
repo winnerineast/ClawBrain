@@ -2,67 +2,95 @@
 import os
 import httpx
 import asyncio
+import logging
 from pathlib import Path
 from src.memory.storage import Hippocampus, clear_chroma_clients
+from src.utils.llm_client import LLMFactory
 
-def side_by_side_report(items: list):
-    print(f"\n{'CHECK':<33} | {'STATUS'}")
-    print("-" * 70)
-    for check, status in items:
-        print(f"{check:<33} | {status}")
-    print("-" * 70)
+logger = logging.getLogger("GATEWAY.UTILS.DOCTOR")
 
-async def check_health():
-    print("🩺 ClawBrain System Doctor")
-    print("=" * 70)
-    
-    report = []
-    
-    # 1. Environment & DB
-    db_dir = os.getenv("CLAWBRAIN_DB_DIR", "data")
-    db_path = Path(db_dir)
-    if db_path.exists() and os.access(db_path, os.W_OK):
-        report.append(("Database Directory", f"OK ({db_dir})"))
-    else:
-        report.append(("Database Directory", f"FAIL (Check permissions for {db_dir})"))
+class SystemDoctor:
+    """ClawBrain System Diagnostic Utility."""
+    def __init__(self):
+        self.db_dir = os.getenv("CLAWBRAIN_DB_DIR", "data")
+        self.distill_url = os.getenv("CLAWBRAIN_DISTILL_URL", "http://localhost:11434")
+        self.distill_provider = os.getenv("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
 
-    # 2. ChromaDB Connection
-    try:
-        clear_chroma_clients()
-        hp = Hippocampus(db_dir=db_dir)
-        count = len(hp.traces_col.get()["ids"])
-        report.append(("ChromaDB Connectivity", f"OK ({count} traces)"))
-    except Exception as e:
-        report.append(("ChromaDB Connectivity", f"FAIL ({str(e)[:30]})"))
-
-    # 3. LLM Services (Relay Plane)
-    ollama_url = "http://localhost:11434/api/tags"
-    try:
+    async def check_connectivity(self) -> dict:
+        """Check all critical backend connections."""
+        status = {"ollama": "OFFLINE", "lmstudio": "OFFLINE", "omlx": "OFFLINE"}
+        
         async with httpx.AsyncClient(timeout=2.0) as client:
-            resp = await client.get(ollama_url)
-            if resp.status_code == 200:
-                models = [m["name"] for m in resp.json().get("models", [])]
-                report.append(("Ollama Service", f"OK ({len(models)} models)"))
-            else:
-                report.append(("Ollama Service", f"WARN (HTTP {resp.status_code})"))
-    except:
-        report.append(("Ollama Service", "OFFLINE"))
+            # 1. Ollama
+            try:
+                resp = await client.get("http://localhost:11434/api/tags")
+                if resp.status_code == 200: status["ollama"] = "ONLINE"
+            except: pass
+            
+            # 2. LM Studio
+            try:
+                resp = await client.get("http://localhost:1234/v1/models")
+                if resp.status_code == 200: status["lmstudio"] = "ONLINE"
+            except: pass
+            
+            # 3. OMLX
+            try:
+                resp = await client.get("http://localhost:8080/v1/models")
+                if resp.status_code == 200: status["omlx"] = "ONLINE"
+            except: pass
+            
+        return status
 
-    # 4. Distillation Backend (Cognitive Plane)
-    distill_url = os.getenv("CLAWBRAIN_DISTILL_URL")
-    if distill_url:
+    async def verify_llm(self) -> bool:
+        """Verify the configured distillation LLM is functional."""
         try:
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                resp = await client.get(distill_url if "api" in distill_url else f"{distill_url}/v1/models")
-                report.append(("Distillation Backend", f"OK ({os.getenv('CLAWBRAIN_DISTILL_MODEL')})"))
-        except:
-            report.append(("Distillation Backend", "UNREACHABLE"))
-    else:
-        report.append(("Distillation Backend", "NOT CONFIGURED"))
+            llm = LLMFactory.from_env()
+            res = await llm.generate("Is 1+1=2? Answer only YES or NO.", system="You are a calculator.")
+            return "YES" in res.upper()
+        except Exception as e:
+            logger.error(f"[DOCTOR] LLM verification failed: {e}")
+            return False
 
-    side_by_side_report(report)
+    async def run_full_report(self):
+        """Execute and print a side-by-side health report."""
+        print("🩺 ClawBrain System Doctor")
+        print("=" * 70)
+        
+        report = []
+        
+        # 1. Database
+        db_path = Path(self.db_dir)
+        if db_path.exists() and os.access(db_path, os.W_OK):
+            report.append(("Database Directory", f"OK ({self.db_dir})"))
+        else:
+            report.append(("Database Directory", f"FAIL (Check permissions for {self.db_dir})"))
+
+        # 2. ChromaDB
+        try:
+            clear_chroma_clients()
+            hp = Hippocampus(db_dir=self.db_dir)
+            count = len(hp.traces_col.get()["ids"])
+            report.append(("ChromaDB Connectivity", f"OK ({count} traces)"))
+        except Exception as e:
+            report.append(("ChromaDB Connectivity", f"FAIL ({str(e)[:30]})"))
+
+        # 3. Connectivity
+        conn = await self.check_connectivity()
+        report.append(("Ollama Service", conn["ollama"]))
+        
+        # 4. LLM
+        distill_ok = await self.verify_llm()
+        model = os.getenv('CLAWBRAIN_DISTILL_MODEL', 'UNKNOWN')
+        report.append(("Distillation Backend", f"{'OK' if distill_ok else 'FAIL'} ({model})"))
+
+        print(f"\n{'CHECK':<33} | {'STATUS'}")
+        print("-" * 70)
+        for check, status in report:
+            print(f"{check:<33} | {status}")
+        print("-" * 70)
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv()
-    asyncio.run(check_health())
+    doc = SystemDoctor()
+    asyncio.run(doc.run_full_report())

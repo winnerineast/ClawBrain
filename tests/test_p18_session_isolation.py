@@ -2,6 +2,8 @@
 import pytest
 import os
 import asyncio
+import respx
+from httpx import Response
 from src.memory.storage import Hippocampus, clear_chroma_clients
 from src.memory.router import MemoryRouter
 
@@ -115,23 +117,31 @@ async def test_p18_wm_session_isolation(tmp_path):
     assert not bob_has_alice
 
 @pytest.mark.asyncio
+@respx.mock
 async def test_p18_get_combined_context_isolated(tmp_path):
     """get_combined_context is isolated by session; A's context does not contain B's content"""
+    # Mock Judge (Cognitive Judge v1.4)
+    respx.post("http://localhost:1234/chat/completions").mock(return_value=Response(200, json={
+        "choices": [{"message": {"content": "YES"}}]
+    }))
+    
     clear_chroma_clients()
     router = MemoryRouter(db_dir=str(tmp_path))
     await router.wait_until_ready()
 
     await router.ingest(
-        {"messages": [{"role": "user", "content": "Alice secret ALPHA-TOKEN"}]},
-        session_id="alice"
+        {"messages": [{"role": "user", "content": "Alice project secret encryption key is ALPHA-TOKEN"}]},
+        session_id="alice",
+        sync_distill=True
     )
     await router.ingest(
-        {"messages": [{"role": "user", "content": "Bob secret BETA-TOKEN"}]},
-        session_id="bob"
+        {"messages": [{"role": "user", "content": "Bob project internal server database password is BETA-TOKEN"}]},
+        session_id="bob",
+        sync_distill=True
     )
 
-    alice_ctx = await router.get_combined_context("alice", "ALPHA-TOKEN")
-    bob_ctx   = await router.get_combined_context("bob",   "BETA-TOKEN")
+    alice_ctx = await router.get_combined_context("alice", "What is the project secret encryption key?")
+    bob_ctx   = await router.get_combined_context("bob",   "What is the internal server database password?")
 
     visual_audit("Alice context contains ALPHA-TOKEN", "L1 WM isolation", True, "ALPHA-TOKEN" in alice_ctx)
     visual_audit("Alice context NOT contains BETA-TOKEN", "No cross-session leak", False, "BETA-TOKEN" in alice_ctx)

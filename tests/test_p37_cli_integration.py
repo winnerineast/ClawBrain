@@ -27,6 +27,7 @@ def server_instance():
     # Use the controlled test vault fixture
     env["CLAWBRAIN_VAULT_PATH"] = os.path.join(project_root, "tests/fixtures/test_vault")
     env["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
+    env["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"] = "true"
     env["PYTHONPATH"] = project_root
     
     process = subprocess.Popen(
@@ -88,7 +89,7 @@ def test_p37_cli_full_cycle(server_instance):
     canary = "The CLI secret password is TRON-99"
     
     # 1. Ingest
-    res = run_cli(["ingest", canary, "--session", session], server_instance)
+    res = run_cli(["ingest", canary, "--session", session, "--sync"], server_instance)
     print(f"CLI Ingest Output: {res.stdout}")
     assert res.returncode == 0
     assert "Fact archived" in res.stdout

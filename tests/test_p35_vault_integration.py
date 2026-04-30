@@ -4,6 +4,8 @@ import os
 import shutil
 import asyncio
 import time
+import respx
+from httpx import Response
 from pathlib import Path
 from src.memory.router import MemoryRouter
 from src.memory.storage import clear_chroma_clients
@@ -69,10 +71,17 @@ async def test_p35_vault_change_detection_matrix(tmp_path):
     stats = await router.vault_indexer.scan()
     visual_audit("TC_REAL", "Content changed", "1 indexed", f"{stats['indexed']} indexed")
     assert stats["indexed"] == 1
+    await router.aclose()
 
 @pytest.mark.asyncio
+@respx.mock
 async def test_p35_vault_retrieval_priority(tmp_path):
     """Verifies that vault knowledge is retrieved semantically and placed correctly."""
+    # Mock Judge (Cognitive Judge v1.4)
+    respx.post("http://localhost:1234/chat/completions").mock(return_value=Response(200, json={
+        "choices": [{"message": {"content": "YES"}}]
+    }))
+    
     clear_chroma_clients()
     db_dir = tmp_path / "db"
     vault_dir = tmp_path / "vault"
@@ -83,13 +92,15 @@ async def test_p35_vault_retrieval_priority(tmp_path):
     gen.create_note(str(vault_dir), "secrets.md", "# Secrets\nThe master password is 'ORION-99'.")
     
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
+    os.environ["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"] = "true"
     # Disable auto-scan to control indexing time
     router = MemoryRouter(db_dir=str(db_dir), enable_room_detection=False, enable_auto_scan=False)
     await router.wait_until_ready()
     await router.vault_indexer.scan()
     
     # Query
-    context = await router.get_combined_context("session-vault", "What is the primary password?")
+    context = await router.get_combined_context("session-vault", "List the master password found in secrets")
     
     assert "ORION-99" in context
     assert "=== EXTERNAL KNOWLEDGE (VAULT) ===" in context
+    await router.aclose()

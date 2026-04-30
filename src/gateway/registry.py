@@ -22,9 +22,9 @@ class ProviderRegistry:
     def __init__(self):
         distill_url = os.getenv("CLAWBRAIN_DISTILL_URL")
         self.providers: Dict[str, ProviderConfig] = {
-            "ollama":      ProviderConfig("ollama",      distill_url if distill_url and "11434" in distill_url else "http://127.0.0.1:11434", "ollama"),
-            "lmstudio":    ProviderConfig("lmstudio",    distill_url if distill_url and "1234" in distill_url else "http://127.0.0.1:1234",  "openai"),
-            "omlx":        ProviderConfig("omlx",        distill_url if distill_url and "8080" in distill_url else "http://127.0.0.1:8080",  "openai"),
+            "ollama":      ProviderConfig("ollama",      distill_url if distill_url and "11434" in distill_url else "http://localhost:11434", "ollama"),
+            "lmstudio":    ProviderConfig("lmstudio",    distill_url if distill_url and "1234" in distill_url else "http://localhost:1234",  "openai"),
+            "omlx":        ProviderConfig("omlx",        distill_url if distill_url and "8080" in distill_url else "http://localhost:8080",  "openai"),
             "openai":      ProviderConfig("openai",      "https://api.openai.com",                    "openai"),
             "deepseek":    ProviderConfig("deepseek",    "https://api.deepseek.com",                  "openai"),
             "anthropic":   ProviderConfig("anthropic",   "https://api.anthropic.com",                 "anthropic"),
@@ -39,6 +39,8 @@ class ProviderRegistry:
             "gemma4:e4b":      "ollama",
             "gemma4:31b":      "ollama",
             "qwen2.5:latest":  "ollama",
+            "gpt-4":           "openai",
+            "gpt-3.5-turbo":   "openai",
         }
 
         # P16: 环境变量扩展提供商

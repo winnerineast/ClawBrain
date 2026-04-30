@@ -81,13 +81,13 @@ async def test_lmstudio_real_routing(gpu_resource_manager, tmp_path):
 
 @pytest.mark.asyncio
 async def test_openai_routing_security():
-    """验证非法模型 (gpt-4) 在 OpenAI 入口下被正确拦截"""
+    """验证非法模型 (gpt-4-unauthorized) 在 OpenAI 入口下被正确拦截"""
     payload = {
-        "model": "gpt-4",
+        "model": "gpt-4-unauthorized",
         "messages": [{"role": "user", "content": "Hello OpenAI"}]
     }
     
     with TestClient(app) as client:
         response = client.post("/v1/chat/completions", json=payload)
-        visual_audit("OpenAI Routing Security", "gpt-4 (unauthorized)", "501 Block", response.status_code)
+        visual_audit("OpenAI Routing Security", "gpt-4-unauthorized (unauthorized)", "501 Block", response.status_code)
         assert response.status_code == 501

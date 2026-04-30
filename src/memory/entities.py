@@ -55,13 +55,15 @@ class EntityExtractor:
         try:
             result = await self.llm.generate(prompt=dialogue_text, system=self.SYSTEM_PROMPT)
             
-            # Clean possible markdown noise
-            clean_json = result.strip()
-            if clean_json.startswith("```"):
-                clean_json = clean_json.split("\n", 1)[1].rsplit("\n", 1)[0].strip()
-            if clean_json.startswith("json"):
-                clean_json = clean_json[4:].strip()
+            # Phase 61: Robust JSON Extraction (Issue #006)
+            # LLMs with reasoning might output text + JSON. We extract the first [...] found.
+            import re
+            json_match = re.search(r'\[\s*\{.*\}\s*\]', result, re.DOTALL)
+            if not json_match:
+                logger.debug(f"[ENTITIES] No JSON array found in result for trace {trace_id}")
+                return
 
+            clean_json = json_match.group(0)
             facts = json.loads(clean_json)
             
             if not isinstance(facts, list):
