@@ -1,24 +1,28 @@
-# design/architecture.md v1.1
+# design/architecture.md v1.2
 
 ## 1. Project Vision
 ClawBrain is more than a gateway — it is a universal LLM enhancement engine with "brain-like memory" capabilities.
 
 ## 2. Core System Modules
 
-### Modules A, B, C (Gateway & Optimizer)
-[Accepted and complete]
+### 2.1 Ingress Layer (Interfaces)
+- **HTTP Relay (`main.py`)**: Transparent OpenAI-compatible API proxy with memory injection.
+- **MCP Server (`mcp_server.py`)**: Model Context Protocol implementation for modern agent integration.
+- **Admin CLI (`cli.py`)**: Scriptable interface for manual memory management and ingestion.
 
-### Module D: Third-Generation Neural Memory Engine
-- **Hippocampus**: Episodic memory. A write-once system keyed by time with semantic vector retrieval via ChromaDB.
-- **Neocortex**: Semantic memory. Slow-integration distillation with async background workers.
-- **Working Memory**: Active cache. Priority queue driven by Attractor dynamics with rapid decay.
+### 2.2 Neural Memory Engine (Core)
+- **Hippocampus (L2)**: Episodic memory. A write-once system keyed by time with semantic vector retrieval via ChromaDB.
+- **Neocortex (L3)**: Semantic memory. Slow-integration distillation with async background workers.
+- **Working Memory (L1)**: Active cache. Priority queue driven by Attractor dynamics with rapid decay.
+- **Knowledge Vault (Ext)**: Incremental Obsidian vault indexing for prioritized "Source of Truth" context.
 
 ## 3. Reliability & Robustness: Dual-Channel Isolation
 To ensure high availability and non-blocking performance, ClawBrain employs **Network Plane Isolation**:
 1. **The Relay Plane**: A high-concurrency HTTP client dedicated solely to upstream LLM traffic. This plane is performance-optimized and has strict isolation from internal tasks.
-2. **The Cognitive Plane**: An independent, internal HTTP client owned by the `MemoryRouter`. It handles background "thinking" tasks (Room Detection, Fact Distillation) without competing for the Relay Plane's connection pool or bandwidth.
+2. **The Cognitive Plane**: An independent, internal HTTP client owned by the `MemoryRouter`. It handles background "thinking" tasks (Room Detection, Fact Distillation, Vault Indexing) without competing for the Relay Plane's connection pool or bandwidth.
 
-## 3. Implementation Roadmap (Updated)
+## 4. Implementation Roadmap (Updated)
 - **Phase 1–5**: Core gateway and protocol stack [Complete]
-- **Phase 6–11**: Neural memory system development [Launched]
-- **Phase 12**: Final integration and production mounting
+- **Phase 6–11**: Neural memory system development [Complete]
+- **Phase 12**: Knowledge Vault & MCP Integration [Complete]
+- **Phase 13**: Final integration and production mounting [Current]

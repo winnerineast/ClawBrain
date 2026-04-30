@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Generated from design/management_api.md v1.2 / design/architecture.md v1.2
 """
 ClawBrain CLI — Universal Memory Hub Access
 ===========================================

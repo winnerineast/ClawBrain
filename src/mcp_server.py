@@ -1,3 +1,4 @@
+# Generated from design/gateway.md v1.42 / design/architecture.md v1.2
 # ClawBrain MCP Server - Standardized Memory Interface
 import asyncio
 import logging

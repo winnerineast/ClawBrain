@@ -1,7 +1,32 @@
-# design/utils_onboarding.md v1.1
+# design/utils_onboarding.md v1.3
 
 ## 1. Objective
 Transform ClawBrain from a manual experimental project into a user-friendly tool by providing automated installation, environment discovery, and configuration. The goal is to allow a new user to go from `git clone` to a fully running server in under 60 seconds on any supported platform (Ubuntu/macOS).
+
+## 2. Environment Discovery (SetupScout)
+
+### 2.1 Hardware Profiling
+- Use `HardwareProfiler` to detect VRAM and determine the "Intelligence Tier".
+
+### 2.2 Service Probing & Reachability
+- **Validation**: Before accepting an existing `CLAWBRAIN_DISTILL_URL` from `.env`, ping the endpoint. 
+- If the endpoint is unreachable (Connection Refused), **invalidate** the setting and re-probe (Ollama, LM Studio, OMLX).
+
+### 2.3 OS-Agnostic Path Handling
+- If a path starts with `/Users` on Linux or `/home` on macOS, it is considered a "Foreign Path" and must be corrected to the local equivalent.
+
+### 2.4 Platform Fingerprinting
+- Store `CLAWBRAIN_PLATFORM` (e.g., "Darwin" or "Linux") in `.env`.
+- If the current platform does not match the stored platform, force a re-probe of all hardware-dependent and path-dependent settings.
+
+### 2.5 Robust .env Generation
+- **Quoting Strategy**: All values wrapped in double-quotes.
+- **De-duplication**: Strip existing quotes before processing to prevent nested `""value""`.
+
+## 3. Implementation Details
+- `src/utils/setup_scout.py`: Main execution script.
+- Support for `--force` to overwrite existing configuration.
+- Diagnostic output showing what was found and what was corrected.
 
 ## 2. Functional Components
 

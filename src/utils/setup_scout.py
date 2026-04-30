@@ -1,4 +1,4 @@
-# Generated from design/utils_onboarding.md v1.1
+# Generated from design/utils_onboarding.md v1.3
 import os
 import asyncio
 import httpx
@@ -15,6 +15,7 @@ class SetupScout:
     """
     Environmental Probing Utility for ClawBrain.
     Identifies hardware resources and local LLM services.
+    v1.3: Platform fingerprinting and reachability validation.
     """
     
     DEFAULT_OLLAMA_URL = "http://localhost:11434"
@@ -27,18 +28,33 @@ class SetupScout:
             "distill_model": None,
             "distill_provider": None,
             "vault_path": None,
-            "db_dir": str(Path.cwd() / "data")
+            "db_dir": str(Path.cwd() / "data"),
+            "platform": platform.system()
         }
 
     def is_path_valid_for_os(self, path_str: str) -> bool:
         """Verify if a path is valid and reachable for the current operating system."""
         if not path_str: return False
         current_os = platform.system()
-        path = Path(path_str)
-        if current_os == "Darwin" and path_str.startswith("/home"): return False
-        if current_os == "Linux" and path_str.startswith("/Users"): return False
-        try: return path.exists() or path.parent.exists()
+        clean_path = path_str.strip('"').strip("'")
+        if current_os == "Darwin" and clean_path.startswith("/home"): return False
+        if current_os == "Linux" and clean_path.startswith("/Users"): return False
+        try: 
+            path = Path(clean_path)
+            return path.exists() or path.parent.exists()
         except: return False
+
+    async def is_url_reachable(self, url: str) -> bool:
+        """Ping the URL to see if the service is actually alive."""
+        if not url: return False
+        try:
+            async with httpx.AsyncClient(timeout=1.0) as client:
+                # Support both /v1/models and /api/tags (Ollama)
+                probe_url = f"{url.rstrip('/')}/api/tags" if "11434" in url else f"{url.rstrip('/')}/v1/models"
+                resp = await client.get(probe_url)
+                return resp.status_code in [200, 404, 401] # 404/401 means server is there but path is different
+        except:
+            return False
 
     async def probe_ollama(self) -> bool:
         """Check for local Ollama instance."""
@@ -117,23 +133,39 @@ class SetupScout:
             self.findings["vault_path"] = str(default_vault)
             logger.info(f"✨ Created default ClawBrain Vault at: {default_vault}")
 
-    def generate_env(self):
+    async def generate_env(self):
         env_path = Path.cwd() / ".env"
         existing = {}
         if env_path.exists():
             for line in env_path.read_text().splitlines():
                 if "=" in line:
                     k, v = line.split("=", 1)
-                    existing[k.strip()] = v.strip()
+                    existing[k.strip()] = v.strip().strip('"').strip("'")
+        
+        current_platform = platform.system()
+        stored_platform = existing.get("CLAWBRAIN_PLATFORM", "unknown")
+        
+        force_reprobe = current_platform != stored_platform
+        if force_reprobe:
+            logger.info(f"🚀 Platform Shift Detected ({stored_platform} -> {current_platform}). Invalidating cross-platform settings.")
+        
+        # 1. Validate Distill URL reachability
+        if "CLAWBRAIN_DISTILL_URL" in existing and not force_reprobe:
+            if not await self.is_url_reachable(existing["CLAWBRAIN_DISTILL_URL"]):
+                logger.info(f"⚠️ Distillation endpoint {existing['CLAWBRAIN_DISTILL_URL']} is unreachable. Re-probing...")
+                force_reprobe = True
+
         mapping = {
             "CLAWBRAIN_DB_DIR": self.findings["db_dir"],
             "CLAWBRAIN_DISTILL_URL": self.findings["distill_url"],
             "CLAWBRAIN_DISTILL_MODEL": self.findings["distill_model"],
             "CLAWBRAIN_DISTILL_PROVIDER": self.findings["distill_provider"],
-            "CLAWBRAIN_VAULT_PATH": self.findings["vault_path"]
+            "CLAWBRAIN_VAULT_PATH": self.findings["vault_path"],
+            "CLAWBRAIN_PLATFORM": current_platform
         }
+        
         for key, value in mapping.items():
-            if key not in existing:
+            if key not in existing or force_reprobe:
                 if value: existing[key] = value
             elif "PATH" in key or "DIR" in key:
                 if not self.is_path_valid_for_os(existing[key]):
@@ -141,11 +173,13 @@ class SetupScout:
                     existing[key] = value
             elif not existing[key] and value:
                 existing[key] = value
+        
         if "CLAWBRAIN_MAX_CONTEXT_CHARS" not in existing:
             existing["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "2000"
+            
         lines = [f'{k}="{v}"' for k, v in existing.items()]
         env_path.write_text("\n".join(lines) + "\n")
-        logger.info(f"✨ Updated .env with optimal settings (quoted).")
+        logger.info(f"✨ Updated .env with platform-optimized settings (quoted).")
 
 async def main():
     scout = SetupScout()
@@ -155,7 +189,7 @@ async def main():
     logger.info(f"📊 Hardware Profile: Tier {tier} ({vram:.1f}GB effectively available)")
     await asyncio.gather(scout.probe_ollama(), scout.probe_lmstudio(), scout.probe_omlx())
     scout.probe_vault()
-    scout.generate_env()
+    await scout.generate_env()
     logger.info("\n✅ Setup complete. You can now start the server.")
 
 if __name__ == "__main__":
