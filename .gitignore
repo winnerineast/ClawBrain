@@ -1,4 +1,5 @@
 .env
+server.pid
 data/
 *.sqlite3
 venv/
