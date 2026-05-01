@@ -40,21 +40,15 @@ Context is assembled in order of "Knowledge Density":
 
 ### 2.5 The Breathing Brain (Heartbeat Loop)
 - **Core Concept**: Cognitive background tasks are decoupled from real-time ingestion.
+- **Priority Gating**:
+  - **L1/L2 Storage**: MUST be synchronous (blocking) to ensure immediate retrieval in the next turn.
+  - **Entity Mentions**: Extracted via fast regex in the request path and stored immediately in the registry to ensure Turn N+1 visibility.
+  - **Verified Facts**: Deep mining via LLM is performed in the background heartbeat.
 - **Method**: `async def _cognitive_heartbeat_loop()`
   - **Rhythm**: Orchestrated by `CLAWBRAIN_HEARTBEAT_SECONDS` (default: 30s).
   - **Task Queues**:
-    - `_dirty_sessions: Set[str]`: Sessions that have had enough interaction to warrant a new L3 distillation.
-    - `_pending_trace_extractions: List[str]`: Trace IDs that require deep entity attribute extraction.
-- **Execution Logic**:
-  1. At every pulse, check if the top-level `CircuitBreaker` is open.
-  2. For each `trace_id` in `_pending_trace_extractions`:
-     - Dispatch to `EntityExtractor` for attribute mining.
-     - Move from pending to processed.
-  3. For each `session_id` in `_dirty_sessions`:
-     - Acquire session lock.
-     - Trigger `Neocortex.distill()`.
-     - Remove from dirty set.
-  4. Perform periodic `hippo` cleanup and maintenance.
+    - `_dirty_sessions: Set[str]`: Sessions requiring L3 distillation.
+    - `_pending_trace_extractions: List[tuple[str, str]]`: Trace IDs for background Fact Evolution mining.
 
 ## 4. Output Targets
 - `src/memory/router.py`, `src/memory/storage.py`, `src/main.py`, `tests/test_p22_wm_persistence.py`.

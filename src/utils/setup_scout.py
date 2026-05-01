@@ -140,7 +140,11 @@ class SetupScout:
             for line in env_path.read_text().splitlines():
                 if "=" in line:
                     k, v = line.split("=", 1)
-                    existing[k.strip()] = v.strip().strip('"').strip("'")
+                    # Phase 61 Fix: Strip surrounding quotes if present to avoid double-quoting
+                    val = v.strip()
+                    if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+                        val = val[1:-1]
+                    existing[k.strip()] = val
         
         current_platform = platform.system()
         stored_platform = existing.get("CLAWBRAIN_PLATFORM", "unknown")
@@ -155,8 +159,8 @@ class SetupScout:
                 logger.info(f"⚠️ Distillation endpoint {existing['CLAWBRAIN_DISTILL_URL']} is unreachable. Re-probing...")
                 force_reprobe = True
 
-        current_platform = platform.system().upper()
-        platform_prefix = f"{current_platform}_"
+        current_platform_up = platform.system().upper()
+        platform_prefix = f"{current_platform_up}_"
         
         mapping = {
             "CLAWBRAIN_DB_DIR": self.findings["db_dir"],
