@@ -154,52 +154,42 @@ Isolate memory between different projects or users by sending a simple header:
 ClawBrain operates as a high-performance neural orchestrator, separating the **Relay Plane** (real-time traffic) from the **Cognitive Plane** (background intelligence).
 
 ```mermaid
-flowchart LR
-    %% Professional Color Palette
-    classDef interface_node stroke:#27ae60,stroke-width:2px,fill:#f1f9f5,color:#1b5e20
-    classDef gateway_node stroke:#e67e22,stroke-width:2px,fill:#fef5e7,color:#d35400
-    classDef core_node stroke:#2980b9,stroke-width:2px,fill:#f0f7fc,color:#0d47a1
-    classDef memory_node stroke:#7f8c8d,stroke-width:1px,fill:#ffffff,color:#2c3e50
-
-    subgraph Ingress [Interfaces]
-        direction TB
-        API[main.py: HTTP Relay]:::interface_node
-        MCP[mcp_server.py: MCP SSE]:::interface_node
-        CLI[cli.py: Admin CLI]:::interface_node
+graph TD
+    subgraph Ingress
+        API[HTTP Relay]
+        MCP[MCP Server]
+        CLI[Admin CLI]
     end
 
-    subgraph Logic [Neural Logic]
-        direction TB
-        Detector[ProtocolDetector]:::gateway_node
-        Router[MemoryRouter]:::core_node
-        Translator[DialectTranslator]:::gateway_node
-        Pipe[Pipeline]:::core_node
+    subgraph Intelligence
+        Detector[Protocol Detector]
+        Router[Memory Router]
+        Translator[Dialect Translator]
+        Pipe[Capture Pipeline]
     end
 
-    subgraph Storage [Memory Planes]
-        direction TB
-        L1[[Working Memory: L1]]:::memory_node
-        L2[(Hippocampus: L2)]:::memory_node
-        L3[Neocortex: L3]:::memory_node
-        Ext[(VaultIndexer: Ext)]:::memory_node
+    subgraph Storage
+        L1((Working Memory))
+        L2[(Hippocampus)]
+        L3[Neocortex]
+        Ext[Vault Indexer]
     end
 
-    %% Flow: Specific Node-to-Node links are most stable
-    API & MCP & CLI --> Detector
+    API --> Detector
+    MCP --> Detector
+    CLI --> Detector
+    
     Detector --> Router
     Router --> Translator
-    Translator --> LLM((🤖 Upstream LLM))
-    LLM -- response --> Pipe
+    Translator --> LLM((Upstream LLM))
+    
+    LLM --> Pipe
     Pipe --> L2
-
-    %% Memory orchestration (non-directional for layout stability)
+    
     Router --- L1
     Router --- L2
     Router --- L3
     Router --- Ext
-
-    %% Style all links globally
-    linkStyle default stroke:#2980b9,stroke-width:2px
 ```
 
 ### 1. The Request Lifecycle
