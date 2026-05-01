@@ -151,10 +151,10 @@ python3 src/cli.py query "密码"
 
 ## 🧠 数据流与智能架构
 
-ClawBrain 作为一个神经协调器，通过两个核心流向管理信息的生命周期：**记忆捕获流**与**认知优化流**。
+ClawBrain 作为一个高性能神经协调器，将 **中转平面 (Relay Plane)**（实时流量）与 **认知平面 (Cognitive Plane)**（后台智能）进行了物理隔离。
 
 ```mermaid
-flowchart LR
+flowchart TD
     %% 专业配色方案
     classDef interface_node stroke:#27ae60,stroke-width:2px,fill:#f1f9f5,color:#1b5e20
     classDef gateway_node stroke:#e67e22,stroke-width:2px,fill:#fef5e7,color:#d35400
@@ -162,62 +162,73 @@ flowchart LR
     classDef memory_node stroke:#7f8c8d,stroke-width:1px,fill:#ffffff,color:#2c3e50
 
     subgraph Ingress [接口层]
-        direction TB
+        direction LR
         API[main.py: HTTP 中转]:::interface_node
         MCP[mcp_server.py: MCP SSE]:::interface_node
         CLI[cli.py: 管理 CLI]:::interface_node
     end
 
-    subgraph Gateway [协议网关]
+    subgraph RelayPlane [中转平面 - 实时]
         direction TB
-        Detector[detector.py: 协议探测]:::gateway_node
-        Translator[translator.py: 语义翻译]:::gateway_node
+        Detector[ProtocolDetector: 协议探测]:::gateway_node
+        Translator[DialectTranslator: 方言翻译]:::gateway_node
+        Pipe[Pipeline: 交互捕获]:::core_node
     end
 
-    subgraph Intelligence [核心智能]
+    subgraph CognitivePlane [认知平面 - 后台]
         direction TB
-        Pipeline[pipeline.py: 流量流水线]:::core_node
-        Router[router.py: 记忆路由]:::core_node
+        Router[MemoryRouter: 协调器]:::core_node
+        Neo[Neocortex: 事实浓缩]:::memory_node
+        Vault[VaultIndexer: Obsidian 同步]:::memory_node
     end
 
-    subgraph Storage [记忆平面]
+    subgraph Storage [记忆层]
         direction TB
-        L1[[working.py: L1 注意力层]]:::memory_node
-        L2[(storage.py: L2 情节层)]:::memory_node
-        L3[neocortex.py: L3 事实层]:::memory_node
-        Ext[(vault_indexer.py: Ext 外部索引)]:::memory_node
+        L1[[工作记忆: L1]]:::memory_node
+        L2[(海马体: L2)]:::memory_node
     end
 
     Ingress --> Detector
-    Detector --> Translator
-    Translator --> Pipeline
-    Pipeline <--> Router
+    Detector --> Router
     Router <--> Storage
-    Pipeline <--> LLM((🤖 上游 LLM))
+    Router <--> CognitivePlane
+    Router --> Translator
+    Translator --> LLM((🤖 上游 LLM))
+    LLM -- 流式响应 --> Pipe
+    Pipe -- 固化归档 --> L2
 
     %% 连线专业样式
-    linkStyle 0,1,2,3,4,5 stroke:#2980b9,stroke-width:3px,color:#2980b9
+    linkStyle 0,1,2,3,4,5,6,7,8 stroke:#2980b9,stroke-width:2px
 ```
 
-### 层级技术细节
+### 1. 请求生命周期
+1.  **接入与探测**：请求通过 HTTP、MCP 或 CLI 进入。`ProtocolDetector` 识别输入方言（Ollama 或 OpenAI）。
+2.  **认知增强**：`MemoryRouter` 提取查询意图，并从四个记忆层级中检索相关上下文。
+3.  **方言翻译**：`DialectTranslator` 将增强后的载荷转换为上游提供商（Anthropic, Google, DeepSeek 等）的原生格式。
+4.  **捕获与固化**：在 LLM 响应时，`Pipeline` 捕获补全内容，并将完整的“用户-助手”对话对归档至 **海马体 (L2)**。
+
+### 2. 双平面隔离架构
+*   **中转平面 (Relay Plane)**：专门用于 LLM 流量。经过性能优化且严格隔离，确保记忆注入带来的延迟开销趋近于零。
+*   **认知平面 (Cognitive Plane)**：独立的“思考”循环。异步处理 **事实浓缩 (L3)**、**房间探测**和 **知识库索引**，不与中转平面竞争连接池资源。
+
+### 3. 层级技术细节
 
 #### **L1 — 工作记忆 (活跃注意力层)**
-*   **核心概念**：模拟人类的短期注意力。
-*   **工作机制**：一个带权重的队列，新交互初始权重为 1.0。若后续对话与旧项相关则为其“充电”，不相关的项随时间指数衰减，低于阈值后自动逐出。
-*   **存储**：极速内存状态，定期持久化。
+*   **核心概念**：利用吸引子动力学 (Attractor dynamics) 模拟人类的短期注意力。
+*   工作机制：带权重的队列，新交互权重为 1.0。相关内容会为旧项“充电”，不相关内容则呈指数级衰减并最终逐出。
 
 #### **L2 — 海马体 (情节记忆层)**
-*   **核心概念**：完美保留您经历过的每一次交互。
-*   **工作机制**：内置 **ChromaDB** 向量引擎。它执行语义搜索，即使关键字不匹配，也能找回意图相近的历史对话。
-*   **数据完整性**：每条记录经过 SHA-256 哈希校验，确保存储历史不可篡改且可追溯。
+*   **核心概念**：无损的交互历史存档。
+*   工作机制：由 **ChromaDB** 驱动。执行语义向量搜索，寻找意图相近的历史对话。
+*   **完整性**：每条追踪记录均经过 SHA-256 哈希处理，确保审计轨迹不可篡改。
 
 #### **L3 — 新皮层 (语义事实层)**
-*   **核心概念**：沉淀后的智慧。
-*   **工作机制**：后台任务定期“阅读” L2 历史，并将其浓缩为一份“事实真相”文档。这为 AI 提供了高层级的背景（例如：“用户更喜欢用 Python 而不是 Go”），而无需浪费 Token 去重复阅读每一行聊天记录。
+*   **核心概念**：智慧的结晶。
+*   工作机制：后台进程定期总结 L2 历史为高层级事实（例如：“用户偏好 Python 而非 Go”），极大地优化了上下文窗口的使用效率。
 
 #### **Ext — 知识库 (外部逻辑层)**
 *   **核心概念**：打破“对话记录”与“既有知识”的边界。
-*   **工作机制**：直接挂载您的 **Obsidian 库**。它将您的笔记视为最高优先级的权威文档，通过增量索引确保最可靠的事实被优先提供给 AI。
+*   工作机制：增量索引您的 **Obsidian 库**，将您的个人笔记视为优先级最高的“事实真相”。
 
 ---
 

@@ -151,10 +151,10 @@ Isolate memory between different projects or users by sending a simple header:
 
 ## 🧠 Data Flow & Intelligence Architecture
 
-ClawBrain functions as a neural orchestrator, managing the lifecycle of information through two primary flows: **Memory Capture** and **Cognitive Optimization**.
+ClawBrain operates as a high-performance neural orchestrator, separating the **Relay Plane** (real-time traffic) from the **Cognitive Plane** (background intelligence).
 
 ```mermaid
-flowchart LR
+flowchart TD
     %% Professional Color Palette
     classDef interface_node stroke:#27ae60,stroke-width:2px,fill:#f1f9f5,color:#1b5e20
     classDef gateway_node stroke:#e67e22,stroke-width:2px,fill:#fef5e7,color:#d35400
@@ -162,62 +162,73 @@ flowchart LR
     classDef memory_node stroke:#7f8c8d,stroke-width:1px,fill:#ffffff,color:#2c3e50
 
     subgraph Ingress [Interfaces]
-        direction TB
+        direction LR
         API[main.py: HTTP Relay]:::interface_node
         MCP[mcp_server.py: MCP SSE]:::interface_node
         CLI[cli.py: Admin CLI]:::interface_node
     end
 
-    subgraph Gateway [Protocol Gateway]
+    subgraph RelayPlane [The Relay Plane - Real-time]
         direction TB
-        Detector[detector.py: Detect]:::gateway_node
-        Translator[translator.py: Translate]:::gateway_node
+        Detector[ProtocolDetector]:::gateway_node
+        Translator[DialectTranslator]:::gateway_node
+        Pipe[Pipeline: Captured Turn]:::core_node
     end
 
-    subgraph Intelligence [Core Intelligence]
+    subgraph CognitivePlane [The Cognitive Plane - Background]
         direction TB
-        Pipeline[pipeline.py: Pipeline]:::core_node
-        Router[router.py: Router]:::core_node
+        Router[MemoryRouter: Orchestrator]:::core_node
+        Neo[Neocortex: Fact Distiller]:::memory_node
+        Vault[VaultIndexer: Obsidian Sync]:::memory_node
     end
 
-    subgraph Storage [Memory Planes]
+    subgraph Storage [Memory Layers]
         direction TB
-        L1[[working.py: L1]]:::memory_node
-        L2[(storage.py: L2)]:::memory_node
-        L3[neocortex.py: L3]:::memory_node
-        Ext[(vault_indexer.py: Ext)]:::memory_node
+        L1[[Working Memory: L1]]:::memory_node
+        L2[(Hippocampus: L2)]:::memory_node
     end
 
     Ingress --> Detector
-    Detector --> Translator
-    Translator --> Pipeline
-    Pipeline <--> Router
+    Detector --> Router
     Router <--> Storage
-    Pipeline <--> LLM((🤖 Upstream LLM))
+    Router <--> CognitivePlane
+    Router --> Translator
+    Translator --> LLM((🤖 Upstream LLM))
+    LLM -- streaming response --> Pipe
+    Pipe -- solidification --> L2
 
     %% Professional Styling for Links
-    linkStyle 0,1,2,3,4,5 stroke:#2980b9,stroke-width:3px,color:#2980b9
+    linkStyle 0,1,2,3,4,5,6,7,8 stroke:#2980b9,stroke-width:2px
 ```
 
-### Layer Details
+### 1. The Request Lifecycle
+1.  **Ingress & Detection**: Requests enter via HTTP, MCP, or CLI. The `ProtocolDetector` identifies the input dialect (Ollama vs OpenAI).
+2.  **Cognitive Enrichment**: The `MemoryRouter` extracts the query intent and pulls relevant context from the four memory layers.
+3.  **Dialect Translation**: The `DialectTranslator` converts the enriched payload into the native format for the upstream provider (Anthropic, Google, DeepSeek, etc.).
+4.  **Capture & Solidification**: As the LLM responds, the `Pipeline` captures the completion and archives the full user-assistant pair into the **Hippocampus (L2)**.
+
+### 2. Dual-Plane Isolation
+*   **The Relay Plane**: Dedicated solely to LLM traffic. It is performance-optimized and strictly isolated to ensure zero-latency overhead for memory injection.
+*   **The Cognitive Plane**: An independent "thinking" loop. It handles **Fact Distillation** (L3), **Room Detection**, and **Vault Indexing** asynchronously without competing for the Relay Plane's connection pool.
+
+### 3. Layer Technical Details
 
 #### **L1 — Working Memory (Active Attention)**
-*   **The Concept**: Mimics human short-term focus.
-*   **Mechanism**: A weighted queue where recent interactions have 1.0 "charge." Relevance to the current turn recharges old items, while irrelevant ones decay and are eventually evicted.
-*   **Storage**: High-speed in-memory state with periodic persistence.
+*   **Concept**: Mimics human short-term focus using Attractor dynamics.
+*   **Mechanism**: A weighted queue where interactions have a 1.0 "charge." Relevance recharges old items; irrelevance leads to exponential decay and eviction.
 
 #### **L2 — Hippocampus (Episodic Archive)**
-*   **The Concept**: Every interaction you've ever had, perfectly preserved.
-*   **Mechanism**: An embedded **ChromaDB** vector store. It performs semantic search to find conversations that are conceptually similar to your current query, even if the keywords differ.
-*   **Integrity**: Every trace is hashed with SHA-256 to ensure a tamper-proof historical audit trail.
+*   **Concept**: Lossless interaction history.
+*   **Mechanism**: Powered by **ChromaDB**. It performs semantic vector search to find conceptually similar past conversations.
+*   **Integrity**: Every trace is hashed (SHA-256) for a tamper-proof audit trail.
 
 #### **L3 — Neocortex (Semantic Facts)**
-*   **The Concept**: Distilled wisdom.
-*   **Mechanism**: A background process that periodically "reads" your L2 history and summarizes it into a single "Source of Truth" document. This provides the AI with high-level context (e.g., "The user prefers Python over Go") without wasting tokens on individual chat turns.
+*   **Concept**: Distilled wisdom.
+*   **Mechanism**: A background process that summarizes L2 history into high-level facts (e.g., "The user prefers Python over Go"), optimizing context window usage.
 
 #### **Ext — Knowledge Vault (External Logic)**
-*   **The Concept**: Bridges the gap between "what we said" and "what I know."
-*   **Mechanism**: Hooks into your **Obsidian Vault**. It treats your existing notes as primary documentation, indexing them incrementally to provide the most reliable facts first.
+*   **Concept**: Bridges "what we said" with "what is known."
+*   **Mechanism**: Indexes your **Obsidian Vault** incrementally, treating your personal notes as a prioritized Source of Truth.
 
 ---
 
