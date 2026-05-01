@@ -95,6 +95,9 @@ async def run_case(client: httpx.AsyncClient, case: dict) -> CaseResult:
             if turn.get("role") == "user":
                 await _ingest(client, session_id_on, turn["content"])
 
+        # Phase 65: Allow ChromaDB index synchronization
+        await asyncio.sleep(0.5)
+
         if recall_turn is None:
             result.error = "No recall query turn found"
             return result

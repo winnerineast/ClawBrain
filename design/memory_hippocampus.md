@@ -1,4 +1,4 @@
-# design/memory_hippocampus.md v1.9
+# design/memory_hippocampus.md v1.10
 
 ## 1. Objective
 Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This engine handles lossless persistence of interaction traces, streaming offload of large payloads to disk, and **semantic vector search** via an embedded ChromaDB instance. It also enforces byte-level integrity audit and session-isolated retrieval.
@@ -11,6 +11,13 @@ Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This 
 - **Collections**:
   - `traces`: Stores episodic archive. Documents are the `search_text` (intent) or `raw_content`. Metadata includes `timestamp`, `model`, `is_blob`, `blob_path`, `checksum`, and `session_id`.
   - `wm_state`: Stores L1 working memory snapshot persistence.
+
+### 2.9 Stability & Concurrency (Phase 65 Fix)
+- **Problem**: ChromaDB's HNSW index can become desynchronized during rapid write/read cycles (e.g. benchmarks), causing `Internal error: Error finding id`.
+- **Remediation**:
+  - Initialise `PersistentClient` with `Settings(allow_reset=True, anonymized_telemetry=False)`.
+  - **Graceful Search Fallback**: If `traces_col.query` raises an `InternalError`, the engine must catch it, log a warning, and fall back to a metadata-only scan (`traces_col.get(where=...)`) to ensure the agent receives context even if semantic ranking is temporarily degraded.
+  - **Connection Pooling**: Use a global `_CHROMA_CLIENTS` cache to ensure only one instance of the client exists per physical path.
 
 ### 2.2 Dynamic Tiered Storage (save_trace)
 - **Method signature**: `save_trace(trace_id, payload, search_text="", threshold=None, session_id="default")`

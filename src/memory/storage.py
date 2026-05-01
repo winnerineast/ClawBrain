@@ -1,6 +1,7 @@
-# Generated from design/memory_hippocampus.md v1.9 / GEMINI.md Rule 12
+# Generated from design/memory_hippocampus.md v1.10 / GEMINI.md Rule 12
 import sqlite3
 import chromadb
+from chromadb.config import Settings
 import json
 import time
 import os
@@ -17,7 +18,10 @@ _CHROMA_CLIENTS = {}
 def get_chroma_client(db_path: Path):
     path_str = str(db_path)
     if path_str not in _CHROMA_CLIENTS:
-        _CHROMA_CLIENTS[path_str] = chromadb.PersistentClient(path=path_str)
+        _CHROMA_CLIENTS[path_str] = chromadb.PersistentClient(
+            path=path_str,
+            settings=Settings(allow_reset=True, anonymized_telemetry=False)
+        )
     return _CHROMA_CLIENTS[path_str]
 
 def clear_chroma_clients():
@@ -170,7 +174,24 @@ class Hippocampus:
     def search(self, query: str, session_id: str = "default", room_id: str = None, limit: int = 10, include_distances: bool = False) -> Union[List[str], List[Dict[str, Any]]]:
         where = {"session_id": session_id}
         if room_id: where = {"$and": [{"session_id": session_id}, {"room_id": room_id}]}
-        res = self.traces_col.query(query_texts=[query], n_results=limit, where=where)
+        try:
+            res = self.traces_col.query(query_texts=[query], n_results=limit, where=where)
+        except Exception as e:
+            # Phase 65: Graceful fallback for desynchronized HNSW index
+            if "Error finding id" in str(e) or "Internal error" in str(e):
+                logger.warning(f"[HIPPO.SEARCH] ChromaDB index lag detected. Falling back to metadata scan for session {session_id}")
+                res = self.traces_col.get(where=where, limit=limit, include=["metadatas", "documents"])
+                # res from get() has a different structure than query()
+                # query() returns {'ids': [[...]], 'distances': [[...]], ...}
+                # get() returns {'ids': [...], 'metadatas': [...], 'documents': [...], ...}
+                if not res or not res["ids"]: return []
+                ids = res["ids"]
+                if include_distances:
+                    # In fallback mode, distance is unknown (assume 0.5/neutral)
+                    return [{"id": tid, "distance": 0.5} for tid in ids]
+                return ids
+            
+            raise
         
         if not res or not res["ids"] or len(res["ids"]) == 0:
             return []

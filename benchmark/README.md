@@ -13,7 +13,7 @@ ClawBrain's value is defined by the **Delta**—the measurable improvement in an
 To ensure both technical precision and real-world utility, the benchmark is split into two tiers:
 
 ### Tier 1: Infrastructure Integrity (Direct API)
-*   **Method**: Drives ClawBrain’s `/internal/*` endpoints directly, bypassing the LLM.
+*   **Method**: Drives ClawBrain’s `/v1/*` endpoints directly, bypassing the LLM.
 *   **Purpose**: Validates the mathematical correctness of the **Retrieval and Context Budgeting** logic.
 *   **Metrics**: Verifies that the correct facts are injected into the prompt addition without exceeding token budgets. It is deterministic and fast.
 
@@ -37,28 +37,34 @@ We don't just test "memory"; we stress-test specific cognitive failure points th
 | **Alias Resolution (v1.1)** | **Personalized Refs**: Mapping nicknames ("The Architect") back to formal system facts. |
 | **Chronicle Conflict (v1.1)** | **Temporal Reasoning**: Resolving conflicting facts by prioritizing the most recent date/version. |
 
-## Environment Setup & Prerequisites
+## Environment Setup & Troubleshooting
 
-All benchmark commands **MUST** be executed from the **ClawBrain project root**.
+### 1. Requirements
+- **Ollama**: Must be running for the **Cognitive Judge** and **Topic Detection** features.
+  ```bash
+  ollama serve
+  ollama pull gemma4:e4b
+  ```
+- **Virtual Environment**: All commands must use the project `venv`.
 
-1. **Initialize Environment**:
-   ```bash
-   # From the project root (ClawBrain/)
-   source venv/bin/activate
-   export PYTHONPATH=$PYTHONPATH:.
-   ```
+### 2. Running the Server
+The benchmark runner connects to a running ClawBrain instance. Start it in a separate terminal:
+```bash
+# From ClawBrain root
+source venv/bin/activate
+export CLAWBRAIN_URL=http://127.0.0.1:11435
+python3 -m uvicorn src.main:app --host 127.0.0.1 --port 11435
+```
 
-2. **Verify Connectivity (Tier 1)**:
-   Tier 1 tests require the ClawBrain server to be running in a separate terminal:
-   ```bash
-   python3 -m uvicorn src.main:app --port 11435
-   ```
-
-3. **Verify Dependencies (Tier 2)**:
-   Ensure `openclaw` is in your PATH and the `gemma4:e4b` model is pulled:
-   ```bash
-   ollama pull gemma4:e4b
-   ```
+### 3. Troubleshooting "Internal Server Error"
+If you encounter `Internal error: Error finding id` in the server logs during high-volume testing:
+- **Cause**: This indicates a desynchronization between the ChromaDB HNSW index and the underlying storage.
+- **Solution**: The system now includes a **Phase 65 Graceful Fallback** that automatically switches to a metadata scan if index lag is detected. No manual action is required, though results may show lower "Cognitive Delta" until the index stabilizes.
+- **Manual Reset**: To start from a 100% clean state:
+  ```bash
+  pkill -9 -f uvicorn
+  rm -rf data/chroma/
+  ```
 
 ## Quick Start
 
@@ -67,41 +73,18 @@ All benchmark commands **MUST** be executed from the **ClawBrain project root**.
 python3 benchmark/run_benchmark.py generate
 
 # 2. Setup OpenClaw profiles (Creates ~/.openclaw-benchmark-on/off)
-# This command configures contextEngine to 'clawbrain' for 'on' and 'legacy' for 'off'
 python3 benchmark/run_benchmark.py setup-profiles
 
 # 3. Run Tier 1 (Fast, requires ClawBrain server running)
-PYTHONPATH=. ./venv/bin/python3 benchmark/run_benchmark.py run --tier 1
+export CLAWBRAIN_URL=http://127.0.0.1:11435
+python3 benchmark/run_benchmark.py run --tier 1
 
 # 4. Run Tier 2 (Slower, requires OpenClaw + local model gemma4:e4b)
-# Uses profiles in ~/.openclaw-benchmark-on and ~/.openclaw-benchmark-off
-PYTHONPATH=. ./venv/bin/python3 benchmark/run_benchmark.py run --tier 2
+python3 benchmark/run_benchmark.py run --tier 2
 
 # 5. View the latest comprehensive report
 python3 benchmark/run_benchmark.py report
 ```
 
-## Tier 2 Environment Details
-
-To ensure a clean testing environment, Tier 2 uses dedicated OpenClaw profiles and workspaces:
-
-- **Profiles**:
-  - `benchmark-on`: Located at `~/.openclaw-benchmark-on/`, uses ClawBrain as the `contextEngine`.
-  - `benchmark-off`: Located at `~/.openclaw-benchmark-off/`, uses the legacy `contextEngine`.
-- **Workspaces**:
-  - `benchmark-on` uses `~/.openclaw/workspace-benchmark-on`.
-  - `benchmark-off` uses `~/.openclaw/workspace-benchmark-off`.
-- **Default Model**: The benchmark defaults to `ollama/gemma4:e4b`. Ensure this model is pulled in Ollama before running.
-
-
-## Work Daily (Phase 32 Status)
-
-The core infrastructure and Tier 1 integrity tests are now fully verified. The next immediate focus is executing **Tier 2 (Cognitive Effectiveness)** benchmarks. This will quantify the end-to-end recall rate of the `gemma4:e4b` model when enhanced by ClawBrain's tri-layer memory system.
-
-**Next Tasks:**
-1.  Verify `gemma4:e4b` is locally active in Ollama.
-2.  Execute full Tier 2 run: `python3 benchmark/run_benchmark.py run --tier 2`.
-3.  Analyze the "Cognitive Delta" between `benchmark-on` and `benchmark-off` profiles.
-
 ---
-*This benchmark is a living system. As ClawBrain evolves (e.g., adding Vector Embeddings), these metrics provide the guardrails to ensure every "improvement" is a genuine cognitive gain.*
+*Generated from design/benchmark.md v1.2 / Phase 65 Update.*
