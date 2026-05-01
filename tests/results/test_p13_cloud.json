@@ -1,7 +1,0 @@
-[
-  {
-    "test_id": "p13_anthropic_schema_v1.1_final",
-    "status": "PASS",
-    "evidence_log": "tests/results/test_p13_cloud.log"
-  }
-]

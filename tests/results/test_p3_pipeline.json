@@ -1,7 +1,0 @@
-[
-  {
-    "test_id": "p3_pipeline_v1.18_audit",
-    "status": "PASS",
-    "evidence_log": "tests/results/test_p3_pipeline.log"
-  }
-]

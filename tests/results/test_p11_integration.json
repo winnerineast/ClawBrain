@@ -1,7 +1,0 @@
-[
-  {
-    "test_id": "p11_memory_full_stack_v1.2",
-    "status": "PASS",
-    "evidence_log": "tests/results/test_p11_integration.log"
-  }
-]

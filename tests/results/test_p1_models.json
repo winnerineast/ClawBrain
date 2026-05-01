@@ -1,7 +1,0 @@
-[
-  {
-    "test_id": "p1_models_v1.18_audit",
-    "status": "PASS",
-    "evidence_log": "tests/results/test_p1_models.log"
-  }
-]

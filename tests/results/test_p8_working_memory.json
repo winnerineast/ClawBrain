@@ -1,7 +1,0 @@
-[
-  {
-    "test_id": "p8_working_memory_v1.3_math_audit",
-    "status": "PASS",
-    "evidence_log": "tests/results/test_p8_working_memory.log"
-  }
-]

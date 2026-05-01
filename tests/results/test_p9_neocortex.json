@@ -1,7 +1,0 @@
-[
-  {
-    "test_id": "p9_neocortex_v1.1_high_fidelity",
-    "status": "PASS",
-    "evidence_log": "tests/results/test_p9_neocortex.log"
-  }
-]

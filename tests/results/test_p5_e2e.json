@@ -1,7 +1,0 @@
-[
-  {
-    "test_id": "p5_e2e_breakdown_audit",
-    "status": "PASS",
-    "evidence_log": "tests/results/test_p5_e2e.log"
-  }
-]
