@@ -198,7 +198,7 @@ flowchart TD
     Pipe -- 固化归档 --> L2
 
     %% 连线专业样式
-    linkStyle 0,1,2,3,4,5,6,7,8 stroke:#2980b9,stroke-width:2px
+    linkStyle 0,1,2,3,4,5,6,7 stroke:#2980b9,stroke-width:2px
 ```
 
 ### 1. 请求生命周期

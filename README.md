@@ -198,7 +198,7 @@ flowchart TD
     Pipe -- solidification --> L2
 
     %% Professional Styling for Links
-    linkStyle 0,1,2,3,4,5,6,7,8 stroke:#2980b9,stroke-width:2px
+    linkStyle 0,1,2,3,4,5,6,7 stroke:#2980b9,stroke-width:2px
 ```
 
 ### 1. The Request Lifecycle
