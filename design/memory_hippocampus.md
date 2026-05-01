@@ -58,6 +58,14 @@ Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This 
 - **Methods**: `save_wm_state`, `load_wm_state`, `clear_wm_state`.
 - Items are sorted by `timestamp` in Python after retrieval.
 
+### 2.10 Fact Registry & Evolution (Generic Intelligence)
+- **Background**: Implements the background fact store for "verified" high-density information.
+- **Method signature**: `upsert_fact(session_id: str, entity: str, key: str, value: str, trace_id: str = None) -> str`
+- **Logic**:
+  - Store facts in a dedicated `entities` collection or SQLite table.
+  - **Evolution**: If a fact with the same `(session_id, entity, key)` exists, the system must **overwrite** it with the new `value` and update the `timestamp`.
+  - **Traceability**: Link every fact to its source `trace_id` for provenance tracking.
+
 ## 3. Test Specification (High-Fidelity TDD)
 
 All tests must be in `tests/test_p7_hippocampus.py` with Side-by-Side audit output.

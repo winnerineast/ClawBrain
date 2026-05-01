@@ -17,7 +17,7 @@ Fully implement ClawBrain Gateway protocol adaptation for major LLM providers. B
   - **Core logic**: Strip only the leading gateway provider identifier via `model_name.split("/", 1)[1]`. Never use `split("/")[-1]` — doing so would truncate organization paths embedded in the model ID (e.g., `nvidia/nemotron`).
 
 ### 2.2 Provider Registry & Routing Security
-- `ProviderRegistry` must include built-in mappings for: google, mistral, xai, openrouter, together, ollama, lmstudio, openai, deepseek.
+- `ProviderRegistry` must include built-in mappings for: google, mistral, xai, openrouter, together, ollama, lmstudio, omlx, openai, deepseek.
 - **Routing security**: If the requested model cannot be resolved by `resolve_provider` (no valid prefix and not a native Ollama model ID), the system must **strictly prohibit any silent fallback**. `resolve_provider` must return `(None, None)`; the caller raises **HTTP 501 Not Implemented**. Forwarding such requests to any backend adapter is forbidden to prevent 404 errors from protocol mismatch.
 
 ### 2.3 Dynamic Protocol Detection & Standardization
