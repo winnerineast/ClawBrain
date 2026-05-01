@@ -154,7 +154,7 @@ python3 src/cli.py query "密码"
 ClawBrain 作为一个高性能神经协调器，将 **中转平面 (Relay Plane)**（实时流量）与 **认知平面 (Cognitive Plane)**（后台智能）进行了物理隔离。
 
 ```mermaid
-flowchart TD
+flowchart LR
     %% 专业配色方案
     classDef interface_node stroke:#27ae60,stroke-width:2px,fill:#f1f9f5,color:#1b5e20
     classDef gateway_node stroke:#e67e22,stroke-width:2px,fill:#fef5e7,color:#d35400
@@ -162,42 +162,41 @@ flowchart TD
     classDef memory_node stroke:#7f8c8d,stroke-width:1px,fill:#ffffff,color:#2c3e50
 
     subgraph Ingress [接口层]
-        direction LR
+        direction TB
         API[main.py: HTTP 中转]:::interface_node
         MCP[mcp_server.py: MCP SSE]:::interface_node
         CLI[cli.py: 管理 CLI]:::interface_node
     end
 
-    subgraph RelayPlane [中转平面 - 实时]
+    subgraph Logic [神经逻辑]
         direction TB
         Detector[ProtocolDetector: 协议探测]:::gateway_node
+        Router[MemoryRouter: 协调器]:::core_node
         Translator[DialectTranslator: 方言翻译]:::gateway_node
         Pipe[Pipeline: 交互捕获]:::core_node
     end
 
-    subgraph CognitivePlane [认知平面 - 后台]
-        direction TB
-        Router[MemoryRouter: 协调器]:::core_node
-        Neo[Neocortex: 事实浓缩]:::memory_node
-        Vault[VaultIndexer: Obsidian 同步]:::memory_node
-    end
-
-    subgraph Storage [记忆层]
+    subgraph Storage [记忆平面]
         direction TB
         L1[[工作记忆: L1]]:::memory_node
         L2[(海马体: L2)]:::memory_node
+        L3[新皮层: L3]:::memory_node
+        Ext[(知识库: Ext)]:::memory_node
     end
 
-    Ingress --> Detector
+    %% 流程：具体的节点间链接最稳定
+    API & MCP & CLI --> Detector
     Detector --> Router
-    Router <--> L1
-    Router <--> L2
-    Router <--> Neo
-    Router <--> Vault
     Router --> Translator
     Translator --> LLM((🤖 上游 LLM))
-    LLM -- 流式响应 --> Pipe
-    Pipe -- 固化归档 --> L2
+    LLM -- 响应 --> Pipe
+    Pipe --> L2
+
+    %% 记忆协调（非定向链接以保证布局稳定性）
+    Router --- L1
+    Router --- L2
+    Router --- L3
+    Router --- Ext
 
     %% 全局连线样式
     linkStyle default stroke:#2980b9,stroke-width:2px
