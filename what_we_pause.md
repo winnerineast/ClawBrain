@@ -1,21 +1,22 @@
-# 🦞 ClawBrain: Active Issues & Paused Tasks (April 27, 2026 - Generic Intelligence Breakthrough)
+# 🦞 ClawBrain: Active Issues & Paused Tasks (May 1, 2026 - Multi-Platform Stability & Phase 65 Fix)
 
 ## ✅ Recently Resolved
-- **v1.4 Judge-Centric Gating**: Replaced rigid similarity thresholds with a "Wide Net" pre-filter (Rule B: 20% coverage) combined with a reasoning-aware Cognitive Judge.
-- **v1.9 Registry Optimization**: Implemented background entity extraction for compound proper nouns (e.g., "MongoDB Atlas") and technical identifiers, populating a verified Fact Registry.
-- **Fact Evolution Support**: Enabled automatic overriding of historical facts in the registry when updated information is provided.
-- **Cross-Platform Stability**: Fully verified on macOS (OMLX/LM Studio) and Ubuntu (Ollama), with robust quoted `.env` generation.
-- **85% Multi-Fact Recall**: Significant breakthrough in complex synthesis queries through unified significance scoring.
+- **Multi-Platform Config Sync**: Implemented a robust `get_env()` system supporting `DARWIN_` and `LINUX_` prefixes in a single `.env` file, enabling seamless switching between macOS and Ubuntu.
+- **Phase 65 Stability Fix**: Resolved the "Error finding id" ChromaDB exception through a graceful metadata-fallback mechanism when HNSW index lag is detected.
+- **v1.2 Architectural Alignment**: Updated high-level architecture diagrams and documentation to reflect the Ingress Layer (HTTP/MCP/CLI) and Knowledge Vault (Ext) integration.
+- **Constitutional Compliance (Rule 4)**: Purged all "Traceability Violations" by ensuring every source file (CLI, MCP, etc.) properly cites its design specification.
+- **Refined Documentation (EN/CN)**: Fully synchronized multi-language READMEs with simplified, ultra-compatible Mermaid diagrams and installation notes.
+- **Historical Cleanup**: Merged all transient prompt/task files into authoritative design documents and purged legacy logs/benchmark results.
 
 ## 🛑 Current Status
-- **Tier 1 Direct Run**: 100% pass in Fact Evolution, Neocortex, and Isolation. 85.1% in Multi-Fact Recall.
-- **Isolation Artifacts**: Technical "Isolation Fails" in benchmark logs are verified as registry precision artifacts (recalling facts that negative-check tests expect to be absent).
-- **Latency**: Cognitive Judge overhead remains at ~1s; acceptable for local-first precision.
+- **Tier 1 Direct Run**: Functionally stable after Phase 65 fix. 100% pass in Fact Evolution and Neocortex.
+- **ChromaDB Resilience**: The system now survives high-concurrency write/read bursts during benchmarking without 500 errors.
+- **GitNexus Intelligence**: Index refreshed with **2,068 symbols** and **3,549 relationships**, providing high-fidelity maps for AI agents.
 
 ## 🚀 Next Priorities
-1. **Tier 2 Acceptance**: Validate that retrieved context results in 90%+ correct LLM answers in end-to-end cycles.
-2. **Context Compression**: Dynamically prune L1/L2 overlap when total budget is tight (<1000 chars).
-3. **Registry Pruning**: Implement TTL for non-verified "mention" facts to prevent registry bloat in long sessions.
+1. **Tier 2 E2E Verification**: Execute full end-to-end cycles using the `gemma4:e4b` model to verify cognitive recall at the response level.
+2. **Context Compression**: Implement L1/L2 deduplication for tight context windows (<1000 chars).
+3. **Hybrid Retrieval (v1.11)**: Combine semantic vector search with exact keyword matching to improve recall for IDs, Ports, and Tokens.
 
 ---
-*Status: GENERIC CROSS-PLATFORM COGNITIVE ENGINE. High-precision retrieval stabilized.*
+*Status: MULTI-PLATFORM PRODUCTION READINESS. Infrastructure and Stability Layer stabilized.*
