@@ -239,7 +239,7 @@ ClawBrain 遵循严格的**设计先行**工作流。所有架构变更必须在
 
 本仓库已由 [GitNexus](https://github.com/abhigyanpatwari/GitNexus) 完成索引，为 AI 智能体提供高保真度的代码库知识图谱。
 
-- **状态**: 🟢 已完全索引 (1,039 个符号, 2,376 条关系)
+- **状态**: 🟢 已完全索引 (2,068 个符号, 3,549 条关系)
 - **核心能力**: 语义级代码导航、变更影响分析、自动化执行流追踪。
 - **使用方法**: 若您正在使用 AI 助手（如 Claude Code 或 Cursor），请参考 [AGENTS.md](./AGENTS.md) 或 [CLAUDE.md](./CLAUDE.md) 获取针对 GitNexus 优化的交互指令。
 

@@ -1,12 +1,13 @@
 {
   "repoPath": "/home/nvidia/ClawBrain",
-  "lastCommit": "8e679f23425d131a902641063592bc2fbbe41a6b",
-  "indexedAt": "2026-04-14T01:43:58.695Z",
+  "lastCommit": "a4d37af70f5f3463a159decfee296415c416891d",
+  "indexedAt": "2026-05-01T13:08:20.475Z",
+  "remoteUrl": "https://github.com/winnerineast/ClawBrain",
   "stats": {
-    "files": 169,
-    "nodes": 1039,
-    "edges": 2376,
-    "communities": 44,
+    "files": 105,
+    "nodes": 2068,
+    "edges": 3549,
+    "communities": 53,
     "processes": 72,
     "embeddings": 0
   }

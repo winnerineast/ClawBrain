@@ -239,7 +239,7 @@ Ensure system stability by running our unmocked, resource-aware regression suite
 
 This repository is indexed by [GitNexus](https://github.com/abhigyanpatwari/GitNexus), providing a high-fidelity knowledge graph of the codebase for AI agents.
 
-- **Status**: 🟢 Fully Indexed (1,039 symbols, 2,376 relationships)
+- **Status**: 🟢 Fully Indexed (2,068 symbols, 3,549 relationships)
 - **Features**: Semantic navigation, impact analysis, and automated execution flow tracing.
 - **Usage**: If you are using an AI assistant (like Claude Code or Cursor), refer to [AGENTS.md](./AGENTS.md) or [CLAUDE.md](./CLAUDE.md) for specialized GitNexus instructions.
 
