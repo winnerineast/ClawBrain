@@ -190,15 +190,17 @@ flowchart TD
 
     Ingress --> Detector
     Detector --> Router
-    Router <--> Storage
-    Router <--> CognitivePlane
+    Router <--> L1
+    Router <--> L2
+    Router <--> Neo
+    Router <--> Vault
     Router --> Translator
     Translator --> LLM((🤖 Upstream LLM))
     LLM -- streaming response --> Pipe
     Pipe -- solidification --> L2
 
-    %% Professional Styling for Links
-    linkStyle 0,1,2,3,4,5,6,7 stroke:#2980b9,stroke-width:2px
+    %% Style all links globally
+    linkStyle default stroke:#2980b9,stroke-width:2px
 ```
 
 ### 1. The Request Lifecycle

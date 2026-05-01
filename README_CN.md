@@ -190,15 +190,17 @@ flowchart TD
 
     Ingress --> Detector
     Detector --> Router
-    Router <--> Storage
-    Router <--> CognitivePlane
+    Router <--> L1
+    Router <--> L2
+    Router <--> Neo
+    Router <--> Vault
     Router --> Translator
     Translator --> LLM((🤖 上游 LLM))
     LLM -- 流式响应 --> Pipe
     Pipe -- 固化归档 --> L2
 
-    %% 连线专业样式
-    linkStyle 0,1,2,3,4,5,6,7 stroke:#2980b9,stroke-width:2px
+    %% 全局连线样式
+    linkStyle default stroke:#2980b9,stroke-width:2px
 ```
 
 ### 1. 请求生命周期
