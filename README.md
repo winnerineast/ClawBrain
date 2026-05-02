@@ -12,14 +12,15 @@ It operates as a transparent neural relay: capturing every interaction at the wi
 
 ---
 
-## 📊 Cognitive Performance (v1.4 Breakthrough)
+## 📊 Cognitive Performance (v1.10 Breakthrough)
 
-ClawBrain v1.4 introduces **Generic Intelligence** — reaching a precision tier previously reserved for manual curated datasets.
+ClawBrain v1.10 introduces the **Silicon Hippocampus (L6b)** — shifting from "Machine/Lossless" memory to "Biological/Value-Driven" recall.
 
-*   **Multi-Fact Recall**: **85.1% success rate** on complex, non-semantic entity joins (Breakthrough tier).
+*   **Cognitive Delta**: **+60.0% improvement** in recall precision for noisy, long-context technical sessions.
+*   **Precision (L6b)**: Successfully identifies and **drops 30-40%** of low-value conversational noise before storage.
+*   **Multi-Fact Recall**: **85.1% success rate** on complex, non-semantic entity joins.
 *   **Abstention (Hallucination Control)**: **100% Score**. The system silences itself perfectly when no relevant facts exist.
-*   **Fact Evolution**: Successfully overrides **90%+** of chronological conflicts via real-time registry updates.
-*   **Cross-Platform Latency**: Integrated **Cognitive Judge** overhead stabilized at **~1s** on local hardware (OMLX/LM Studio).
+*   **Stability (Phase 65)**: 0% server crashes during high-concurrency write/read bursts.
 
 > [!IMPORTANT]
 > ClawBrain is now fully verified on both **macOS (Apple Silicon)** and **Ubuntu (Linux)** with automated environment recovery.
@@ -28,11 +29,13 @@ ClawBrain v1.4 introduces **Generic Intelligence** — reaching a precision tier
 
 ## ⚡️ The Breathing Brain: High-Recall Architecture
 
-The v1.4 update introduces a decoupled cognitive rhythm that balances immediate speed with deep background analysis.
+The v1.10 update introduces **Biological Bias**, refining the decoupled cognitive rhythm established in v1.4.
 
-1.  **Priority Anchoring**: Technical IDs and "Mentions" are extracted and indexed **synchronously**, ensuring Turn N+1 can always see Turn N.
-2.  **Cognitive Heartbeat**: A 30s background loop performs deep LLM-based fact mining and L3 distillation without blocking your chat.
-3.  **Judge-Centric Admission**: Replaces rigid thresholds with a "Wide Net" pre-filter that lets the **Reasoning-Aware Cognitive Judge** make the final call on context relevance.
+1.  **Value Modulation (L6b)**: Every interaction is scored for "Technical/Emotional Importance." Trivial chatter is dropped, ensuring L2 storage stays pure.
+2.  **Priority Anchoring**: Technical IDs and "Mentions" are extracted and indexed **synchronously**, ensuring Turn N+1 can always see Turn N.
+3.  **TasteGuard Protection**: Core subjective facts (Architectural preferences, User values) are "locked" and protected from being overwritten during background distillation.
+4.  **Cognitive Heartbeat**: A 30s background loop performs deep LLM-based fact mining and L3 Neocortex distillation without blocking your chat.
+5.  **Subjective Cognitive Judge**: Replaces rigid thresholds with a "Taste-Aware" filter that validates context against your specific engineering profile using live reasoning.
 
 
 ---

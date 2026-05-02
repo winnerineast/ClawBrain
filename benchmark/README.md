@@ -28,8 +28,10 @@ We don't just test "memory"; we stress-test specific cognitive failure points th
 
 | Dimension | Challenge |
 |-----------|-----------|
+| **L6b Precision** | **Value-Driven Storage**: Measuring the system's ability to drop trivial noise and preserve high-value facts. |
 | **Recall Distance** | Remembering a specific fact after 100+ turns of unrelated chatter. |
 | **Fact Evolution** | Correcting memory when a user changes their mind (e.g., "The server moved from port 5432 to 5433"). |
+| **TasteGuard Stability** | **Belief Anchoring**: Ensuring core subjective facts are not overwritten by contradictory transient noise. |
 | **Noise Robustness** | Extracting a "needle" fact from a "haystack" of technical jargon. |
 | **Session Isolation** | Ensuring User A's private data never leaks into User B's context (100% pass required). |
 | **Multi-Fact Synthesis** | Answering questions that require combining 2–5 different historical facts. |
