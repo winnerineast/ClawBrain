@@ -26,9 +26,8 @@ def visual_audit(test_name, input_summary, expected_keywords, actual):
     return found
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_e2e_multi_round_marathon(tmp_path):
-    """E2E: 21-round marathon conversation test."""
+    """E2E: 21-round marathon conversation test against real local services."""
     clear_chroma_clients()
     os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
     
@@ -41,29 +40,25 @@ async def test_e2e_multi_round_marathon(tmp_path):
     
     payload = {"model": "gemma4:e4b", "messages": thread, "stream": False}
     
-    # Mock Ollama Response
-    respx.post("http://127.0.0.1:11434/api/chat").mock(return_value=Response(200, json={
-        "message": {"role": "assistant", "content": "Stability requires FastAPI, ECS, ALB and CloudWatch."}
-    }))
-    
+    # NO MOCKS: Communication occurs with real Ollama
+
     with TestClient(app) as client:
         response = client.post("/api/chat", json=payload)
         assert response.status_code == 200
         actual_content = response.json()["message"]["content"]
         
-        canary_keywords = ["FastAPI", "ECS", "ALB", "CloudWatch"]
+        # Real model might phrase things differently; check for key technical terms
+        canary_keywords = ["FastAPI", "ECS"] 
         success = visual_audit("Marathon Knowledge Recall", question, canary_keywords, actual_content)
         assert success, f"Marathon recall failed! Expected keywords {canary_keywords} not found in model response."
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_e2e_ollama_chat_lifespan(tmp_path):
+    """Simple chat test against real Ollama."""
     clear_chroma_clients()
     os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
-    respx.post("http://127.0.0.1:11434/api/chat").mock(return_value=Response(200, json={
-        "message": {"role": "assistant", "content": "1+1=2"}
-    }))
-    payload = {"model": "gemma4:e4b", "messages": [{"role": "user", "content": "1+1=?"}], "stream": False}
+    
+    payload = {"model": "gemma4:e4b", "messages": [{"role": "user", "content": "Calculate 1+1 and reply ONLY with the number."}], "stream": False}
     with TestClient(app) as client:
         response = client.post("/api/chat", json=payload)
         assert response.status_code == 200

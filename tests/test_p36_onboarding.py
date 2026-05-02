@@ -29,7 +29,7 @@ async def test_scout_cross_platform_correction(tmp_path, monkeypatch):
     scout = SetupScout()
     scout.findings["db_dir"] = expected_path
     
-    scout.generate_env()
+    await scout.generate_env()
     
     content = env_file.read_text()
     assert f'CLAWBRAIN_DB_DIR="{expected_path}"' in content
@@ -91,17 +91,17 @@ async def test_doctor_connectivity():
     assert status["ollama"] == "OFFLINE"
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_doctor_llm_verification(monkeypatch):
-    """Verify doctor can perform a test generation with the backend."""
-    monkeypatch.setenv("CLAWBRAIN_DISABLE_COGNITIVE_JUDGE", "true")
-    # Mock Judge (Cognitive Judge v1.4)
-    respx.post("http://localhost:1234/chat/completions").mock(return_value=Response(200, json={
-        "choices": [{"message": {"content": "YES"}}]
-    }))
+    """Verify doctor can perform a test generation with the real backend."""
+    # Ensure we use the model we know is available
+    monkeypatch.setenv("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
+    monkeypatch.setenv("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
+    monkeypatch.setenv("CLAWBRAIN_DISTILL_URL", "http://localhost:11434")
     
+    # NO MOCKS: Test real connectivity and response parsing
     doctor = SystemDoctor()
     res = await doctor.verify_llm()
+    
     assert res is True
 
 @pytest.mark.asyncio
@@ -118,19 +118,23 @@ async def test_scout_env_generation(tmp_path):
     }
     
     # 1. First generation
-    scout.generate_env()
+    await scout.generate_env()
     env_file = tmp_path / ".env"
     assert env_file.exists()
     content = env_file.read_text()
     assert 'CLAWBRAIN_DISTILL_URL="http://test-url"' in content
     
     # 2. Idempotency: Manually change a value
-    env_file.write_text('CLAWBRAIN_MAX_CONTEXT_CHARS="5000"\nCLAWBRAIN_DISTILL_MODEL="manual-model"\n')
-    scout.generate_env()
+    # Note: The platform-specific key takes priority in content_v2
+    current_platform = platform.system().upper()
+    platform_key = f"{current_platform}_CLAWBRAIN_DISTILL_MODEL"
+    
+    env_file.write_text(f'CLAWBRAIN_MAX_CONTEXT_CHARS="5000"\n{platform_key}="manual-model"\n')
+    await scout.generate_env()
     content_v2 = env_file.read_text()
     
     # Should keep manual-model and 5000
-    assert 'CLAWBRAIN_DISTILL_MODEL="manual-model"' in content_v2
+    assert f'{platform_key}="manual-model"' in content_v2
     assert 'CLAWBRAIN_MAX_CONTEXT_CHARS="5000"' in content_v2
     # Should still have the others
     assert 'CLAWBRAIN_VAULT_PATH="/test/vault"' in content_v2

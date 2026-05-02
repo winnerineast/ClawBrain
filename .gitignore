@@ -3,6 +3,7 @@ server.pid
 data/
 *.sqlite3
 venv/
+<<<<<<< Updated upstream
 __pycache__/
 **/*.pyc
 .pytest_cache/
@@ -10,3 +11,6 @@ __pycache__/
 .claude/
 .gitnexus/
 packages/openclaw-pkg/
+=======
+.gitnexus
+>>>>>>> Stashed changes

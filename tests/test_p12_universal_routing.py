@@ -58,7 +58,7 @@ async def test_universal_routing_ollama():
     }
     
     # 精准拦截：只拦截发往 Ollama 的请求
-    route = respx.post("http://127.0.0.1:11434/api/chat").mock(
+    route = respx.post("http://localhost:11434/api/chat").mock(
         return_value=Response(200, json={"message": {"content": "mock"}})
     )
     

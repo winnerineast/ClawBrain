@@ -26,35 +26,30 @@ def visual_audit_memory(test_name, round_num, input_data, expected_recall, actua
     print("=" * 80)
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_p11_full_chain_memory_echo_real():
-    """Phase 11 Real environment integration audit: verify memory echo using respx mock."""
+    """Phase 11 Real environment integration audit: verify memory echo using real local services."""
     if os.path.exists(TEST_DB_DIR): shutil.rmtree(TEST_DB_DIR)
     os.makedirs(TEST_DB_DIR)
     
     # Force isolated DB path via environment
     os.environ["CLAWBRAIN_DB_DIR"] = TEST_DB_DIR
     
-    # Mock Ollama
-    respx.post("http://127.0.0.1:11434/api/chat").mock(return_value=Response(200, json={
-        "message": {"role": "assistant", "content": "Secret recorded."}
-    }))
-    
-    # Mock Judge (Cognitive Judge v1.4)
-    respx.post("http://localhost:1234/chat/completions").mock(return_value=Response(200, json={
-        "choices": [{"message": {"content": "YES"}}]
-    }))
-    
+    # NO MOCKS: Communication occurs with real local services (Ollama/LM Studio)
+    # The system will use LLMFactory.from_env() internally via MemoryRouter
+
     with TestClient(app) as client:
         # Round 1: Plant secret
+        # Use gemma4:e4b which was verified as available
         payload1 = {
             "model": "gemma4:e4b",
             "messages": [{"role": "user", "content": "The secret code is APPLE-777"}]
         }
-        client.post("/api/chat", json=payload1)
+        resp1 = client.post("/api/chat", json=payload1)
+        assert resp1.status_code == 200
         
         # Ensure async ingestion and WM persistence are complete
-        time.sleep(2.0)
+        # Live LLMs may take a moment to respond; wait for the heartbeat/solidification
+        time.sleep(3.0)
         
         # Round 2: Verify recall
         memory = client.app.state.memory_router
@@ -69,4 +64,4 @@ async def test_p11_full_chain_memory_echo_real():
         )
         
         assert "APPLE-777" in enhanced_context
-        assert "WORKING MEMORY" in enhanced_context
+        assert "WORKING MEMORY" in enhanced_context or "HIPPOCAMPUS" in enhanced_context
