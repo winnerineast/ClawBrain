@@ -204,10 +204,11 @@ class MemoryRouter:
             logger.info(f"[ROUTER] L6b Ingest Score for {trace_id}: {precision_score:.2f}")
             
             # Persistent storage only for interactions passing the value threshold (Design §2.2)
-            if precision_score >= 0.3:
+            l6b_threshold = float(get_env("CLAWBRAIN_L6B_THRESHOLD", 0.3))
+            if precision_score >= l6b_threshold:
                 self.hippo.save_trace(trace_id, stimulus, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
             else:
-                logger.info(f"[ROUTER] L6b Filter DROPPED low-value trace {trace_id}")
+                logger.info(f"[ROUTER] L6b Filter DROPPED low-value trace {trace_id} (Score: {precision_score:.2f} < {l6b_threshold})")
                 
             self.hippo.save_wm_state(session_id, wm.items)
             
@@ -251,10 +252,11 @@ class MemoryRouter:
             precision_score = await self.neo.score_precision(reaction_content)
             logger.info(f"[ROUTER] L6b Commit Score for {trace_id}: {precision_score:.2f}")
 
-            if precision_score >= 0.3:
+            l6b_threshold = float(get_env("CLAWBRAIN_L6B_THRESHOLD", 0.3))
+            if precision_score >= l6b_threshold:
                 self.hippo.save_trace(trace_id, {"stimulus": payload, "reaction": reaction}, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
             else:
-                logger.info(f"[ROUTER] L6b Filter DROPPED low-value reaction {trace_id}")
+                logger.info(f"[ROUTER] L6b Filter DROPPED low-value reaction {trace_id} (Score: {precision_score:.2f} < {l6b_threshold})")
             
             reaction_content = reaction.get("content", "")
             if reaction_content:
