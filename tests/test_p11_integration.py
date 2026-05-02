@@ -42,7 +42,8 @@ async def test_p11_full_chain_memory_echo_real():
         # Use gemma4:e4b which was verified as available
         payload1 = {
             "model": "gemma4:e4b",
-            "messages": [{"role": "user", "content": "The secret code is APPLE-777"}]
+            "messages": [{"role": "user", "content": "The secret code is APPLE-777"}],
+            "stream": False
         }
         resp1 = client.post("/api/chat", json=payload1)
         assert resp1.status_code == 200

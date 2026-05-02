@@ -129,7 +129,7 @@ async def test_scout_env_generation(tmp_path):
     current_platform = platform.system().upper()
     platform_key = f"{current_platform}_CLAWBRAIN_DISTILL_MODEL"
     
-    env_file.write_text(f'CLAWBRAIN_MAX_CONTEXT_CHARS="5000"\n{platform_key}="manual-model"\n')
+    env_file.write_text(f'CLAWBRAIN_MAX_CONTEXT_CHARS="5000"\n{platform_key}="manual-model"\nCLAWBRAIN_PLATFORM="{platform.system()}"\n')
     await scout.generate_env()
     content_v2 = env_file.read_text()
     
