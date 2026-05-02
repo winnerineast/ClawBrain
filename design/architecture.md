@@ -11,10 +11,11 @@ ClawBrain is more than a gateway — it is a universal LLM enhancement engine wi
 - **Admin CLI (`cli.py`)**: Scriptable interface for manual memory management and ingestion.
 
 ### 2.2 Neural Memory Engine (Core)
-- **Hippocampus (L2)**: Episodic memory. A write-once system keyed by time with semantic vector retrieval via ChromaDB.
-- **Neocortex (L3)**: Semantic memory. Slow-integration distillation with async background workers.
+- **Value Modulation (L6b)**: The Precision Layer. A pre-ingestion filter that scores interactions for emotional intensity, intent, or structural importance, aggressively decaying or dropping low-value chatter before it reaches long-term storage.
+- **Hippocampus (L2)**: Episodic memory. A write-once system keyed by time with semantic vector retrieval via ChromaDB, storing only high-value interactions that pass the L6b filter.
+- **Neocortex (L3)**: Semantic memory. Slow-integration distillation with async background workers, protected by **TasteGuard** to prevent subjective beliefs from being overwritten.
 - **Working Memory (L1)**: Active cache. Priority queue driven by Attractor dynamics with rapid decay.
-- **Knowledge Vault (Ext)**: Incremental Obsidian vault indexing for prioritized "Source of Truth" context.
+- **Knowledge Vault (Ext)**: Incremental Obsidian vault indexing providing "Subjective Curvature" (a Normal field) to prioritize personal truth over statistical averages.
 
 ## 3. Reliability & Robustness: Dual-Channel Isolation
 To ensure high availability and non-blocking performance, ClawBrain employs **Network Plane Isolation**:

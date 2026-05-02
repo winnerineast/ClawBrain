@@ -19,7 +19,12 @@ Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This 
   - **Graceful Search Fallback**: If `traces_col.query` raises an `InternalError`, the engine must catch it, log a warning, and fall back to a metadata-only scan (`traces_col.get(where=...)`) to ensure the agent receives context even if semantic ranking is temporarily degraded.
   - **Connection Pooling**: Use a global `_CHROMA_CLIENTS` cache to ensure only one instance of the client exists per physical path.
 
-### 2.2 Dynamic Tiered Storage (save_trace)
+### 2.2 L6b Modulation Filter (Pre-Ingestion)
+- **Background**: Replaces the legacy "lossless interaction history" with biological bias. Not all data is equal; recording everything indiscriminately leads to statistical collapse.
+- **Mechanism**: Before a trace is sent to `save_trace`, an LLM call (the L6b evaluator) scores the interaction based on "Emotional Intensity," "High Intent," or "Structural Importance."
+- **Action**: Low-value chatter is assigned a low precision weight and is aggressively decayed or dropped entirely. Only interactions that pass the L6b threshold are persisted to the Hippocampus.
+
+### 2.3 Dynamic Tiered Storage (save_trace)
 - **Method signature**: `save_trace(trace_id, payload, search_text="", threshold=None, session_id="default")`
 - Serialise `payload` to JSON, compute byte length.
 - **SHA-256 checksum**: Compute the SHA-256 hash of the raw UTF-8 bytes.

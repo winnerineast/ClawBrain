@@ -32,8 +32,15 @@ Implement the **ClawBrain Neocortex** engine from scratch. This engine is respon
   2. Construct the summarization prompt. The prompt MUST be template-based and strictly categorize extracted facts into 'Technical Decisions', 'User Preferences', and 'Project Context' to optimize for specific test dimensions (ISSUE-007).
   3. Dispatch to the selected provider.
   4. Upsert result into `neocortex_summaries`.
+  5. **TasteGuard (Belief Anchor)**: Apply a protective layer over the distilled summary. Core, highly-weighted subjective facts (e.g., "The user hates ORMs") are anchored and highly resistant to being overwritten or unlearned by transient, contradictory data during future distillations.
 
-### 2.3 Memory Recall Interface
+### 2.4 Subjective Cognitive Judge (L6b Evaluator)
+- **Background**: Replaces the objective "hallucination prevention" judge with a user-specific "Taste/Value Profile" judge.
+- **Mechanism**: The judge must ask: "Does this context align with the user's specific architectural tastes and personal values?" rather than just checking for objective relevance.
+- **Action**: Before context is finalized, an LLM call validates the assembled facts against the user's subjective TasteGuard profile.
+- **Fail-open**: If the LLM throws an exception (e.g. timeout), the judge defaults to `True` (allowing the context).
+
+### 2.5 Memory Recall Interface
 - **Method signature**: `def get_summary(session_id: str) -> Optional[str]`
 - Reads and returns the latest summary for the given session from SQLite.
 

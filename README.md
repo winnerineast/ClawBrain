@@ -177,10 +177,12 @@ graph TD
         Pipe[Capture Pipeline]
     end
 
-    subgraph Storage
+    subgraph Storage [Memory Planes]
+        direction TB
         L1((Working Memory))
         L2[(Hippocampus)]
         L3[Neocortex]
+        L6b[Value Modulation]
         Ext[Vault Indexer]
     end
 
@@ -193,11 +195,13 @@ graph TD
     Translator --> LLM((Upstream LLM))
     
     LLM --> Pipe
-    Pipe --> L2
+    Pipe --> L6b
+    L6b --> L2
     
     Router --- L1
     Router --- L2
     Router --- L3
+    Router --- L6b
     Router --- Ext
 ```
 
@@ -205,7 +209,7 @@ graph TD
 1.  **Ingress & Detection**: Requests enter via HTTP, MCP, or CLI. The `ProtocolDetector` identifies the input dialect (Ollama vs OpenAI).
 2.  **Cognitive Enrichment**: The `MemoryRouter` extracts the query intent and pulls relevant context from the four memory layers.
 3.  **Dialect Translation**: The `DialectTranslator` converts the enriched payload into the native format for the upstream provider (Anthropic, Google, DeepSeek, etc.).
-4.  **Capture & Solidification**: As the LLM responds, the `Pipeline` captures the completion and archives the full user-assistant pair into the **Hippocampus (L2)**.
+4.  **Capture & Solidification**: As the LLM responds, the `Pipeline` captures the completion. The **L6b Modulation Filter** scores the interaction's value before archiving it into the **Hippocampus (L2)**.
 
 ### 2. Dual-Plane Isolation
 *   **The Relay Plane**: Dedicated solely to LLM traffic. It is performance-optimized and strictly isolated to ensure zero-latency overhead for memory injection.
@@ -217,18 +221,22 @@ graph TD
 *   **Concept**: Mimics human short-term focus using Attractor dynamics.
 *   **Mechanism**: A weighted queue where interactions have a 1.0 "charge." Relevance recharges old items; irrelevance leads to exponential decay and eviction.
 
+#### **L6b — Value Modulation (The Precision Layer)**
+*   **Concept**: Biological bias and selective forgetting.
+*   **Mechanism**: Prevents indiscriminate logging by scoring each interaction for emotional intensity, high intent, or structural importance. Low-value chatter is decayed or dropped, ensuring the Hippocampus only stores what truly matters.
+
 #### **L2 — Hippocampus (Episodic Archive)**
-*   **Concept**: Lossless interaction history.
-*   **Mechanism**: Powered by **ChromaDB**. It performs semantic vector search to find conceptually similar past conversations.
+*   **Concept**: Value-filtered interaction history.
+*   **Mechanism**: Powered by **ChromaDB**. It performs semantic vector search to find conceptually similar past conversations that passed the L6b filter.
 *   **Integrity**: Every trace is hashed (SHA-256) for a tamper-proof audit trail.
 
-#### **L3 — Neocortex (Semantic Facts)**
-*   **Concept**: Distilled wisdom.
-*   **Mechanism**: A background process that summarizes L2 history into high-level facts (e.g., "The user prefers Python over Go"), optimizing context window usage.
+#### **L3 — Neocortex (Semantic Facts & TasteGuard)**
+*   **Concept**: Distilled wisdom protected by subjective values.
+*   **Mechanism**: A background process that summarizes L2 history into high-level facts. It features **TasteGuard**, which acts as a "Belief Anchor" to protect core, subjective user facts from being overwritten by noisy or contradictory new data during fact evolution.
 
-#### **Ext — Knowledge Vault (External Logic)**
+#### **Ext — Knowledge Vault (Subjective Curvature)**
 *   **Concept**: Bridges "what we said" with "what is known."
-*   **Mechanism**: Indexes your **Obsidian Vault** incrementally, treating your personal notes as a prioritized Source of Truth.
+*   **Mechanism**: Indexes your **Obsidian Vault** incrementally. It injects a "Normal field" curvature into the AI—a specific subjective identity—treating your personal notes as a prioritized Source of Truth to escape statistical averages.
 
 ---
 
