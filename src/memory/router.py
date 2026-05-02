@@ -1,4 +1,4 @@
-# Generated from design/memory_router.md v1.5 / GEMINI.md Rule 12
+# Generated from design/memory_router.md v1.6 / GEMINI.md Rule 12
 import uuid
 import json
 import os
@@ -199,7 +199,16 @@ class MemoryRouter:
                     for entity in entities:
                         self.hippo.upsert_fact(session_id, entity, "mention", content, trace_id=trace_id)
             
-            self.hippo.save_trace(trace_id, stimulus, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
+            # Phase 65: L6b Precision Filter (Value Modulation)
+            precision_score = await self.neo.score_precision(search_text)
+            logger.info(f"[ROUTER] L6b Ingest Score for {trace_id}: {precision_score:.2f}")
+            
+            # Persistent storage only for interactions passing the value threshold (Design §2.2)
+            if precision_score >= 0.3:
+                self.hippo.save_trace(trace_id, stimulus, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
+            else:
+                logger.info(f"[ROUTER] L6b Filter DROPPED low-value trace {trace_id}")
+                
             self.hippo.save_wm_state(session_id, wm.items)
             
             # v1.9: Registry Optimization - Fast synchronous mention anchoring
@@ -237,7 +246,15 @@ class MemoryRouter:
             wm = self._get_wm(session_id)
             room_id = self._get_current_room(session_id)
             search_text = payload.get("messages", [{}])[-1].get("content", "")
-            self.hippo.save_trace(trace_id, {"stimulus": payload, "reaction": reaction}, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
+            # Phase 65: L6b Precision Filter for Assistant Response
+            reaction_content = reaction.get("content", "")
+            precision_score = await self.neo.score_precision(reaction_content)
+            logger.info(f"[ROUTER] L6b Commit Score for {trace_id}: {precision_score:.2f}")
+
+            if precision_score >= 0.3:
+                self.hippo.save_trace(trace_id, {"stimulus": payload, "reaction": reaction}, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
+            else:
+                logger.info(f"[ROUTER] L6b Filter DROPPED low-value reaction {trace_id}")
             
             reaction_content = reaction.get("content", "")
             if reaction_content:
