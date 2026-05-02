@@ -288,7 +288,6 @@ async def gateway_relay(path: str, request: Request):
             await pipe.post_turn_solidification(final_json, input_protocol, session_id, mr, body, trace_id)
             return final_json
     except Exception as e:
-        logger.error(f"[GATEWAY.RELAY] Exception during upstream call: {e}")
         await mr.orphan_turn(trace_id, body, str(e), session_id=session_id)
         raise HTTPException(status_code=502, detail=str(e))
 
