@@ -5,12 +5,15 @@ import logging
 import platform
 import subprocess
 from typing import List, Dict, Any, Optional
-from src.utils.config import get_env
+from pathlib import Path
+from dotenv import load_dotenv
 
 try:
     import psutil
 except ImportError:
     psutil = None
+
+from src.utils.config import get_env
 
 logger = logging.getLogger("GATEWAY.LLM")
 
@@ -69,8 +72,6 @@ class HardwareProfiler:
 
 class LLMClient:
     """Base class for all LLM providers."""
-    _client_instance: Optional[httpx.AsyncClient] = None
-
     def __init__(self, url: str, model: str, api_key: str = "", timeout: float = 60.0):
         self.url = url.rstrip('/')
         self.model = model
@@ -82,18 +83,6 @@ class LLMClient:
 
     async def chat(self, messages: List[Dict[str, str]]) -> str:
         raise NotImplementedError
-
-    @classmethod
-    async def aclose(cls):
-        if cls._client_instance:
-            try:
-                if not cls._client_instance.is_closed:
-                    await cls._client_instance.aclose()
-            except RuntimeError:
-                # Loop might already be closed
-                pass
-            finally:
-                cls._client_instance = None
 
 class OllamaClient(LLMClient):
     """Ollama-specific implementation."""
@@ -131,12 +120,12 @@ class OpenAIClient(LLMClient):
         return await self.chat(messages)
 
     async def chat(self, messages: List[Dict[str, str]]) -> str:
-        url = f"{self.url}/chat/completions"
+        url = f"{self.url}/v1/chat/completions"
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "temperature": 0.1,  # Ensure determinism
+            "temperature": 0.1,
             "max_tokens": 1000
         }
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
@@ -144,11 +133,9 @@ class OpenAIClient(LLMClient):
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
-                msg = resp.json().get("choices", [{}])[0].get("message", {})
-                content = msg.get("content", "")
-                if not content and "reasoning_content" in msg:
-                    content = msg["reasoning_content"]
-                print(f"[DEBUG_LLM] Provider: {self.url}, Model: {self.model}, Response: '{content[:50]}...'")
+                content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+                # SURGICAL DEBUG PRINT
+                print(f"\n[DEBUG_LLM_RAW] Model: {self.model}\n[DEBUG_LLM_RAW] Response: '{content[:100]}'")
                 return content
         except Exception as e:
             logger.error(f"[OPENAI-COMPAT] Chat failed: {e}")
@@ -165,9 +152,15 @@ class LLMFactory:
 
     @staticmethod
     def from_env() -> LLMClient:
-        """Create a client from environment variables."""
-        provider = get_env("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
-        url = get_env("CLAWBRAIN_DISTILL_URL", "http://localhost:11434")
-        model = get_env("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
+        """Create a client from environment variables via generic config utility."""
+        provider = get_env("CLAWBRAIN_DISTILL_PROVIDER")
+        url = get_env("CLAWBRAIN_DISTILL_URL")
+        model = get_env("CLAWBRAIN_DISTILL_MODEL")
+        
+        # Safe defaults if env is TRULY empty
+        provider = provider or "ollama"
+        url = url or "http://localhost:11434"
+        model = model or "gemma4:e4b"
         api_key = get_env("CLAWBRAIN_DISTILL_API_KEY", "")
+        
         return LLMFactory.get_client(provider, url, model, api_key)

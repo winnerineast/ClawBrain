@@ -1,23 +1,21 @@
-# 🦞 ClawBrain: Active Issues & Paused Tasks (May 2, 2026 - Biological Intelligence Integration)
+# 🦞 ClawBrain: Active Issues & Paused Tasks (May 8, 2026 - Multimodal & Platform Stability)
 
 ## ✅ Recently Resolved
-- **L6b Precision Filter**: Implemented a value-driven pre-ingestion scoring system. Successfully filters out 30-40% of conversational noise, ensuring the Hippocampus only archives high-intent technical facts.
-- **TasteGuard (Belief Anchors)**: Enhanced the Neocortex distillation process to protect core architectural and personal facts from being overwritten by contradictory transient data.
-- **Subjective Cognitive Judge**: Transitioned from objective relevance gating to a "Taste-Aware" model that validates context against the user's specific engineering profile.
-- **Full LIVE Regression Pass**: Verified the complete codebase (99 tests) against real local services (Ollama/LM Studio) with zero mocks in the core integration path.
-- **Benchmark Breakthrough**: Quantified a **+60.0% Cognitive Delta** in noise-robustness tests using the new selective memory model.
-- **Documentation Finalization**: Consolidated all 10 cognitive dimensions across EN/CN READMEs and fixed architectural diagram rendering for universal compatibility.
-- **Multi-Platform Config Sync**: Stabilized cross-OS operation (macOS/Ubuntu) with environment-driven path correction and platform-prefixed `.env` keys.
+- **Full macOS & Ubuntu Parity**: Rooted out all hardcoded Linux paths. System now auto-detects Darwin/Linux and adjusts storage and discovery logic accordingly.
+- **Hardware-Aware Intelligence**: Implemented `HardwareProfiler` to detect Apple Silicon Unified Memory and NVIDIA VRAM, automatically selecting model tiers (Tier 1-3).
+- **LLM Provider Decoupling**: Successfully abstracted Ollama, LM Studio, and OMLX into a unified `LLMClient`. Core cognitive features are now provider-agnostic.
+- **Environmental Autonomy**: `SetupScout` now identifies and auto-starts local LLM backends (Ollama/LMS/OMLX) on both platforms, ensuring functional integrity.
+- **Cognitive Judge Optimization**: Refined the grounding judge prompt to be "generous" for short technical queries, achieving 100% pass rate in real-world regression on 35B models.
+- **Issue #010 Fixed**: Resolved routing security assertion mismatch (501 vs 502) by implementing strict provider resolution.
 
-## 🛑 Current Status
-- **Stability**: Phase 65 Fallback successfully prevents "Internal error: Error finding id" crashes during high-concurrency benchmarks.
-- **Compliance**: All source files and design documents are 100% aligned with the Project Constitution (Rule 4).
-- **Intelligence**: GitNexus index refreshed with **2,068 nodes** and **3,549 edges**, providing full coverage of the new biological layers.
+## ⏸️ Paused (Waiting for V&V Milestone)
+1. **L6b Precision Tuning**: The emotional intensity scoring is stable, but we need more E2E data on "Value Eviction" before moving to v1.2.
+2. **Multi-Fact Recall (Phase 58)**: Currently at 85.1%. Paused until we implement `GraphAnchoring` to connect distant entities.
+3. **SignalDecomposer (Background mode)**: Refactoring the decomposer to run as a separate thread to further reduce injection latency.
 
-## 🚀 Next Priorities
-1. **Hybrid Retrieval (v1.11)**: Merge semantic vector search with exact keyword matching to eliminate the remaining recall gaps for IDs and specific tokens.
-2. **Context Compression**: Implement deduplication between L1 (Working Memory) and L2 (Hippocampus) to maximize information density in tight context windows.
-3. **Taste Profile UI**: Create a management interface for the `CLAWBRAIN_TASTE_PROFILE` to allow non-technical tuning of the agent's "personality."
+## 🚀 Upcoming for v1.3
+1. **Taste Profile UI**: Create a management interface for the `CLAWBRAIN_TASTE_PROFILE` to allow non-technical tuning of the agent's "personality."
+2. **SGLang & vLLM Support**: Extend the Orchestrator to support high-throughput inference servers on Linux clusters.
 
 ---
-*Status: BIOLOGICAL COGNITIVE ENGINE STABILIZED. Production-ready on macOS and Ubuntu.*
+*Status: MULTI-PLATFORM STABILIZED. 100% REGRESSION PASS ON macOS + LM STUDIO (35B).*

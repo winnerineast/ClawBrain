@@ -102,6 +102,33 @@ source venv/bin/activate
 python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435
 ```
 
+---
+
+## 📊 Monitoring & Visualization
+
+ClawBrain provides an **All-in-One Information Flow Dashboard** to visualize how the two planes (Relay & Cognitive) work together to enhance your AI's memory.
+
+### 1. Access the Dashboard
+Once the server is running, open your browser to:
+👉 **[http://localhost:11435/dashboard](http://localhost:11435/dashboard)**
+
+### 2. Simulate Real-time Data
+To make the dashboard vivid and see the system in action (even without an active agent), you can run the background activity simulator:
+
+```bash
+# In a new terminal window
+source venv/bin/activate
+export PYTHONPATH=$PYTHONPATH:.
+python3 tests/simulate_activity.py
+```
+
+This simulator will:
+- **Relay Plane**: Send mock chat messages to simulate active conversations.
+- **Cognitive Plane**: Write "Vault Clips" to your configured Obsidian path to trigger background indexing.
+- **Context X-Ray**: Allow you to click on "Context Enrichment" events in the dashboard to see exactly what facts were injected into the context window.
+
+---
+
 > [!NOTE]
 > **Multi-Platform Sync**: ClawBrain supports synchronized settings for macOS and Ubuntu in a single `.env` file. Use `DARWIN_` or `LINUX_` prefixes for platform-specific overrides (e.g., `LINUX_CLAWBRAIN_DB_DIR`).
 

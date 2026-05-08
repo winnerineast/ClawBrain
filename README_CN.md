@@ -103,6 +103,33 @@ source venv/bin/activate
 python3 -m uvicorn src.main:app --host 0.0.0.0 --port 11435
 ```
 
+---
+
+## 📊 监控与可视化
+
+ClawBrain 提供 **全合一信息流看板 (All-in-One Dashboard)**，让您直观地监控“中转平面 (Relay)”与“认知平面 (Cognitive)”如何协同工作以增强 AI 记忆。
+
+### 1. 访问看板
+服务器启动后，在浏览器中打开：
+👉 **[http://localhost:11435/dashboard](http://localhost:11435/dashboard)**
+
+### 2. 模拟实时数据
+为了让看板更加生动并实时观察系统动作（即使当前没有活跃的 Agent），您可以运行后台活动模拟器：
+
+```bash
+# 在新的终端窗口中
+source venv/bin/activate
+export PYTHONPATH=$PYTHONPATH:.
+python3 tests/simulate_activity.py
+```
+
+该模拟器将执行以下操作：
+- **中转平面 (Relay Plane)**：发送模拟聊天消息以模拟活跃对话。
+- **认知平面 (Cognitive Plane)**：向您配置的 Obsidian 路径写入“知识片段”，触发后台索引。
+- **上下文 X-Ray**：您可以点击看板中的“Context Enrichment”事件，查看注入到上下文窗口中的确切事实。
+
+---
+
 > [!NOTE]
 > **多平台同步**：ClawBrain 支持在单个 `.env` 文件中同步 macOS 和 Ubuntu 的设置。通过 `DARWIN_` 或 `LINUX_` 前缀可实现平台特定覆盖（例如 `LINUX_CLAWBRAIN_DB_DIR`）。
 

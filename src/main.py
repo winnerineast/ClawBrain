@@ -188,6 +188,7 @@ async def internal_after_turn(request: Request):
 async def get_memory_state(session_id: str, request: Request):
     check_ready(request.app)
     mr = request.app.state.memory_router
+    mr._integration_mode = "Plugin (Native)"
     wm = mr._get_wm(session_id)
     return {
         "session_id": session_id,
@@ -229,6 +230,47 @@ async def get_traces(session_id: str, request: Request, limit: int = 50):
 async def get_last_injection(session_id: str, request: Request):
     check_ready(request.app)
     return {"payload": request.app.state.memory_router._last_injections.get(session_id)}
+@app.get("/v1/management/cognitive/status")
+async def get_cognitive_status(request: Request):
+    check_ready(request.app)
+    mr = request.app.state.memory_router
+    import platform
+    return {
+        "platform": platform.system(),
+        "integration_mode": mr._integration_mode,
+        "heartbeat_seconds": mr._heartbeat_seconds,
+        "dirty_sessions_count": len(mr._dirty_sessions),
+        "pending_extractions_count": len(mr._pending_trace_extractions),
+        "circuit_breakers": {
+            "room": mr.cb_room.is_open(),
+            "distill": mr.cb_distill.is_open(),
+            "heartbeat": mr.cb_heartbeat.is_open()
+        }
+    }
+
+@app.get("/v1/management/vault/status")
+async def get_vault_status(request: Request):
+    check_ready(request.app)
+    mr = request.app.state.memory_router
+    if not mr.vault_indexer:
+        return {"enabled": False}
+    
+    return {
+        "enabled": True,
+        "path": str(mr.vault_path),
+        "indexed_files": list(mr.vault_indexer.state.get("processed_files", {}).keys()),
+        "total_files": len(mr.vault_indexer.state.get("processed_files", {}))
+    }
+
+@app.get("/v1/management/events")
+async def get_events(request: Request, session_id: Optional[str] = None, limit: int = 50):
+    check_ready(request.app)
+    mr = request.app.state.memory_router
+    events = mr._cognitive_events
+    if session_id:
+        # Include events that match the session OR have no specific session (global events)
+        events = [e for e in events if not e.get("data") or e["data"].get("session_id") == session_id or e["data"].get("session_id") is None]
+    return {"events": events[-limit:]}
 
 @app.get("/dashboard")
 async def serve_dashboard():
@@ -242,6 +284,7 @@ async def ingest_v1(request: Request):
     body = await request.json()
     session_id = body.get("session_id", "default")
     mr = request.app.state.memory_router
+    mr._integration_mode = "Plugin (Native)"
     stimulus = {"messages": [{"role": "user", "content": body.get("content", "")}]}
     tid = await mr.ingest(stimulus, session_id=session_id)
     return {"trace_id": tid, "status": "ingested"}
@@ -250,8 +293,10 @@ async def ingest_v1(request: Request):
 async def gateway_relay(path: str, request: Request):
     check_ready(request.app)
     mr, reg, pipe, hc = request.app.state.memory_router, request.app.state.registry, request.app.state.pipeline, request.app.state.http_client
+    mr._integration_mode = "Standalone (Relay)"
     body = await request.json()
-    session_id = request.headers.get("x-clawbrain-session", "default")
+    
+    session_id = request.headers.get("x-clawbrain-session") or body.get("session_id", "default")
     
     # 1. Pre-flight Validation (Rule: No network ops before security checks)
     input_protocol = ProtocolDetector.detect(path, body)

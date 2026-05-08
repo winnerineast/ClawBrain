@@ -56,7 +56,7 @@ class VaultIndexer:
             logger.warning(f"[VAULT] Path not found: {self.vault_path}")
             return {"scanned": 0, "indexed": 0, "skipped": 0}
 
-        stats = {"scanned": 0, "indexed": 0, "skipped": 0, "hash checked": 0}
+        stats = {"scanned": 0, "indexed": 0, "skipped": 0, "hash checked": 0, "modified_paths": []}
         processed_files = self.state.get("processed_files", {})
         new_processed = {}
 
@@ -96,6 +96,7 @@ class VaultIndexer:
                     await self._index_file(full_path, rel_path)
                     new_processed[rel_path] = {"mtime": mtime, "hash": current_hash}
                     stats["indexed"] += 1
+                    stats["modified_paths"].append(full_path)
                 except Exception as e:
                     logger.error(f"[VAULT] Failed to index {rel_path}: {e}")
 

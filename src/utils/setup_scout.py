@@ -1,9 +1,11 @@
-# Generated from design/utils_onboarding.md v1.3
+# Generated from design/utils_onboarding.md v1.4
 import os
 import asyncio
 import httpx
 import logging
 import platform
+import subprocess
+import shutil
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from src.utils.llm_client import HardwareProfiler
@@ -11,103 +13,113 @@ from src.utils.llm_client import HardwareProfiler
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger("SCOUT")
 
+class LLMService:
+    """Metadata and orchestration logic for an LLM provider."""
+    def __init__(self, name: str, port: int, macos_app: str = None, linux_bin: str = None, health_path: str = "/"):
+        self.name = name
+        self.port = port
+        self.url = f"http://localhost:{port}"
+        self.macos_app = macos_app
+        self.linux_bin = linux_bin
+        self.health_path = health_path
+
+    async def is_running(self) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=1.0) as client:
+                resp = await client.get(f"{self.url}{self.health_path}")
+                return resp.status_code == 200
+        except:
+            return False
+
+    def start(self):
+        system = platform.system()
+        logger.info(f"🚀 Attempting to auto-activate {self.name}...")
+        
+        if system == "Darwin" and self.macos_app:
+            app_path = f"/Applications/{self.macos_app}.app"
+            if os.path.exists(app_path):
+                subprocess.Popen(["open", "-a", self.macos_app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+        elif system == "Linux" and self.linux_bin:
+            bin_path = shutil.which(self.linux_bin)
+            if bin_path:
+                if self.name == "Ollama":
+                    subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    subprocess.Popen([bin_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+        return False
+
 class SetupScout:
     """
-    Environmental Probing Utility for ClawBrain.
+    Environmental Probing and Orchestration Utility for ClawBrain.
     Identifies hardware resources and local LLM services.
-    v1.3: Platform fingerprinting and reachability validation.
     """
     
-    DEFAULT_OLLAMA_URL = "http://localhost:11434"
-    DEFAULT_LMSTUDIO_URL = "http://localhost:1234"
-    DEFAULT_OMLX_URL = "http://localhost:8080"
-
     def __init__(self):
+        self.services = [
+            LLMService("Ollama", 11434, macos_app="Ollama", linux_bin="ollama", health_path="/api/tags"),
+            LLMService("LM Studio", 1234, macos_app="LM Studio", health_path="/v1/models"),
+            LLMService("OMLX", 8080, macos_app="OMLX", health_path="/v1/models"),
+            LLMService("vLLM", 8000, linux_bin="vllm", health_path="/v1/models"),
+            LLMService("sglang", 30000, linux_bin="sglang", health_path="/v1/models"),
+        ]
         self.findings = {
             "distill_url": None,
             "distill_model": None,
             "distill_provider": None,
             "vault_path": None,
-            "db_dir": str(Path.cwd() / "data"),
-            "platform": platform.system()
+            "db_dir": str(Path.cwd() / "data")
         }
 
     def is_path_valid_for_os(self, path_str: str) -> bool:
-        """Verify if a path is valid and reachable for the current operating system."""
         if not path_str: return False
         current_os = platform.system()
-        clean_path = path_str.strip('"').strip("'")
-        if current_os == "Darwin" and clean_path.startswith("/home"): return False
-        if current_os == "Linux" and clean_path.startswith("/Users"): return False
-        try: 
-            path = Path(clean_path)
-            return path.exists() or path.parent.exists()
+        path = Path(path_str)
+        if current_os == "Darwin" and path_str.startswith("/home"): return False
+        if current_os == "Linux" and path_str.startswith("/Users"): return False
+        try: return path.exists() or path.parent.exists()
         except: return False
 
-    async def is_url_reachable(self, url: str) -> bool:
-        """Ping the URL to see if the service is actually alive."""
-        if not url: return False
-        try:
-            async with httpx.AsyncClient(timeout=1.0) as client:
-                # Support both /v1/models and /api/tags (Ollama)
-                probe_url = f"{url.rstrip('/')}/api/tags" if "11434" in url else f"{url.rstrip('/')}/v1/models"
-                resp = await client.get(probe_url)
-                return resp.status_code in [200, 404, 401] # 404/401 means server is there but path is different
-        except:
-            return False
+    async def orchestrate_services(self):
+        """Standardized discovery and activation loop."""
+        for svc in self.services:
+            running = await svc.is_running()
+            if not running:
+                if svc.start():
+                    logger.info(f"⏳ Waiting for {svc.name} to initialize...")
+                    for _ in range(10):
+                        await asyncio.sleep(2)
+                        if await svc.is_running():
+                            running = True
+                            logger.info(f"✅ {svc.name} is now ONLINE.")
+                            break
+            
+            if running:
+                await self.probe_service_details(svc)
 
-    async def probe_ollama(self) -> bool:
-        """Check for local Ollama instance."""
+    async def probe_service_details(self, svc: LLMService):
+        """Fetch models and update findings based on platform preference."""
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
-                resp = await client.get(f"{self.DEFAULT_OLLAMA_URL}/api/tags")
+                resp = await client.get(f"{svc.url}{svc.health_path}")
                 if resp.status_code == 200:
-                    models = [m["name"] for m in resp.json().get("models", [])]
+                    data = resp.json()
+                    models = [m["name"] for m in data.get("models", [])] if svc.name == "Ollama" else [m["id"] for m in data.get("data", [])]
                     if models:
                         best = HardwareProfiler.pick_best_model(models)
-                        if not self.findings["distill_url"] or platform.system() != "Darwin":
-                            self.findings["distill_url"] = self.DEFAULT_OLLAMA_URL
-                            self.findings["distill_provider"] = "ollama"
+                        system = platform.system()
+                        should_update = False
+                        if not self.findings["distill_url"]: should_update = True
+                        elif system == "Darwin" and svc.name in ["OMLX", "LM Studio"]: should_update = True
+                        elif system == "Linux" and svc.name in ["vLLM", "sglang"]: should_update = True
+
+                        if should_update:
+                            self.findings["distill_url"] = svc.url
+                            self.findings["distill_provider"] = "ollama" if svc.name == "Ollama" else "openai"
                             self.findings["distill_model"] = best
-                        logger.info(f"🔎 Found Ollama with model: {best}")
-                        return True
+                        logger.info(f"🔎 Found {svc.name} with model: {best}")
         except: pass
-        return False
-
-    async def probe_lmstudio(self) -> bool:
-        """Check for local LM Studio instance."""
-        try:
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                resp = await client.get(f"{self.DEFAULT_LMSTUDIO_URL}/v1/models")
-                if resp.status_code == 200:
-                    models = [m["id"] for m in resp.json().get("data", [])]
-                    if models:
-                        best = HardwareProfiler.pick_best_model(models)
-                        if not self.findings["distill_url"] or platform.system() == "Darwin":
-                            self.findings["distill_url"] = self.DEFAULT_LMSTUDIO_URL
-                            self.findings["distill_provider"] = "openai"
-                            self.findings["distill_model"] = best
-                        logger.info(f"🔎 Found LM Studio with model: {best}")
-                        return True
-        except: pass
-        return False
-
-    async def probe_omlx(self) -> bool:
-        """Check for local OMLX instance (OpenAI-compatible MLX server)."""
-        try:
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                resp = await client.get(f"{self.DEFAULT_OMLX_URL}/v1/models")
-                if resp.status_code == 200:
-                    models = [m["id"] for m in resp.json().get("data", [])]
-                    if models:
-                        best = HardwareProfiler.pick_best_model(models)
-                        self.findings["distill_url"] = self.DEFAULT_OMLX_URL
-                        self.findings["distill_provider"] = "openai"
-                        self.findings["distill_model"] = best
-                        logger.info(f"🔎 Found OMLX with model: {best}")
-                        return True
-        except: pass
-        return False
 
     def probe_vault(self):
         search_paths = [Path.home() / "Documents", Path.home() / "Obsidian", Path.home()]
@@ -133,80 +145,45 @@ class SetupScout:
             self.findings["vault_path"] = str(default_vault)
             logger.info(f"✨ Created default ClawBrain Vault at: {default_vault}")
 
-    async def generate_env(self):
+    def generate_env(self):
         env_path = Path.cwd() / ".env"
         existing = {}
         if env_path.exists():
             for line in env_path.read_text().splitlines():
                 if "=" in line:
                     k, v = line.split("=", 1)
-                    # Phase 61 Fix: Strip surrounding quotes if present to avoid double-quoting
-                    val = v.strip()
-                    if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
-                        val = val[1:-1]
-                    existing[k.strip()] = val
-        
-        current_platform = platform.system()
-        stored_platform = existing.get("CLAWBRAIN_PLATFORM", "unknown")
-        
-        force_reprobe = current_platform != stored_platform
-        if force_reprobe:
-            logger.info(f"🚀 Platform Shift Detected ({stored_platform} -> {current_platform}). Invalidating cross-platform settings.")
-        
-        # 1. Validate Distill URL reachability
-        if "CLAWBRAIN_DISTILL_URL" in existing and not force_reprobe:
-            if not await self.is_url_reachable(existing["CLAWBRAIN_DISTILL_URL"]):
-                logger.info(f"⚠️ Distillation endpoint {existing['CLAWBRAIN_DISTILL_URL']} is unreachable. Re-probing...")
-                force_reprobe = True
-
-        current_platform_up = platform.system().upper()
-        platform_prefix = f"{current_platform_up}_"
-        
+                    existing[k.strip().strip('"')] = v.strip().strip('"')
         mapping = {
             "CLAWBRAIN_DB_DIR": self.findings["db_dir"],
             "CLAWBRAIN_DISTILL_URL": self.findings["distill_url"],
             "CLAWBRAIN_DISTILL_MODEL": self.findings["distill_model"],
             "CLAWBRAIN_DISTILL_PROVIDER": self.findings["distill_provider"],
-            "CLAWBRAIN_VAULT_PATH": self.findings["vault_path"],
-            "CLAWBRAIN_PLATFORM": platform.system()
+            "CLAWBRAIN_VAULT_PATH": self.findings["vault_path"]
         }
-        
         for key, value in mapping.items():
-            if key == "CLAWBRAIN_PLATFORM":
+            if key not in existing:
+                if value: existing[key] = value
+            elif "PATH" in key or "DIR" in key:
+                if not self.is_path_valid_for_os(existing[key]):
+                    logger.info(f"🔄 Correcting invalid path for {key}: {existing[key]} -> {value}")
+                    existing[key] = value
+            elif not existing[key] and value:
                 existing[key] = value
-                continue
-                
-            p_key = f"{platform_prefix}{key}"
-            
-            # 1. Update platform-specific key
-            if p_key not in existing or force_reprobe:
-                if value: existing[p_key] = value
-            elif "PATH" in p_key or "DIR" in p_key:
-                if not self.is_path_valid_for_os(existing[p_key]):
-                    logger.info(f"🔄 Correcting invalid platform path: {p_key}")
-                    existing[p_key] = value
-            
-            # 2. Synchronize generic key for the current platform
-            if value: existing[key] = value
-        
         if "CLAWBRAIN_MAX_CONTEXT_CHARS" not in existing:
             existing["CLAWBRAIN_MAX_CONTEXT_CHARS"] = "2000"
-            
-        # Re-sort to keep it clean (platform specific together)
-        sorted_keys = sorted(existing.keys())
-        lines = [f'{k}="{existing[k]}"' for k in sorted_keys]
+        lines = [f'{k}="{v}"' for k, v in existing.items()]
         env_path.write_text("\n".join(lines) + "\n")
-        logger.info(f"✨ Updated .env with platform-optimized settings ({current_platform} specific).")
+        logger.info(f"✨ Updated .env with optimal settings.")
 
 async def main():
     scout = SetupScout()
-    logger.info("🚀 Starting environment discovery...")
+    logger.info("🚀 Starting environment discovery & orchestration...")
     vram = HardwareProfiler.get_vram_gb()
     tier = HardwareProfiler.get_tier()
     logger.info(f"📊 Hardware Profile: Tier {tier} ({vram:.1f}GB effectively available)")
-    await asyncio.gather(scout.probe_ollama(), scout.probe_lmstudio(), scout.probe_omlx())
+    await scout.orchestrate_services()
     scout.probe_vault()
-    await scout.generate_env()
+    scout.generate_env()
     logger.info("\n✅ Setup complete. You can now start the server.")
 
 if __name__ == "__main__":

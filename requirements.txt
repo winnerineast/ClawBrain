@@ -28,3 +28,4 @@ uvicorn==0.43.0
 chromadb>=0.4.0
 mcp[fastapi]>=1.0.0
 psutil==7.0.0
+litellm==1.50.0

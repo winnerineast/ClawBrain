@@ -18,7 +18,16 @@ Implement the **ClawBrain MemoryRouter v2** — the central cognitive hub that o
 To handle wide and diverse datasets, the Router computes a `Significance Score` for every candidate:
 - `Score = (Anchors * 150) + (Coverage * 80 * (1 + Similarity)) + (Similarity * 20)`
 
-#### 2.2.2 Cognitive Admission (v1.4 - Judge-Centric)
+#### 2.2.2 Hybrid Retrieval Strategy (PageIndex Integration)
+The Router orchestrates a two-tier retrieval process:
+1.  **Vector Path (VaultIndexer)**: Default for all documents. Provides candidate snippets via semantic similarity.
+2.  **Reasoning Path (PageIndexer)**: Supplements the Vector path for complex technical recall.
+    - **Trigger Heuristic**:
+        - `If Vector Confidence < 0.7 AND Document Size > 5000 chars`
+        - OR `If Query contains deep reasoning keywords (e.g., "compare", "parameter", "manual")`.
+    - **Execution**: Invokes `PageIndexer.reasoning_search(query)` to traverse the TOC tree and find precise leaf nodes.
+
+#### 2.2.3 Cognitive Admission (v1.4 - Judge-Centric)
 Instead of hardcoded absolute gates, the system uses an adaptive "Wide Net" approach:
 1. **Hard Anchors**: Any snippet containing a hard anchor (technical ID, proper noun) identified by the `SignalDecomposer` is admitted.
 2. **Recall Focus**: The Pre-Filter is intentionally generous to ensure the LLM-based **Cognitive Judge** has a chance to evaluate potentially relevant context.

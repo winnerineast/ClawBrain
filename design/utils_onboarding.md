@@ -1,19 +1,26 @@
-# design/utils_onboarding.md v1.3
+# design/utils_onboarding.md v1.4
 
 ## 1. Objective
 Transform ClawBrain from a manual experimental project into a user-friendly tool by providing automated installation, environment discovery, and configuration. The goal is to allow a new user to go from `git clone` to a fully running server in under 60 seconds on any supported platform (Ubuntu/macOS).
 
-## 2. Environment Discovery (SetupScout)
+## 2. Environment Discovery & Orchestration (SetupScout)
 
 ### 2.1 Hardware Profiling
 - Use `HardwareProfiler` to detect VRAM and determine the "Intelligence Tier".
 
-### 2.2 Service Probing & Reachability
-- **Validation**: Before accepting an existing `CLAWBRAIN_DISTILL_URL` from `.env`, ping the endpoint. 
-- If the endpoint is unreachable (Connection Refused), **invalidate** the setting and re-probe (Ollama, LM Studio, OMLX).
+### 2.2 Unified LLM Service Orchestration
+The Scout must manage the lifecycle of various LLM backends to ensure functional integrity:
+- **Supported Providers**: Ollama, LM Studio, OMLX, sglang, vLLM.
+- **Discovery**: Check if the service binary or application is installed.
+- **Verification**: Ping the configured or default port. If unreachable, attempt **Auto-Activation**.
+- **Auto-Activation Logic**:
+    - **Ollama**: Execute `ollama serve` (Linux) or check App path (macOS).
+    - **LM Studio / OMLX**: Execute `open -a` on macOS.
+    - **vLLM / sglang**: Check for existing screen/tmux sessions or systemd units; if missing, log a warning (as these usually require specific model weights/parameters to start).
+- **Polling**: Wait up to 30s for the API to respond before declaring the backend "FAILED".
 
 ### 2.3 OS-Agnostic Path Handling
-- If a path starts with `/Users` on Linux or `/home` on macOS, it is considered a "Foreign Path" and must be corrected to the local equivalent.
+- Correct "Foreign Paths" (e.g., `/Users` on Linux) to local equivalents.
 
 ### 2.4 Platform Fingerprinting
 - Store `CLAWBRAIN_PLATFORM` (e.g., "Darwin" or "Linux") in `.env`.

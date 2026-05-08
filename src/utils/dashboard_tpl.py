@@ -1,4 +1,4 @@
-# Generated from design/management_api.md v1.2
+# Generated from design/management_api.md v1.3
 
 DASHBOARD_HTML = """
 <!DOCTYPE html>
@@ -6,7 +6,8 @@ DASHBOARD_HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦞 ClawBrain Management Dashboard</title>
+    <title>🦞 ClawBrain Information Flow</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
         :root {
             --bg: #0d1117;
@@ -16,8 +17,10 @@ DASHBOARD_HTML = """
             --accent: #58a6ff;
             --danger: #f85149;
             --success: #3fb950;
+            --warning: #d29922;
             --border: #30363d;
-            --xray: #1c2128;
+            --plane-relay: #238636;
+            --plane-cognitive: #8957e5;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -26,34 +29,37 @@ DASHBOARD_HTML = """
             margin: 0;
             display: flex;
             height: 100vh;
+            overflow: hidden;
         }
         #sidebar {
             width: 250px;
             background-color: var(--sidebar);
             border-right: 1px solid var(--border);
             padding: 20px;
+            display: flex;
+            flex-direction: column;
             overflow-y: auto;
         }
         #main {
             flex: 1;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
             overflow-y: auto;
         }
-        h1, h2, h3 { color: var(--accent); }
+        h1, h2, h3 { color: var(--accent); margin-top: 0; }
         .session-item {
-            padding: 10px;
+            padding: 8px 12px;
             border-radius: 6px;
             cursor: pointer;
-            margin-bottom: 5px;
-            border: 1px solid transparent;
+            margin-bottom: 4px;
             font-size: 13px;
             word-break: break-all;
+            border: 1px solid transparent;
         }
         .session-item:hover { background-color: var(--card); }
-        .session-item.active { 
-            background-color: var(--accent); 
-            color: white; 
-        }
+        .session-item.active { background-color: var(--accent); color: white; }
+        
         .card {
             background-color: var(--card);
             border: 1px solid var(--border);
@@ -61,93 +67,159 @@ DASHBOARD_HTML = """
             padding: 15px;
             margin-bottom: 20px;
         }
-        .xray-card {
-            background-color: var(--xray);
-            border: 1px solid var(--accent);
+        
+        #flow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
         }
-        pre {
+        #visual-flow {
+            background: #fff;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 20px;
+            min-height: 180px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #event-feed {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #event-list {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
             background: #000;
             padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-            font-size: 12px;
         }
-        .controls {
+        .event-item {
+            padding: 8px;
+            border-bottom: 1px solid #222;
+            font-size: 12px;
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
-        }
-        button {
-            padding: 8px 16px;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: var(--sidebar);
-            color: var(--text);
             cursor: pointer;
-            font-weight: bold;
         }
-        button:hover { background: var(--card); }
-        .btn-danger { color: var(--danger); border-color: var(--danger); }
-        .btn-success { color: var(--success); border-color: var(--success); }
-        .trace-item {
-            border-bottom: 1px solid var(--border);
-            padding: 10px 0;
-        }
-        .timestamp { font-size: 0.8em; color: #8b949e; }
-        .tag {
+        .event-item:hover { background: #111; }
+        .event-time { color: #666; min-width: 80px; }
+        .event-plane { 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-weight: bold; 
+            text-transform: uppercase;
             font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 10px;
+            min-width: 60px;
+            text-align: center;
+        }
+        .plane-relay { background: var(--plane-relay); color: white; }
+        .plane-cognitive { background: var(--plane-cognitive); color: white; }
+        .event-msg { flex: 1; }
+        
+        #xray-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #xray-content {
+            width: 80%;
+            height: 80%;
+            background: var(--bg);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        pre {
+            flex: 1;
+            background: #000;
+            padding: 15px;
+            border-radius: 4px;
+            overflow: auto;
+            color: var(--success);
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 12px;
+        }
+        
+        .status-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
             background: var(--border);
-            margin-right: 5px;
+        }
+        .pulse { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(248, 81, 73, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
         }
     </style>
 </head>
 <body>
     <div id="sidebar">
-        <h2>Sessions</h2>
-        <button onclick="loadSessions()">Refresh List</button>
-        <div id="session-list" style="margin-top: 20px;"></div>
-    </div>
-    <div id="main">
-        <div id="welcome" style="text-align: center; margin-top: 100px;">
-            <h1>🦞 ClawBrain Dashboard</h1>
-            <p>Select a session to inspect the AI's internal memory state.</p>
+        <h2>ClawBrain</h2>
+        <div id="platform-info" class="card" style="padding: 10px; font-size: 11px;">
+            Detecting platform...
         </div>
-        <div id="dashboard-content" style="display: none;">
-            <h1 id="active-session-id">Session: ...</h1>
-            
-            <div class="controls">
-                <button class="btn-success" onclick="triggerDistill()">🚀 Trigger Distillation (L3)</button>
-                <button class="btn-danger" onclick="clearMemory()">🗑️ Clear Memory</button>
-            </div>
+        
+        <h3 style="margin-top: 20px; font-size: 16px;">Active Sessions</h3>
+        <div id="session-list" style="flex: 1;"></div>
+        <button onclick="loadSessions()" style="width: 100%; padding: 8px; margin-top: 10px; cursor: pointer;">Refresh Sessions</button>
+    </div>
 
-            <div class="card xray-card">
-                <h3>🔍 The X-Ray View (Last Context Injection)</h3>
-                <div id="xray-content"><pre>Waiting for next interaction...</pre></div>
+    <div id="main">
+        <div id="flow-header">
+            <h1 id="active-session-title">Select a Session</h1>
+            <div id="global-status">
+                <span id="relay-status" class="status-pill">Relay Plane: --</span>
+                <span id="cog-status" class="status-pill">Cognitive Plane: --</span>
             </div>
+        </div>
 
-            <div class="card">
-                <h3>🧠 Neocortex (L3 - Semantic Summary)</h3>
-                <div id="l3-content"><pre>Loading...</pre></div>
-            </div>
+        <div id="visual-flow" class="mermaid">
+            graph LR
+                User((User)) -- Chat --> Relay[Relay Plane]
+                Relay -- Request Context --> Cognitive[Cognitive Plane]
+                Cognitive -- Semantic Memory --> Relay
+                Relay -- Enriched Prompt --> LLM((LLM))
+                Vault[(Obsidian Vault)] -- Offline Sync --> Cognitive
+        </div>
 
-            <div class="card">
-                <h3>💭 Working Memory (L1 - Active Focus)</h3>
-                <div id="l1-content"><pre>Loading...</pre></div>
+        <div id="event-feed">
+            <h3>Information Flow Log (Real-time)</h3>
+            <div id="event-list">
+                <div style="color: #666; text-align: center; margin-top: 40px;">No events recorded yet. Start a chat or sync your vault.</div>
             </div>
+        </div>
+    </div>
 
-            <div class="card">
-                <h3>📜 Interaction Traces (L2 - Hippocampus)</h3>
-                <div id="l2-content">Loading...</div>
+    <div id="xray-overlay" onclick="closeXRay()">
+        <div id="xray-content" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="margin: 0;">🔍 Context X-Ray View</h2>
+                <button onclick="closeXRay()">Close</button>
             </div>
+            <pre id="xray-json"></pre>
         </div>
     </div>
 
     <script>
         let currentSession = null;
+        let lastEventTimestamp = 0;
+
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
 
         async function loadSessions() {
             try {
@@ -162,78 +234,90 @@ DASHBOARD_HTML = """
                     div.onclick = () => selectSession(sid);
                     list.appendChild(div);
                 });
-            } catch (e) { console.error('Failed to load sessions', e); }
+                if (!currentSession && data.sessions.length > 0) selectSession(data.sessions[0]);
+            } catch (e) { console.error('Sessions failed', e); }
         }
 
         async function selectSession(sid) {
             currentSession = sid;
-            document.getElementById('welcome').style.display = 'none';
-            document.getElementById('dashboard-content').style.display = 'block';
-            document.getElementById('active-session-id').textContent = 'Session: ' + sid;
-            
-            // Highlight sidebar
+            lastEventTimestamp = 0; // Reset to show history for this session
+            document.getElementById('active-session-title').textContent = "Session: " + sid;
             document.querySelectorAll('.session-item').forEach(el => {
                 el.classList.toggle('active', el.textContent === sid);
             });
-
-            refreshAll();
+            document.getElementById('event-list').innerHTML = '';
+            refresh();
         }
 
-        async function refreshAll() {
-            if (!currentSession) return;
-            
+        async function refresh() {
             try {
-                // 1. Load Memory State (L1/L3)
-                const mResp = await fetch(`/v1/memory/${currentSession}`);
-                const mData = await mResp.json();
-                document.getElementById('l3-content').innerHTML = `<pre>${mData.neocortex_summary || 'No summary generated yet.'}</pre>`;
-                document.getElementById('l1-content').innerHTML = `<pre>${JSON.stringify(mData.working_memory_preview, null, 2)}</pre>`;
+                const cogResp = await fetch('/v1/management/cognitive/status');
+                const cogData = await cogResp.json();
+                
+                document.getElementById('platform-info').innerHTML = `
+                    <div><strong>OS:</strong> ` + (cogData.platform || 'Detected') + `</div>
+                    <div><strong>Mode:</strong> <span style="color: var(--accent)">` + (cogData.integration_mode || 'Unknown') + `</span></div>
+                    <div><strong>Heartbeat:</strong> ` + cogData.heartbeat_seconds + `s</div>
+                `;
+                
+                const relayPill = document.getElementById('relay-status');
+                relayPill.textContent = "Relay Plane: ACTIVE";
+                relayPill.style.color = "var(--success)";
+                
+                const cogPill = document.getElementById('cog-status');
+                cogPill.textContent = "Cognitive Plane: " + (cogData.circuit_breakers.heartbeat ? "STALLED" : "ACTIVE");
+                cogPill.style.color = cogData.circuit_breakers.heartbeat ? "var(--danger)" : "var(--plane-cognitive)";
+                if (cogData.circuit_breakers.heartbeat) cogPill.classList.add('pulse');
+                else cogPill.classList.remove('pulse');
 
-                // 2. Load X-Ray (Last Injection)
-                const xResp = await fetch(`/v1/management/last_injection/${currentSession}`);
-                const xData = await xResp.json();
-                if (xData.payload) {
-                    // Extract just the messages part for readability
-                    const stimulus = xData.payload.stimulus || xData.payload;
-                    document.getElementById('xray-content').innerHTML = `<pre>${JSON.stringify(stimulus, null, 2)}</pre>`;
-                } else {
-                    document.getElementById('xray-content').innerHTML = `<pre>No injection captured for this session yet.</pre>`;
+                const eResp = await fetch('/v1/management/events?limit=50' + (currentSession ? '&session_id=' + currentSession : ''));
+                const eData = await eResp.json();
+                const container = document.getElementById('event-list');
+                
+                if (eData.events.length > 0 && container.querySelector('div[style]')) {
+                    container.innerHTML = '';
                 }
 
-                // 3. Load Traces (L2)
-                const tResp = await fetch(`/v1/management/traces/${currentSession}?limit=20`);
-                const tData = await tResp.json();
-                const container = document.getElementById('l2-content');
-                container.innerHTML = '';
-                tData.traces.forEach(t => {
+                eData.events.forEach(ev => {
+                    if (ev.timestamp <= lastEventTimestamp) return;
+                    
                     const div = document.createElement('div');
-                    div.className = 'trace-item';
-                    const time = new Date(t.timestamp * 1000).toLocaleString();
+                    div.className = 'event-item';
+                    const time = new Date(ev.timestamp * 1000).toLocaleTimeString();
                     div.innerHTML = `
-                        <div class="timestamp">${time} <span class="tag">${t.model}</span></div>
-                        <pre>${t.raw_content}</pre>
+                        <div class="event-time">` + time + `</div>
+                        <div class="event-plane plane-` + ev.plane.toLowerCase() + `">` + ev.plane + `</div>
+                        <div class="event-msg">` + ev.message + `</div>
                     `;
-                    container.appendChild(div);
+                    
+                    if (ev.type === 'ContextEnrichment') {
+                        div.onclick = () => showXRay(ev.data.session_id);
+                        div.style.borderLeft = "3px solid var(--accent)";
+                        div.innerHTML += "<span style='color: var(--accent)'>[View X-Ray]</span>";
+                    } else if (ev.type === 'DeepMining' || ev.type === 'DeepIndexing') {
+                        div.style.borderLeft = "3px solid var(--plane-cognitive)";
+                    }
+                    
+                    container.insertBefore(div, container.firstChild);
+                    lastEventTimestamp = Math.max(lastEventTimestamp, ev.timestamp);
                 });
+
             } catch (e) { console.error('Refresh failed', e); }
         }
 
-        async function triggerDistill() {
-            if (!currentSession) return;
-            await fetch(`/v1/memory/${currentSession}/distill`, {method: 'POST'});
-            alert('Distillation triggered.');
+        async function showXRay(sid) {
+            const resp = await fetch('/v1/management/last_injection/' + sid);
+            const data = await resp.json();
+            document.getElementById('xray-json').textContent = JSON.stringify(data.payload || {error: "No injection found"}, null, 2);
+            document.getElementById('xray-overlay').style.display = 'flex';
         }
 
-        async function clearMemory() {
-            if (!currentSession || !confirm('Really clear all memory for this session?')) return;
-            await fetch(`/v1/memory/${currentSession}`, {method: 'DELETE'});
-            refreshAll();
+        function closeXRay() {
+            document.getElementById('xray-overlay').style.display = 'none';
         }
 
-        // Initial load
         loadSessions();
-        // Auto refresh (10s)
-        setInterval(refreshAll, 10000);
+        setInterval(refresh, 3000);
     </script>
 </body>
 </html>
