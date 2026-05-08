@@ -1,4 +1,4 @@
-# Generated from design/memory_pageindex.md v1.0
+# Generated from design/memory_pageindex.md v1.2
 import os
 import json
 import hashlib
@@ -6,8 +6,7 @@ import logging
 import asyncio
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
-from litellm import completion
-from src.utils.config import get_env
+from src.utils.llm_client import LLMFactory, LLMClient
 
 logger = logging.getLogger("GATEWAY.MEMORY.PAGEINDEX")
 
@@ -32,28 +31,23 @@ class PageNode:
 class PageIndexer:
     """
     PageIndex Implementation: Vectorless, Reasoning-Based RAG.
-    Transforms document hierarchy into a navigable reasoning tree.
+    v1.2: Fully decoupled via LLMFactory for unified cross-platform compatibility.
     """
     def __init__(self, db_dir: Path, distill_url: str, distill_model: str, distill_provider: str):
-        self.db_dir = db_dir
+        self.db_dir = Path(db_dir)
         self.index_dir = self.db_dir / "pageindex"
         self.index_dir.mkdir(parents=True, exist_ok=True)
         
-        self.url = distill_url
-        self.model = distill_model
-        self.provider = distill_provider
+        # v1.2: Use the standard LLM Abstraction Layer
+        self.llm = LLMFactory.get_client(
+            provider=distill_provider,
+            url=distill_url,
+            model=distill_model,
+            timeout=90.0 # High-precision reasoning requires patience
+        )
         
-        # Mapping model to litellm format
-        if self.provider == "ollama":
-            self.llm_model = f"ollama/{self.model}"
-            self.api_base = self.url
-        elif self.provider == "openai":
-            # For LM Studio or OMLX (OpenAI compatible)
-            self.llm_model = f"openai/{self.model}"
-            self.api_base = self.url
-        else:
-            self.llm_model = self.model
-            self.api_base = self.url
+        # Concurrency Gate
+        self.semaphore = asyncio.Semaphore(2)
 
     def _get_file_hash(self, content: str) -> str:
         return hashlib.sha256(content.encode()).hexdigest()
@@ -65,84 +59,73 @@ class PageIndexer:
         index_file = self.index_dir / f"{file_hash}.json"
         
         if index_file.exists():
-            logger.info(f"[PAGEINDEX] Tree already exists for {file_path.name}")
             return file_hash
 
         logger.info(f"[PAGEINDEX] Building reasoning tree for {file_path.name}...")
+        root = PageNode("root", file_path.name, content, (1, 1))
         
-        # Simple Markdown Header Parsing (Heuristic-based)
-        root = PageNode("root", file_path.name, content, (1, 1)) # Dummy pages for MD
         lines = content.splitlines()
-        
-        # Construct flat hierarchy first
-        current_node = root
         for i, line in enumerate(lines):
             if line.startswith("#"):
-                level = line.count("#")
                 title = line.strip("# ").strip()
                 new_node = PageNode(f"node_{i}", title, "", (1, 1))
-                root.children.append(new_node) # Simple flat for MVP
+                root.children.append(new_node)
         
-        # Recursive Summarization
         await self._summarize_recursive(root)
-        
         index_file.write_text(json.dumps(root.to_dict(), indent=2))
         return file_hash
 
     async def _summarize_recursive(self, node: PageNode):
-        """Uses LLM to summarize node content and its children."""
-        # For MVP, we just summarize the whole block if no children
-        text_to_summarize = node.content[:2000] if node.content else f"Section: {node.title}"
+        """Uses unified LLM client to summarize node content."""
+        text = node.content[:2000] if node.content else f"Section: {node.title}"
         
-        try:
-            resp = await asyncio.to_thread(
-                completion,
-                model=self.llm_model,
-                messages=[{"role": "user", "content": f"Summarize this document section precisely for future retrieval:\n\n{text_to_summarize}"}],
-                api_base=self.api_base,
-                max_tokens=150
-            )
-            node.summary = resp.choices[0].message.content.strip()
-        except Exception as e:
-            logger.error(f"[PAGEINDEX] Summarization failed: {e}")
-            node.summary = f"Summary of {node.title}"
+        async with self.semaphore:
+            try:
+                # v1.2: Standardized generation call
+                summary = await self.llm.generate(
+                    prompt=f"Summarize this document section precisely for future retrieval:\n\n{text}",
+                    system="You are a professional technical document indexer."
+                )
+                if summary and "[Error]" not in summary:
+                    node.summary = summary.strip()
+                else:
+                    node.summary = f"Summary of {node.title}"
+            except Exception as e:
+                logger.error(f"[PAGEINDEX] Summary fail for {node.title}: {e}")
+                node.summary = f"Summary of {node.title}"
 
-        for child in node.children:
-            await self._summarize_recursive(child)
+        # Recurse
+        tasks = [self._summarize_recursive(child) for child in node.children]
+        if tasks: await asyncio.gather(*tasks)
 
     async def reasoning_search(self, query: str, file_hash: str) -> str:
-        """Traverses the tree to find the most relevant leaf node content."""
+        """Traverses the tree using reasoning traversal."""
         index_file = self.index_dir / f"{file_hash}.json"
         if not index_file.exists(): return ""
         
         tree = json.loads(index_file.read_text())
-        logger.info(f"[PAGEINDEX] Starting reasoning traversal for: {query[:30]}...")
+        choices = [f"[{i}] {c['title']}: {c['summary']}" for i, c in enumerate(tree.get("children", []))]
+        if not choices: return ""
+
+        prompt = (
+            f"USER QUERY: '{query}'\n\n"
+            "AVAILABLE SECTIONS:\n" + "\n".join(choices) + "\n\n"
+            "INSTRUCTION: Which section index is most relevant to answering the query? "
+            "Respond ONLY with the index number (e.g. 0)."
+        )
         
-        # Level 1 Traversal (MVP: Single level search)
-        choices = []
-        for i, child in enumerate(tree.get("children", [])):
-            choices.append(f"[{i}] {child['title']}: {child['summary']}")
-        
-        prompt = f"Given the query: '{query}', which section index is most relevant?\n" + "\n".join(choices)
-        prompt += "\n\nRespond with ONLY the index number (e.g., 0, 1, 2)."
-        
-        try:
-            resp = await asyncio.to_thread(
-                completion,
-                model=self.llm_model,
-                messages=[{"role": "user", "content": prompt}],
-                api_base=self.api_base,
-                max_tokens=10
-            )
-            idx_str = "".join(filter(str.isdigit, resp.choices[0].message.content))
-            if idx_str:
-                idx = int(idx_str)
-                if idx < len(tree["children"]):
-                    target = tree["children"][idx]
-                    logger.info(f"[PAGEINDEX] Navigated to section: {target['title']}")
-                    # In real PageIndex, we would recurse. In MVP, we return the section's context.
-                    return f"EXACT SOURCE ({target['title']}): {target['summary']}"
-        except Exception as e:
-            logger.error(f"[PAGEINDEX] Traversal failed: {e}")
+        async with self.semaphore:
+            try:
+                result = await self.llm.generate(prompt=prompt, system="You are a precision navigation agent.")
+                # Extract digit
+                match = re.search(r'\d+', result)
+                if match:
+                    idx = int(match.group())
+                    if idx < len(tree["children"]):
+                        target = tree["children"][idx]
+                        logger.info(f"[PAGEINDEX] Reasoned navigation to: {target['title']}")
+                        return f"EXACT SOURCE ({target['title']}): {target['summary']}"
+            except Exception as e:
+                logger.error(f"[PAGEINDEX] Traversal fail: {e}")
         
         return ""

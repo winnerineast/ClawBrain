@@ -1,4 +1,4 @@
-# Generated from design/memory_router.md v1.15 / GEMINI.md Rule 12
+# Generated from design/memory_router.md v1.16 / GEMINI.md Rule 12
 import uuid
 import json
 import os
@@ -18,6 +18,7 @@ from src.memory.neocortex import Neocortex
 from src.memory.room_detector import RoomDetector
 from src.memory.vault_indexer import VaultIndexer
 from src.memory.signals import SignalDecomposer
+from src.memory.page_indexer import PageIndexer
 from src.utils.config import get_env
 from src.utils.llm_client import LLMClient
 
@@ -54,6 +55,7 @@ class MemoryRouter:
         self.neo = None
         self.room_detector = None
         self.vault_indexer = None
+        self.page_indexer = None
         self.decomposer = None
         
         # Environmental Priority
@@ -72,6 +74,7 @@ class MemoryRouter:
         self._session_locks: Dict[str, asyncio.Lock] = {}
         self._last_injections: Dict[str, Any] = {}
         self._cognitive_events: List[Dict] = []
+        self._pending_trace_extractions: List[tuple] = []
         self._dirty_sessions: set = set()
         self._heartbeat_seconds = 30
         self._running = True
@@ -89,12 +92,17 @@ class MemoryRouter:
             logger.info(f"[COGNITIVE] Initializing Memory Engine at {self.db_dir}...")
             self.hippo = Hippocampus(str(self.db_dir))
             
-            # v1.16: Decoupled Initialization. Let components self-configure from environment
-            # to ensure load_dotenv() values are correctly captured.
             self.neo = Neocortex(db_dir=str(self.db_dir))
             self.room_detector = RoomDetector(
-                url=get_env("CLAWBRAIN_DISTILL_URL", "http://127.0.0.1:11434"),
-                model=get_env("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
+                url=self.distill_url, 
+                model=self.distill_model, 
+                provider=self.distill_provider
+            )
+            self.page_indexer = PageIndexer(
+                db_dir=self.db_dir,
+                distill_url=self.distill_url,
+                distill_model=self.distill_model,
+                distill_provider=self.distill_provider
             )
             self.decomposer = SignalDecomposer()
             
@@ -227,7 +235,8 @@ class MemoryRouter:
                 return ok, score
 
             sem_res = self.hippo.search(query, session_id, self._get_current_room(session_id), limit=25, include_distances=True)
-            lex_ids = self.hippo.search_lexical(list(hard_anchors) + list(core_subjects)[:5], session_id, limit=25)
+            lex_tokens = list(hard_anchors) + list(core_subjects)[:5]
+            lex_ids = self.hippo.search_lexical(lex_tokens, session_id, limit=25)
             
             cmap = {c["id"]: c["distance"] for c in sem_res}
             for lid in lex_ids:
@@ -250,7 +259,18 @@ class MemoryRouter:
             if self.vault_indexer:
                 for r in self.vault_indexer.search(query, limit=5):
                     ok, sc = _is_satisfied(r["content"], r.get("distance", 1.0))
-                    if ok: vault_results.append({"content": r["content"], "score": sc})
+                    if ok: vault_results.append({"title": r["title"], "content": r["content"], "score": sc})
+                
+                # v1.16: Hybrid Routing. Reasoning fallback for low-confidence vector results.
+                if vault_results and vault_results[0]["score"] < 0.7:
+                    top_title = vault_results[0]["title"]
+                    full_p = self.vault_path / top_title
+                    if full_p.exists():
+                        f_hash = hashlib.sha256(full_p.read_bytes()).hexdigest()
+                        reasoning = await self.page_indexer.reasoning_search(query, f_hash)
+                        if reasoning:
+                            vault_results.insert(0, {"title": f"DEEP MINED: {top_title}", "content": reasoning, "score": 1.0})
+
                 vault_results.sort(key=lambda x: x["score"], reverse=True)
 
             potential_entities = list(hard_anchors)
@@ -261,21 +281,23 @@ class MemoryRouter:
             sample = "\n".join([l3_summary] + l2_contents[:1] + [r["content"] for r in vault_results[:1]])
             if not await self.neo.verify_relevance(query, sample): return ""
 
-            output_parts, cur_len = [], 0
+            output_parts = []
+            current_len = 0
+            
             def try_add(header, contents, prefix="- "):
-                nonlocal cur_len
+                nonlocal current_len
                 if not contents: return
                 ht = f"\n\n=== {header} ===\n"
-                if cur_len + len(ht) + 20 > max_chars: return
+                if current_len + len(ht) + 20 > max_chars: return
                 lines = []
                 for it in contents:
                     val = it["content"] if isinstance(it, dict) else it
                     line = f"{prefix}{val}"
-                    if cur_len + len(ht) + len("\n".join(lines + [line])) <= max_chars: lines.append(line)
+                    if current_len + len(ht) + len("\n".join(lines + [line])) <= max_chars: lines.append(line)
                     else: break
                 if lines:
                     sec = ht + "\n".join(lines)
-                    output_parts.append(sec); cur_len += len(sec)
+                    output_parts.append(sec); current_len += len(sec)
 
             if l3_summary: try_add("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary])
             try_add("ACTIVE CONVERSATION (WORKING MEMORY)", [it.content for it in working_items])
@@ -314,7 +336,13 @@ class MemoryRouter:
 
     async def _vault_scan_loop(self):
         while self._running and self.vault_indexer:
-            try: await self.vault_indexer.scan()
+            try:
+                stats = await self.vault_indexer.scan()
+                threshold = int(get_env("CLAWBRAIN_PAGEINDEX_THRESHOLD", 5000))
+                for path_str in stats.get("modified_paths", []):
+                    p = Path(path_str)
+                    if p.stat().st_size > threshold:
+                        await self.page_indexer.build_tree(p)
             except: pass
             await asyncio.sleep(300)
 

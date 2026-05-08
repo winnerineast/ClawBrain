@@ -1,9 +1,10 @@
-# Generated from design/model_decoupling.md v1.1
+# Generated from design/model_decoupling.md v1.2
 import os
 import httpx
 import logging
 import platform
 import subprocess
+import re
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
@@ -37,7 +38,8 @@ class HardwareProfiler:
         
         # 2. Detect VRAM
         if system == "Darwin" and platform.machine() == "arm64":
-            vram_gb = total_ram_gb * 0.7 # Apple Silicon Unified Memory
+            # Apple Silicon Unified Memory
+            vram_gb = total_ram_gb * 0.7 
         elif system == "Linux":
             try:
                 res = subprocess.check_output(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"])
@@ -56,11 +58,13 @@ class HardwareProfiler:
 
     @staticmethod
     def pick_best_model(models: List[str]) -> Optional[str]:
+        """Strategic model picking based on hardware tier."""
         if not models: return None
         tier = HardwareProfiler.get_tier()
         
-        if tier == 1: targets = ["70b", "32b", "30b", "27b"]
-        elif tier == 2: targets = ["14b", "13b", "8b", "7b"]
+        # Priority mapping
+        if tier == 1: targets = ["70b", "32b", "35b", "30b", "27b"]
+        elif tier == 2: targets = ["14b", "13b", "9b", "8b", "7b"]
         else: targets = ["3b", "2b", "1b", "0.5b"]
             
         fallback_targets = ["8b", "7b", "3b"] if tier <= 2 else ["3b", "latest"]
@@ -78,18 +82,29 @@ class LLMClient:
         self.api_key = api_key
         self.timeout = timeout
 
-    async def generate(self, prompt: str, system: str = None) -> str:
+    async def generate(self, prompt: str, system: str = None, **kwargs) -> str:
+        """Standardized text generation with optional parameters."""
         raise NotImplementedError
 
-    async def chat(self, messages: List[Dict[str, str]]) -> str:
+    async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
+        """Standardized chat completion."""
         raise NotImplementedError
 
 class OllamaClient(LLMClient):
     """Ollama-specific implementation."""
-    async def generate(self, prompt: str, system: str = None) -> str:
+    async def generate(self, prompt: str, system: str = None, **kwargs) -> str:
         url = f"{self.url}/api/generate"
-        payload = {"model": self.model, "prompt": prompt, "stream": False}
+        payload = {
+            "model": self.model, 
+            "prompt": prompt, 
+            "stream": False,
+            "options": {
+                "temperature": kwargs.get("temperature", 0.1),
+                "num_predict": kwargs.get("max_tokens", 1000)
+            }
+        }
         if system: payload["system"] = system
+        
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.post(url, json=payload)
@@ -99,9 +114,16 @@ class OllamaClient(LLMClient):
             logger.error(f"[OLLAMA] Generation failed: {e}")
             return f"[Error] {e}"
 
-    async def chat(self, messages: List[Dict[str, str]]) -> str:
+    async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
         url = f"{self.url}/api/chat"
-        payload = {"model": self.model, "messages": messages, "stream": False}
+        payload = {
+            "model": self.model, 
+            "messages": messages, 
+            "stream": False,
+            "options": {
+                "temperature": kwargs.get("temperature", 0.1)
+            }
+        }
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.post(url, json=payload)
@@ -113,20 +135,21 @@ class OllamaClient(LLMClient):
 
 class OpenAIClient(LLMClient):
     """OpenAI-compatible implementation (used by LM Studio, OMLX)."""
-    async def generate(self, prompt: str, system: str = None) -> str:
+    async def generate(self, prompt: str, system: str = None, **kwargs) -> str:
         messages = []
         if system: messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        return await self.chat(messages)
+        return await self.chat(messages, **kwargs)
 
-    async def chat(self, messages: List[Dict[str, str]]) -> str:
+    async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
+        # Standard OpenAI V1 path
         url = f"{self.url}/v1/chat/completions"
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "temperature": 0.1,
-            "max_tokens": 1000
+            "temperature": kwargs.get("temperature", 0.1),
+            "max_tokens": kwargs.get("max_tokens", 1000)
         }
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         try:
@@ -134,8 +157,8 @@ class OpenAIClient(LLMClient):
                 resp = await client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
                 content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-                # SURGICAL DEBUG PRINT
-                print(f"\n[DEBUG_LLM_RAW] Model: {self.model}\n[DEBUG_LLM_RAW] Response: '{content[:100]}'")
+                if not content and resp.status_code == 200:
+                    logger.warning(f"[OPENAI-COMPAT] Model {self.model} returned empty response body.")
                 return content
         except Exception as e:
             logger.error(f"[OPENAI-COMPAT] Chat failed: {e}")
@@ -157,7 +180,17 @@ class LLMFactory:
         url = get_env("CLAWBRAIN_DISTILL_URL")
         model = get_env("CLAWBRAIN_DISTILL_MODEL")
         
-        # Safe defaults if env is TRULY empty
+        # Cross-OS Auto-Configuration Logic
+        if not provider:
+            system = platform.system()
+            if system == "Darwin":
+                provider = "openai" # macOS prefers OMLX/LMStudio
+                url = url or "http://localhost:8080"
+            else:
+                provider = "ollama" # Ubuntu prefers Ollama
+                url = url or "http://localhost:11434"
+        
+        # Fallback values if still empty
         provider = provider or "ollama"
         url = url or "http://localhost:11434"
         model = model or "gemma4:e4b"
