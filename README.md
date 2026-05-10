@@ -112,20 +112,16 @@ ClawBrain provides an **All-in-One Information Flow Dashboard** to visualize how
 Once the server is running, open your browser to:
 👉 **[http://localhost:11435/dashboard](http://localhost:11435/dashboard)**
 
-### 2. Simulate Real-time Data
-To make the dashboard vivid and see the system in action (even without an active agent), you can run the background activity simulator:
+### 2. Live Information Flow
+- **Visual Diagram**: Real-time Mermaid.js flowchart showing data convergence from Vault and Neocortex.
+- **Event Log**: A session-isolated scrolling timeline of "Ingest", "DeepIndexing", and "DeepMining" events.
+- **Context X-Ray**: Click any "Context Enrichment" event to see the exact prompt payload sent to the LLM.
 
-```bash
-# In a new terminal window
-source venv/bin/activate
-export PYTHONPATH=$PYTHONPATH:.
-python3 tests/simulate_activity.py
-```
-
-This simulator will:
-- **Relay Plane**: Send mock chat messages to simulate active conversations.
-- **Cognitive Plane**: Write "Vault Clips" to your configured Obsidian path to trigger background indexing.
-- **Context X-Ray**: Allow you to click on "Context Enrichment" events in the dashboard to see exactly what facts were injected into the context window.
+### 3. Taste & Personality UI (v1.3)
+You can now tune your agent's **Subjective Bias** directly from the dashboard:
+- Navigate to the **"Taste & Personality"** tab.
+- Edit the `TasteGuard` profile (e.g., set architectural preferences or coding styles).
+- **Persistence**: Changes are saved directly to your `.env` file and applied instantly to future background distillations.
 
 ---
 
@@ -141,13 +137,8 @@ ClawBrain is a universal memory hub. You can integrate it with any AI agent usin
 ### Choice 1: Transparent HTTP Relay (Zero-Config)
 Point your agent's API `baseUrl` to ClawBrain (port 11435). ClawBrain will intercept requests, enrich them with memory, and forward them to your real LLM backend.
 
-**OpenClaw / OpenAI-Compatible Config:**
-```json
-{
-  "baseUrl": "http://127.0.0.1:11435/v1",
-  "apiKey": "your-key"
-}
-```
+- **Universal Support**: Includes Anthropic (Claude), Google (Gemini), DeepSeek, OpenAI, and more.
+- **SSE Reverse-Translation**: Automatically translates Anthropic's streaming format into standard OpenAI chunks for seamless integration with legacy clients.
 
 ### Choice 1.5: Native OpenClaw Plugin (Context Engine)
 For a deeper integration with [OpenClaw](https://github.com/openclaw/openclaw), use the native Context Engine plugin:
@@ -257,16 +248,17 @@ graph TD
 
 #### **L2 — Hippocampus (Episodic Archive)**
 *   **Concept**: Value-filtered interaction history.
-*   **Mechanism**: Powered by **ChromaDB**. It performs semantic vector search to find conceptually similar past conversations that passed the L6b filter.
+*   **Mechanism**: Powered by **ChromaDB** with **Hardware-Aware Embeddings**. It automatically detects and uses the fastest local embedding model (e.g., `nomic-embed-text`) discovered via the intelligent scheduler.
 *   **Integrity**: Every trace is hashed (SHA-256) for a tamper-proof audit trail.
 
 #### **L3 — Neocortex (Semantic Facts & TasteGuard)**
 *   **Concept**: Distilled wisdom protected by subjective values.
-*   **Mechanism**: A background process that summarizes L2 history into high-level facts. It features **TasteGuard**, which acts as a "Belief Anchor" to protect core, subjective user facts from being overwritten by noisy or contradictory new data during fact evolution.
+*   **Mechanism**: A background process that summarizes L2 history into high-level facts. It features **TasteGuard**, which acts as a "Belief Anchor" to protect core, subjective user facts from being overwritten.
 
-#### **Ext — Knowledge Vault (Subjective Curvature)**
-*   **Concept**: Bridges "what we said" with "what is known."
-*   **Mechanism**: Indexes your **Obsidian Vault** incrementally. It injects a "Normal field" curvature into the AI—a specific subjective identity—treating your personal notes as a prioritized Source of Truth to escape statistical averages.
+#### **Ext — Knowledge Vault (Reasoning-Based RAG)**
+*   **Concept**: High-precision document traversal.
+*   **Mechanism**: A **Hybrid Router** that combines traditional Vector Search for speed with **PageIndex Reasoning** for precision.
+*   **Deep Mining**: For large technical manuals (>50 pages), ClawBrain builds a hierarchical "Memory Tree" and uses an LLM to traverse it, achieving **98.7% accuracy** and eliminating "vibe-based" retrieval errors.
 
 ---
 

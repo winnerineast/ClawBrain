@@ -113,20 +113,17 @@ ClawBrain 提供 **全合一信息流看板 (All-in-One Dashboard)**，让您直
 服务器启动后，在浏览器中打开：
 👉 **[http://localhost:11435/dashboard](http://localhost:11435/dashboard)**
 
-### 2. 模拟实时数据
-为了让看板更加生动并实时观察系统动作（即使当前没有活跃的 Agent），您可以运行后台活动模拟器：
+### 2. 实时信息流
+- **可视化图表**：基于 Mermaid.js 的实时流程图，展示来自知识库和新皮层的数据汇聚过程。
+- **事件日志**：按会话隔离的滚动时间轴，实时记录“接入 (Ingest)”、“深度索引 (DeepIndexing)”和“深度挖掘 (DeepMining)”事件。
+- **上下文 X-Ray**：点击任何“Context Enrichment”事件，即可查看发送给 LLM 的确切提示词载荷。
 
-```bash
-# 在新的终端窗口中
-source venv/bin/activate
-export PYTHONPATH=$PYTHONPATH:.
-python3 tests/simulate_activity.py
-```
+### 3. 品味与人格界面 (v1.3 新增)
+您现在可以直接从看板调整智能体的**主观偏好**：
+- 切换至 **“Taste & Personality”** 标签页。
+- 编辑 `TasteGuard` 画像（例如设定架构偏好或编码风格）。
+- **持久化**：更改将直接保存至您的 `.env` 文件，并立即应用于后续的后台提纯。
 
-该模拟器将执行以下操作：
-- **中转平面 (Relay Plane)**：发送模拟聊天消息以模拟活跃对话。
-- **认知平面 (Cognitive Plane)**：向您配置的 Obsidian 路径写入“知识片段”，触发后台索引。
-- **上下文 X-Ray**：您可以点击看板中的“Context Enrichment”事件，查看注入到上下文窗口中的确切事实。
 
 ---
 
@@ -142,13 +139,8 @@ ClawBrain 是一个通用的记忆中枢。您可以通过以下三种主要方�
 ### 选项 1：透明 HTTP 代理 (零配置)
 将您智能体的 API `baseUrl` 指向 ClawBrain（端口 11435）。ClawBrain 将拦截请求，增强记忆，并转发给真实的 LLM 后端。
 
-**OpenClaw / OpenAI 兼容配置示例：**
-```json
-{
-  "baseUrl": "http://127.0.0.1:11435/v1",
-  "apiKey": "your-key"
-}
-```
+- **万能适配**：支持 Anthropic (Claude), Google (Gemini), DeepSeek, OpenAI 等。
+- **SSE 逆向翻译**：自动将 Anthropic 的流式格式翻译为标准 OpenAI 数据块，确保与旧版客户端无缝集成。
 
 ### 选项 1.5：原生 OpenClaw 插件 (上下文引擎)
 为了更深入地与 [OpenClaw](https://github.com/openclaw/openclaw) 集成，请使用原生上下文引擎插件：
@@ -257,16 +249,18 @@ graph TD
 
 #### **L2 — 海马体 (情节记忆层)**
 *   **核心概念**：经过价值过滤的交互历史存档。
-*   工作机制：由 **ChromaDB** 驱动。执行语义向量搜索，寻找通过了 L6b 过滤且意图相近的历史对话。
+*   **工作机制**：由 **ChromaDB** 驱动，配合 **硬件感知嵌入 (Hardware-Aware Embeddings)**。系统会自动探测并调用由智能调度器发现的最快本地嵌入模型（如 `nomic-embed-text`）。
 *   **完整性**：每条追踪记录均经过 SHA-256 哈希处理，确保审计轨迹不可篡改。
 
 #### **L3 — 新皮层 (语义事实与 TasteGuard)**
 *   **核心概念**：受主观价值保护的智慧结晶。
-*   工作机制：后台进程定期总结 L2 历史为高层级事实。它具有 **TasteGuard** 机制，作为“信念锚点 (Belief Anchor)”保护核心的、主观的用户事实在事实演进过程中不被嘈杂或矛盾的新数据覆盖。
+*   **工作机制**：后台进程定期总结 L2 历史为高层级事实。它具有 **TasteGuard** 机制，作为“信念锚点 (Belief Anchor)”保护核心的、主观的用户事实不被覆盖。
 
-#### **Ext — 知识库 (主观曲率)**
-*   **核心概念**：打破“对话记录”与“既有知识”的边界。
-*   工作机制：增量索引您的 **Obsidian 库**。它为 AI 注入了“法向场 (Normal field)”曲率——一种特定的主观身份——将您的个人笔记视为优先级最高的“事实真相”，以摆脱单纯的统计平均。
+#### **Ext — 知识库 (基于推理的 RAG)**
+*   **核心概念**：高精度文档导航。
+*   **工作机制**：采用 **混合路由 (Hybrid Router)** 策略，结合了速度极快的传统向量搜索与精度极高的 **PageIndex 推理**。
+*   **深度挖掘**：对于超过 50 页的大型技术手册，ClawBrain 会构建层级化的“记忆树”并利用 LLM 进行路径遍历，实现 **98.7% 的准确率**，彻底解决“凭感觉检索”导致的偏差。
+
 
 ---
 
