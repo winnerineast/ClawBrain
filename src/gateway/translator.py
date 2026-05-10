@@ -144,3 +144,28 @@ class DialectTranslator:
                 yield f"data: {json.dumps(openai_chunk)}\n\n"
                 if data.get("done"): yield "data: [DONE]\n\n"
             except: pass
+
+    @staticmethod
+    async def reverse_stream_anthropic_to_openai(response_stream: AsyncGenerator[bytes, None]) -> AsyncGenerator[str, None]:
+        """Translates Anthropic SSE stream events back to standard OpenAI chat.completion.chunk format."""
+        async for chunk in response_stream:
+            if not chunk: continue
+            text_data = chunk.decode("utf-8", errors="ignore")
+            lines = text_data.split('\n')
+            for line in lines:
+                if line.startswith("data:"):
+                    data_str = line[5:].strip()
+                    if not data_str: continue
+                    try:
+                        data = json.loads(data_str)
+                        if data.get("type") == "content_block_delta":
+                            text = data.get("delta", {}).get("text", "")
+                            if text:
+                                openai_chunk = {
+                                    "id": "chatcmpl-claw", "object": "chat.completion.chunk",
+                                    "choices": [{"index": 0, "delta": {"content": text}}]
+                                }
+                                yield f"data: {json.dumps(openai_chunk)}\n\n"
+                        elif data.get("type") == "message_stop":
+                            yield "data: [DONE]\n\n"
+                    except: pass

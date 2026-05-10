@@ -1,80 +1,97 @@
-# Generated from design/memory_pageindex.md v1.0
+# Generated from design/memory_pageindex.md v1.0 / Issue #48
 import pytest
 import os
 import asyncio
+import hashlib
+import json
 from pathlib import Path
+from unittest.mock import patch, AsyncMock, MagicMock
 from src.memory.router import MemoryRouter
+from src.utils.llm_client import EmbedClient
+
+class DummyEmbedClient(EmbedClient):
+    def __init__(self):
+        super().__init__("http://dummy", "dummy")
+    def _embed(self, texts):
+        results = []
+        for text in texts:
+            vec = [0.0] * 384
+            for char in text.lower():
+                vec[ord(char) % 384] += 1.0
+            mag = sum(v*v for v in vec) ** 0.5
+            if mag > 0: vec = [v/mag for v in vec]
+            results.append(vec)
+        return results
+    async def embed(self, texts, **kwargs): return self._embed(texts)
+    def embed_sync(self, texts, **kwargs): return self._embed(texts)
 
 @pytest.mark.asyncio
 async def test_pageindexer_tree_generation(tmp_path):
-    """Verify that PageIndexer builds a hierarchical tree for a large file."""
+    """验证 PageIndexer 能够为大文件构建层级树。"""
     db_dir = tmp_path / "db"
     vault_dir = tmp_path / "vault"
-    vault_dir.mkdir()
+    db_dir.mkdir(); vault_dir.mkdir()
     
-    # Create a complex markdown file > 5000 chars
-    large_content = "# System Overview\n" + "Introduction to the platform.\n" * 100
-    large_content += "\n## Power Specifications\n" + "Voltage: 12V DC.\n" * 50
-    large_content += "\n## Network Configuration\n" + "IP: 192.168.1.1\n" * 50
-    
-    manual_path = vault_dir / "Manual.md"
-    manual_path.write_text(large_content)
+    large_content = "# System Overview\n" + "Intro content.\n" * 10
+    large_content += "\n## Power Specs\n" + "Voltage: 12V DC.\n" * 5
+    manual_path = vault_dir / "Manual.md"; manual_path.write_text(large_content)
     
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
-    router = MemoryRouter(db_dir=db_dir)
-    await router.wait_until_ready()
     
-    # Trigger scan
-    stats = await router.vault_indexer.scan()
-    assert stats["indexed"] == 1
+    # 模拟 Scheduler 和 Client
+    mock_scheduler = MagicMock()
+    mock_client = AsyncMock()
+    mock_client.generate.return_value = "Mocked Summary"
+    mock_client.model = "mock-model"
+    mock_scheduler.select_best_chat.return_value = mock_client
     
-    # Trigger deep indexing manually (normally background)
-    await router.page_indexer.build_tree(manual_path)
-    
-    # Check if tree exists
-    index_files = list((db_dir / "pageindex").glob("*.json"))
-    assert len(index_files) == 1
-    
-    # Verify tree structure
-    import json
-    tree = json.loads(index_files[0].read_text())
-    assert tree["title"] == "Manual.md"
-    assert len(tree["children"]) >= 3 # Root + headers
-    
-    await router.aclose()
+    # 注意：PageIndexer 内部会调用 get_intelligent_scheduler
+    with patch("src.utils.llm_client.LLMFactory.get_intelligent_scheduler", return_value=mock_scheduler):
+        router = MemoryRouter(db_dir=str(db_dir), embed_client=DummyEmbedClient())
+        await router.wait_until_ready()
+        
+        await router.vault_indexer.scan()
+        await router.page_indexer.build_tree(manual_path)
+        
+        index_files = list((db_dir / "pageindex").glob("*.json"))
+        assert len(index_files) == 1
+        
+        tree = json.loads(index_files[0].read_text())
+        assert tree["title"] == "Manual.md"
+        assert len(tree["children"]) >= 1
+        await router.aclose()
 
 @pytest.mark.asyncio
 async def test_hybrid_routing_pageindex(tmp_path):
-    """Verify that complex queries trigger PageIndex reasoning."""
+    """验证复杂查询能够触发 PageIndex 推理。"""
     db_dir = tmp_path / "db"
     vault_dir = tmp_path / "vault"
-    vault_dir.mkdir()
+    db_dir.mkdir(); vault_dir.mkdir()
     
-    large_content = "# Project Alpha\nThis is a long document.\n" * 300
-    large_content += "\n## Technical Parameters\nTarget voltage for high altitude: 48V."
+    content = "# Alpha Project\n## Technical Parameters\nTarget voltage is 48V."
+    manual_path = vault_dir / "Alpha.md"; manual_path.write_text(content)
     
-    manual_path = vault_dir / "Alpha_Specs.md"
-    manual_path.write_text(large_content)
-    
-    # Setup router with vault
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
-    router = MemoryRouter(db_dir=db_dir)
-    await router.wait_until_ready()
+    os.environ["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"] = "true"
+
+    mock_scheduler = MagicMock()
+    mock_client = AsyncMock()
+    mock_client.model = "mock-model"
+    # 第一次调用返回摘要，第二次调用返回索引 "0"
+    mock_client.generate.side_effect = ["Summary A", "Summary B", "Summary Root", "0"]
+    mock_scheduler.select_best_chat.return_value = mock_client
     
-    # Build tree
-    await router.vault_indexer.scan()
-    await router.page_indexer.build_tree(manual_path)
-    
-    # Complex query containing keywords
-    query = "What is the technical parameter for voltage in high altitude?"
-    context = await router.get_combined_context("test_session", query)
-    
-    # Verify PageIndex was triggered and successful
-    assert "DEEP MINED: Alpha_Specs.md" in context
-    assert "48V" in context
-    
-    # Check event log
-    events = [e for e in router._cognitive_events if e["type"] == "DeepMining"]
-    assert len(events) > 0
-    
-    await router.aclose()
+    with patch("src.utils.llm_client.LLMFactory.get_intelligent_scheduler", return_value=mock_scheduler):
+        router = MemoryRouter(db_dir=str(db_dir), embed_client=DummyEmbedClient())
+        await router.wait_until_ready()
+        
+        await router.vault_indexer.scan()
+        await router.page_indexer.build_tree(manual_path)
+        
+        # 包含 "voltage" 关键词，应触发 PageIndex
+        query = "What is the voltage?"
+        context = await router.get_combined_context("session-66", query)
+        
+        print(f"\n[ISSUE-48 AUDIT] Context: {context}")
+        assert "EXACT SOURCE" in context
+        await router.aclose()

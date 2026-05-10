@@ -1,4 +1,4 @@
-# design/gateway.md v1.42
+# design/gateway.md v1.43
 
 ## 1. Objective
 Fully implement ClawBrain Gateway protocol adaptation for major LLM providers. Build a true "universal neural translator" ensuring every platform promised in the README can receive memory-augmented requests through ClawBrain. Simultaneously, complete the structured logging system so every neural activity is fully transparent. **P27 Update: Implement Secure Header Forwarding to prevent credential leakage (Issue #1).**
@@ -58,8 +58,12 @@ To prevent internal cognitive tasks from interfering with the main relay through
 - **Non-blocking Guarantee**: Cognitive Plane tasks must never block the Relay Plane. Failures or timeouts in the Cognitive Plane (e.g., local Ollama being offline) must fail silently or log warnings without returning 5xx errors to the user.
 - **Mock Integrity**: Tests must use URL-targeted mocking (e.g., `respx`) instead of global class patching (`unittest.mock.patch`). This ensures that mocks intended for the Relay Plane do not accidentally capture or interfere with Cognitive Plane requests.
 
+## 2.9 Anthropic SSE Reverse-Translation (Issue #47)
+- **Background**: ClawBrain acts as an OpenAI-compatible proxy. When routing requests to Anthropic models (Claude) in streaming mode, the upstream returns Anthropic's Server-Sent Events (SSE) format, which clients expect to be OpenAI format.
+- **Mechanism**: The gateway must intercept the streaming response from Anthropic.
+- **Logic**: Use `DialectTranslator.reverse_stream_anthropic_to_openai` to consume the Anthropic SSE stream and yield OpenAI-compatible `chat.completion.chunk` events.
+
 ## 3. Test Specification (TDD & High-Fidelity Audit)
-...
 
 ### 3.3 Secure Header Leak Audit (New)
 - **Audit Case**: Send a request with `x-clawbrain-session` and `Authorization`.

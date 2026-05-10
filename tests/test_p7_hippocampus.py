@@ -1,4 +1,4 @@
-# Generated from design/memory_hippocampus.md v1.5
+# Generated from design/memory_hippocampus.md v1.11 / Issue #48
 import pytest
 import os
 import shutil
@@ -6,15 +6,26 @@ import hashlib
 import json
 import sqlite3
 from pathlib import Path
-from src.memory.storage import Hippocampus
+from src.memory.storage import Hippocampus, clear_chroma_clients
+from src.utils.llm_client import EmbedClient
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "tests/data/p7_hippocampus_tmp")
+class DummyEmbedClient(EmbedClient):
+    def __init__(self):
+        super().__init__("http://dummy", "dummy")
+    def _embed(self, texts):
+        results = []
+        for text in texts:
+            vec = [0.0] * 384
+            for char in text.lower():
+                vec[ord(char) % 384] += 1.0
+            mag = sum(v*v for v in vec) ** 0.5
+            if mag > 0: vec = [v/mag for v in vec]
+            results.append(vec)
+        return results
+    async def embed(self, texts, **kwargs): return self._embed(texts)
+    def embed_sync(self, texts, **kwargs): return self._embed(texts)
 
 def visual_audit_high_fid(test_name, input_desc, expected_evidence, actual_evidence):
-    """
-    High-fidelity audit output: displays precise evidence comparison
-    """
     print(f"\n[HIGH-FIDELITY AUDIT: {test_name}]")
     print("=" * 80)
     print(f"DESCRIPTION: {input_desc}")
@@ -38,10 +49,10 @@ def visual_audit_high_fid(test_name, input_desc, expected_evidence, actual_evide
 def get_hash(data: str) -> str:
     return hashlib.sha256(data.encode('utf-8')).hexdigest()
 
-def test_p7_storage_integrity_audit():
+def test_p7_storage_integrity_audit(tmp_path):
     """Phase 7 Deep Audit: Byte consistency and SHA-256 verification after large file offloading (Fixed Bug 7)"""
-    if os.path.exists(TEST_DATA_DIR): shutil.rmtree(TEST_DATA_DIR)
-    hp = Hippocampus(db_dir=TEST_DATA_DIR)
+    clear_chroma_clients()
+    hp = Hippocampus(db_dir=str(tmp_path), embed_client=DummyEmbedClient())
     
     # Construct 1MB large file data (> 512KB)
     raw_content = "CANARY_DATA_" + "A" * (1024 * 1024)
@@ -54,48 +65,43 @@ def test_p7_storage_integrity_audit():
     # Store in Hippocampus
     res = hp.save_trace("trace-deep-audit", input_payload)
     
-    # 1. Verify checksum in the return contract (Bug 7 fix verification)
+    # 1. Verify checksum in the return contract
     system_hash = res.get("checksum")
     
-    # 2. Read the generated content from disk and calculate Hash (Physical verification)
+    # 2. Read the generated content from disk and calculate Hash
     assert res["is_blob"] is True
     with open(res["blob_path"], "r", encoding="utf-8") as f:
         on_disk_content = f.read()
         on_disk_hash = get_hash(on_disk_content)
     
-    # 3. Read the stored Hash from ChromaDB (Persistence verification)
+    # 3. Read the stored Hash from ChromaDB
     chroma_res = hp.traces_col.get(ids=["trace-deep-audit"])
     db_hash = chroma_res["metadatas"][0]["checksum"]
     
-    # High-fidelity audit display (Fixed Visual Bug: Ensure that the comparison is of the hash itself)
+    # High-fidelity audit display
     visual_audit_high_fid(
         "Storage Byte Integrity & SHA-256",
         "1MB Payload -> Blob Offloading + Hash Check",
-        expected_hash, # Pure hash for comparison
-        on_disk_hash   # Pure hash for comparison
+        expected_hash,
+        on_disk_hash
     )
     
-    # Extra print of multi-party evidence for visual review
-    print(f"DEBUG EVIDENCE: SYSTEM={system_hash[:8]}... DB={db_hash[:8]}... DISK={on_disk_hash[:8]}...")
-    
-    # Hardcore assertion: Four-way Hash must be completely consistent
-    assert system_hash == expected_hash, "Return metadata checksum mismatch"
-    assert db_hash == expected_hash, "Database persistent checksum mismatch"
-    assert on_disk_hash == expected_hash, "Physical file content checksum mismatch"
+    assert system_hash == expected_hash
+    assert db_hash == expected_hash
+    assert on_disk_hash == expected_hash
 
-def test_p7_fts_recall_precision_audit():
+def test_p7_fts_recall_precision_audit(tmp_path):
     """Phase 7 Deep Audit: Full-text search recall precision verification"""
-    hp = Hippocampus(db_dir=TEST_DATA_DIR)
+    clear_chroma_clients()
+    hp = Hippocampus(db_dir=str(tmp_path), embed_client=DummyEmbedClient())
     
-    # Simulate a high-noise environment: Store 5 useless records
     for i in range(5):
         hp.save_trace(f"noise-{i}", {"text": f"Normal system log line {i}"}, search_text=f"Normal log {i}")
     
-    # Insert target canary containing special symbols (hyphens)
     target_fact = "CRITICAL_SECURITY_EVENT: Port 22 opened by user 'admin-root'"
     hp.save_trace("target-99", {"text": target_fact}, search_text=target_fact)
     
-    # Perform search: Word with hyphens
+    # Perform search
     results = hp.search("admin-root")
     
     expected_list = "['target-99']"
@@ -108,6 +114,5 @@ def test_p7_fts_recall_precision_audit():
         actual_list
     )
     
-    # Semantic verification: target-99 MUST be the top result (highest similarity)
     assert len(results) >= 1
     assert results[0] == "target-99"

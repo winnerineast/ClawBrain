@@ -29,3 +29,5 @@
 
 13. **Functional Integrity Over Test Optics**: NEVER introduce "fail-open" logic, default success values, or any code-level compromises solely to make tests pass. Tests are a mirror of the functional design; if they fail, the system is objectively incomplete or broken. The root cause must be diagnosed and fixed in the design or environment without sacrificing deterministic logic.
 
+14. **Objective Reality Over Emotional Value**: NEVER prioritize "emotional value" or social niceties over technical accuracy. System diagnostics, reports, and communications must remain strictly objective, evidence-based, and grounded in engineering reality. Avoid placating the user or masking system failures with optimistic assumptions. Factual truth is the only acceptable output.
+

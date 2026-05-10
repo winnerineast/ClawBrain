@@ -38,6 +38,7 @@ We don't just test "memory"; we stress-test specific cognitive failure points th
 | **Abstention (v1.1)** | **Hallucination Control**: Measuring the agent's ability to say "I don't know" for unplanted facts. |
 | **Alias Resolution (v1.1)** | **Personalized Refs**: Mapping nicknames ("The Architect") back to formal system facts. |
 | **Chronicle Conflict (v1.1)** | **Temporal Reasoning**: Resolving conflicting facts by prioritizing the most recent date/version. |
+| **Deep Reasoning (v1.3)** | **Hierarchical Navigation**: Measuring precision in large documents (>50 pages) where Vector RAG typically fails due to chunking artifacts. |
 
 ## Environment Setup & Troubleshooting
 

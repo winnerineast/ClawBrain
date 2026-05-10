@@ -1,4 +1,4 @@
-# design/memory_hippocampus.md v1.10
+# design/memory_hippocampus.md v1.11
 
 ## 1. Objective
 Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This engine handles lossless persistence of interaction traces, streaming offload of large payloads to disk, and **semantic vector search** via an embedded ChromaDB instance. It also enforces byte-level integrity audit and session-isolated retrieval.
@@ -70,6 +70,12 @@ Implement the **ClawBrain Hippocampus** storage engine using **ChromaDB**. This 
   - Store facts in a dedicated `entities` collection or SQLite table.
   - **Evolution**: If a fact with the same `(session_id, entity, key)` exists, the system must **overwrite** it with the new `value` and update the `timestamp`.
   - **Traceability**: Link every fact to its source `trace_id` for provenance tracking.
+
+## 2.11 Unified Embedding Engine (Issue #48)
+- **Problem**: ChromaDB defaults to a slow CPU-based embedding model if none is provided.
+- **Mechanism**: The Hippocampus must be initialized with a custom `EmbeddingFunction`.
+- **Implementation**: Create a wrapper around `EmbedClient` (from `utils.llm_client.py`). Since ChromaDB's `EmbeddingFunction` is synchronous, the wrapper must use a synchronous version of the embedding logic (`embed_sync`).
+- **Integration**: `MemoryRouter` passes the discovered `EmbedClient` (via `LLMScheduler`) to the `Hippocampus` constructor.
 
 ## 3. Test Specification (High-Fidelity TDD)
 

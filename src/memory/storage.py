@@ -1,4 +1,4 @@
-# Generated from design/memory_hippocampus.md v1.10 / GEMINI.md Rule 12
+# Generated from design/memory_hippocampus.md v1.11 / GEMINI.md Rule 12
 import sqlite3
 import chromadb
 from chromadb.config import Settings
@@ -12,6 +12,16 @@ from typing import Dict, Any, List, Optional, Union
 from src.utils.config import get_env
 
 logger = logging.getLogger("GATEWAY.MEMORY")
+
+class ChromaEmbedWrapper(chromadb.api.types.EmbeddingFunction):
+    """v1.11: Wrapper for LLMClient.EmbedClient to satisfy ChromaDB's sync interface."""
+    def __init__(self, embed_client):
+        self.embed_client = embed_client
+
+    def __call__(self, input: chromadb.api.types.Documents) -> chromadb.api.types.Embeddings:
+        if not self.embed_client:
+            return [] # Fallback to Chroma default if none provided
+        return self.embed_client.embed_sync(input)
 
 _CHROMA_CLIENTS = {}
 
@@ -33,18 +43,30 @@ class Hippocampus:
     ClawBrain Episodic Memory Engine (SSOT).
     Rule 12: Unified session_id terminology enforced.
     """
-    def __init__(self, db_dir: str):
+    def __init__(self, db_dir: str, embed_client = None):
         self.db_dir = Path(db_dir)
         self.chroma_path = self.db_dir / "chroma"
         self.blob_dir = self.db_dir / "blobs"
         self.db_dir.mkdir(parents=True, exist_ok=True)
         self.blob_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.embed_fn = ChromaEmbedWrapper(embed_client) if embed_client else None
 
         try:
             self.client = get_chroma_client(self.chroma_path)
-            self.traces_col = self.client.get_or_create_collection(name="traces", metadata={"hnsw:space": "cosine"})
-            self.wm_col = self.client.get_or_create_collection(name="wm_state")
-            self.entities_col = self.client.get_or_create_collection(name="entities")
+            self.traces_col = self.client.get_or_create_collection(
+                name="traces", 
+                metadata={"hnsw:space": "cosine"},
+                embedding_function=self.embed_fn
+            )
+            self.wm_col = self.client.get_or_create_collection(
+                name="wm_state",
+                embedding_function=self.embed_fn
+            )
+            self.entities_col = self.client.get_or_create_collection(
+                name="entities",
+                embedding_function=self.embed_fn
+            )
             logger.info("[HIPPO] Storage stabilized (session_id unified).")
             self._startup_cleanup()
         except Exception as e:

@@ -84,45 +84,56 @@ class Pipeline:
             logger.error(f"Post-turn solidification failed: {e}")
             await mr.orphan_turn(trace_id, original_body, str(e), session_id=session_id)
 
-    async def stream_relay(self, http_client, upstream_url, body, upstream_headers, session_id, mr, original_body, trace_id) -> AsyncGenerator[bytes, None]:
-        """Phase 32: Asynchronous streaming relay with turn capture."""
+    async def stream_relay(self, http_client, upstream_url, body, upstream_headers, session_id, mr, original_body, trace_id, protocol: str = "openai") -> AsyncGenerator[bytes, None]:
+        """Phase 32: Asynchronous streaming relay with turn capture and Issue #47 SSE translation."""
         assistant_chunks = []
         is_complete = False
+        from src.gateway.translator import DialectTranslator
+        
         try:
             async with http_client.stream("POST", upstream_url, json=body, headers=upstream_headers) as resp:
-                async for chunk in resp.aiter_bytes():
-                    yield chunk
-                    try:
-                        text_data = chunk.decode("utf-8", errors="ignore").strip()
-                        for line in text_data.split('\n'):
-                            text = line.strip()
-                            if text == "data: [DONE]":
-                                is_complete = True
-                                continue
-                            if text.startswith("data:"):
-                                text = text[5:].strip()
-                            if text and text != "[DONE]":
-                                try:
-                                    data = json.loads(text)
-                                    if data.get("done"): is_complete = True
-                                    if "message" in data:
-                                        assistant_chunks.append(data["message"].get("content", ""))
-                                    elif "choices" in data and data["choices"]:
-                                        delta = data["choices"][0].get("delta", {})
-                                        assistant_chunks.append(delta.get("content", ""))
-                                        if data["choices"][0].get("finish_reason") is not None:
-                                            is_complete = True
-                                except json.JSONDecodeError: pass
-                    except Exception: pass
-            
+                # Issue #47: Use DialectTranslator for Anthropic SSE to OpenAI conversion
+                if protocol == "anthropic":
+                    stream = DialectTranslator.reverse_stream_anthropic_to_openai(resp.aiter_bytes())
+                elif protocol == "ollama":
+                    stream = DialectTranslator.reverse_stream_ollama_to_openai(resp.aiter_bytes())
+                else:
+                    # Default: yielded directly as bytes
+                    async for chunk in resp.aiter_bytes():
+                        yield chunk
+                        self._process_chunk(chunk, assistant_chunks)
+                    stream = None # Already processed
+
+                if stream:
+                    async for openai_chunk_str in stream:
+                        chunk_bytes = openai_chunk_str.encode()
+                        yield chunk_bytes
+                        self._process_chunk(chunk_bytes, assistant_chunks)
+
             assistant_final = "".join(assistant_chunks)
-            reaction = {"message": {"role": "assistant", "content": assistant_final}, "is_complete": is_complete}
-            
-            # Rule 12: Unified session_id terminology
+            reaction = {"message": {"role": "assistant", "content": assistant_final}, "is_complete": True}
             asyncio.create_task(mr.commit_turn(trace_id, original_body, reaction, session_id=session_id))
-            logger.info(f"[STREAM] Committed turn for session: {session_id} (Complete: {is_complete})")
-            
+            logger.info(f"[STREAM] Committed turn for session: {session_id}")
+
         except Exception as e:
             logger.error(f"Stream relay failed: {e}")
             await mr.orphan_turn(trace_id, original_body, str(e), session_id=session_id)
             yield f"data: {json.dumps({'error': str(e)})}\n\n".encode()
+
+    def _process_chunk(self, chunk: bytes, assistant_chunks: List[str]):
+        """Helper to extract content from standard OpenAI SSE chunks."""
+        try:
+            text_data = chunk.decode("utf-8", errors="ignore").strip()
+            for line in text_data.split('\n'):
+                text = line.strip()
+                if text.startswith("data:"):
+                    text = text[5:].strip()
+                if text and text != "[DONE]":
+                    try:
+                        data = json.loads(text)
+                        if "choices" in data and data["choices"]:
+                            delta = data["choices"][0].get("delta", {})
+                            if "content" in delta:
+                                assistant_chunks.append(delta["content"])
+                    except json.JSONDecodeError: pass
+        except Exception: pass

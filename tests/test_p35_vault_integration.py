@@ -1,15 +1,33 @@
-# Generated from design/memory_vault.md v1.0
+# Generated from design/memory_vault.md v1.1 / Issue #48
 import pytest
 import os
 import shutil
 import asyncio
 import time
 import respx
+import hashlib
 from httpx import Response
 from pathlib import Path
 from src.memory.router import MemoryRouter
 from src.memory.storage import clear_chroma_clients
+from src.utils.llm_client import EmbedClient
 from tests.vault_generator import VaultGenerator
+
+class DummyEmbedClient(EmbedClient):
+    def __init__(self):
+        super().__init__("http://dummy", "dummy")
+    def _embed(self, texts):
+        results = []
+        for text in texts:
+            vec = [0.0] * 384
+            for char in text.lower():
+                vec[ord(char) % 384] += 1.0
+            mag = sum(v*v for v in vec) ** 0.5
+            if mag > 0: vec = [v/mag for v in vec]
+            results.append(vec)
+        return results
+    async def embed(self, texts, **kwargs): return self._embed(texts)
+    def embed_sync(self, texts, **kwargs): return self._embed(texts)
 
 def visual_audit(test_name, step, expected, actual):
     match = "YES" if str(expected) == str(actual) else "NO"
@@ -40,7 +58,7 @@ async def test_p35_vault_change_detection_matrix(tmp_path):
     
     # 2. Initialize Router with AUTO-SCAN DISABLED to ensure order
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
-    router = MemoryRouter(db_dir=str(db_dir), enable_room_detection=False, enable_auto_scan=False)
+    router = MemoryRouter(db_dir=str(db_dir), enable_room_detection=False, enable_auto_scan=False, embed_client=DummyEmbedClient())
     await router.wait_until_ready()
     
     # TC_ZERO: Initial Scan (Manual)
@@ -78,7 +96,7 @@ async def test_p35_vault_change_detection_matrix(tmp_path):
 async def test_p35_vault_retrieval_priority(tmp_path):
     """Verifies that vault knowledge is retrieved semantically and placed correctly."""
     # Mock Judge (Cognitive Judge v1.4)
-    respx.post("http://localhost:1234/chat/completions").mock(return_value=Response(200, json={
+    respx.post("http://localhost:1234/v1/chat/completions").mock(return_value=Response(200, json={
         "choices": [{"message": {"content": "YES"}}]
     }))
     
@@ -94,7 +112,7 @@ async def test_p35_vault_retrieval_priority(tmp_path):
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
     os.environ["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"] = "true"
     # Disable auto-scan to control indexing time
-    router = MemoryRouter(db_dir=str(db_dir), enable_room_detection=False, enable_auto_scan=False)
+    router = MemoryRouter(db_dir=str(db_dir), enable_room_detection=False, enable_auto_scan=False, embed_client=DummyEmbedClient())
     await router.wait_until_ready()
     await router.vault_indexer.scan()
     

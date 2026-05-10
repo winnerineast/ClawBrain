@@ -1,4 +1,4 @@
-# Generated from design/memory_vault.md v1.0
+# Generated from design/memory_vault.md v1.1 / GEMINI.md Rule 12
 import os
 import json
 import hashlib
@@ -8,7 +8,7 @@ import asyncio
 from pathlib import Path
 from typing import Dict, Any, List
 import chromadb
-from src.memory.storage import get_chroma_client
+from src.memory.storage import get_chroma_client, ChromaEmbedWrapper
 
 logger = logging.getLogger("GATEWAY.MEMORY.VAULT")
 
@@ -16,18 +16,22 @@ class VaultIndexer:
     """
     Incremental Vault Indexer with mtime + hash change detection.
     Runs in the Cognitive Plane to sync local markdown files to ChromaDB.
+    v1.1: Support for custom EmbedClient.
     """
     
-    def __init__(self, vault_path: str, db_dir: Path, client: chromadb.PersistentClient):
+    def __init__(self, vault_path: str, db_dir: Path, client: chromadb.PersistentClient, embed_client = None):
         self.vault_path = Path(vault_path)
         self.db_dir = db_dir
         self.client = client
         self.state_file = self.db_dir / "vault_state.json"
         
+        self.embed_fn = ChromaEmbedWrapper(embed_client) if embed_client else None
+
         # Collection for vault knowledge
         self.collection = self.client.get_or_create_collection(
             name="vault_knowledge",
-            metadata={"hnsw:space": "cosine"}
+            metadata={"hnsw:space": "cosine"},
+            embedding_function=self.embed_fn
         )
         
         self.state = self._load_state()

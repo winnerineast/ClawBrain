@@ -1,4 +1,4 @@
-# Generated from design/memory_neocortex.md v1.3 / GEMINI.md Rule 12
+# Generated from design/memory_neocortex.md v1.4 / GEMINI.md Rule 12
 import sqlite3
 import chromadb
 import httpx
@@ -8,17 +8,16 @@ import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from src.memory.storage import get_chroma_client
-from src.utils.llm_client import LLMFactory, LLMClient
+from src.utils.llm_client import LLMFactory, ChatClient
 from src.utils.config import get_env
 
 class Neocortex:
     """
     ClawBrain Semantic Distillation Engine.
-    Implements L6b Value Modulation and TasteGuard Belief Anchors.
-    Rule 12: Unified session_id terminology enforced.
+    v1.4: Updated to use unified ChatClient and LLMFactory.
     """
     def __init__(self, db_dir: str = None, distill_url: str = None, distill_model: str = None, 
-                 distill_provider: str = None, client: httpx.AsyncClient = None):
+                 distill_provider: str = None):
         if db_dir is None:
             db_dir = get_env("CLAWBRAIN_DB_DIR", os.path.join(os.getcwd(), "data"))
             
@@ -33,19 +32,17 @@ class Neocortex:
         # Legacy DB path
         self.db_path = self.db_dir / "hippocampus.db"
         
-        # Distillation Config (Strict Priority: Arg > Env > Standard)
-        self.distill_url = distill_url or get_env("CLAWBRAIN_DISTILL_URL", "http://127.0.0.1:11434")
-        self.distill_model = distill_model or get_env("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
-        self.distill_provider = distill_provider or get_env("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
+        # Distillation Config
+        self.url = distill_url or get_env("CLAWBRAIN_DISTILL_URL", "http://127.0.0.1:11434")
+        self.model = distill_model or get_env("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
+        self.provider = distill_provider or get_env("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
         self.api_key = get_env("CLAWBRAIN_DISTILL_API_KEY", "")
         
-        # Decoupled LLM Client
-        self.llm = LLMFactory.get_client(self.distill_provider, self.distill_url, self.distill_model, self.api_key)
+        # v1.4: Use unified ChatClient
+        self.llm = LLMFactory.get_chat_client(self.provider, self.url, self.model, self.api_key)
 
         self._judge_cache = {}
         self._cache_lock = asyncio.Lock()
-
-        # Phase 65: Taste Profile (L6b/TasteGuard Anchor)
         self.taste_profile = get_env("CLAWBRAIN_TASTE_PROFILE", "Strict technical accuracy. No conversational filler.")
 
     async def distill(self, session_id: str, traces: List[Dict[str, Any]]) -> str:
@@ -82,7 +79,6 @@ class Neocortex:
         return summary or "[Error] Empty summary."
 
     def _save_summary(self, session_id: str, summary: str):
-        """Phase 33: Summary persistence in ChromaDB."""
         self.summary_col.upsert(
             ids=[session_id],
             documents=[summary],
@@ -95,12 +91,9 @@ class Neocortex:
         return None
 
     def clear_summary(self, session_id: str):
-        """P17 Management API: Clear Neocortex summary."""
         self.summary_col.delete(ids=[session_id])
 
     async def verify_relevance(self, query: str, context_sample: str) -> bool:
-        """Phase 55: Cognitive Judge (v1.3)."""
-        # Figure Justification: Judge prompt optimized for broad semantic linkage.
         instruction = (
             "You are a Grounding Judge. Decide if the CONTEXT contains information relevant to the USER QUERY.\n"
             "Be generous: if there is a logical or technical connection, respond with 'YES'.\n"

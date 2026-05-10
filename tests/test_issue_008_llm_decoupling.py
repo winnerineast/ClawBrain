@@ -8,7 +8,7 @@ from httpx import Response
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.utils.llm_client import HardwareProfiler, LLMFactory, OllamaClient, OpenAIClient
+from src.utils.llm_client import HardwareProfiler, LLMFactory, OllamaChatClient, OpenAIChatClient, EmbedClient, OllamaEmbedClient
 from src.utils.config import get_env
 
 # --- Environment Detection ---
@@ -35,16 +35,23 @@ def test_hardware_profiler_tier_logic():
 
 def test_model_selection_v1_2_logic():
     """Verify model selection picks optimized versions (35b, 9b, etc.)."""
-    models = ["llama3:70b", "qwen3.6:35b", "qwen3.5:9b", "phi3:3b"]
+    from src.utils.llm_client import LLMScheduler, LLMFactory
+    scheduler = LLMScheduler()
+    scheduler.chat_pool = [
+        LLMFactory.get_chat_client("ollama", "url", "llama3:70b"),
+        LLMFactory.get_chat_client("ollama", "url", "qwen3.6:35b"),
+        LLMFactory.get_chat_client("ollama", "url", "qwen3.5:9b"),
+        LLMFactory.get_chat_client("ollama", "url", "phi3:3b"),
+    ]
     
     with patch("src.utils.llm_client.HardwareProfiler.get_tier") as mock_tier:
         mock_tier.return_value = 1
-        best = HardwareProfiler.pick_best_model(models)
-        assert "35b" in best.lower() or "70b" in best.lower()
+        best = scheduler.select_best_chat(role="brain")
+        assert "35b" in best.model.lower() or "70b" in best.model.lower()
         
         mock_tier.return_value = 2
-        best = HardwareProfiler.pick_best_model(models)
-        assert "9b" in best.lower()
+        best = scheduler.select_best_chat(role="brain")
+        assert "9b" in best.model.lower()
 
 # --- 2. Advanced Parameter Pass-through Verification ---
 
@@ -54,7 +61,7 @@ async def test_ollama_parameter_translation():
     """Verify that OllamaClient correctly translates kwargs into 'options'."""
     respx.post("http://localhost:11434/api/generate").mock(return_value=Response(200, json={"response": "OK"}))
     
-    client = OllamaClient("http://localhost:11434", "m1")
+    client = OllamaChatClient("http://localhost:11434", "m1")
     await client.generate("Hi", temperature=0.7, max_tokens=500)
     
     sent_json = json.loads(respx.calls.last.request.content)
@@ -70,29 +77,21 @@ async def test_openai_v1_path_alignment():
         "choices": [{"message": {"content": "V1 OK"}}]
     }))
     
-    client = OpenAIClient("http://localhost:1234", "m2")
+    client = OpenAIChatClient("http://localhost:1234", "m2")
     res = await client.generate("Hi")
     assert res == "V1 OK"
 
 # --- 3. Cross-OS Auto-Configuration Verification (No Mocking Logic) ---
 
-@pytest.mark.asyncio
 def test_llm_factory_os_defaults():
-    """Verify that LLMFactory chooses proper defaults based on real OS when env is missing."""
+    """Verify that LLMFactory chooses proper defaults when env is missing."""
     # We use a clean env state for this test
     with patch.dict(os.environ, {}, clear=True), \
          patch("src.utils.config.get_env", return_value=None):
         
         client = LLMFactory.from_env()
-        
-        if IS_MACOS:
-            # On macOS, it should default to OpenAI-compatible (OMLX) on 8080
-            assert isinstance(client, OpenAIClient)
-            assert "8080" in client.url
-        else:
-            # On Linux/Other, it should default to Ollama on 11434
-            assert isinstance(client, OllamaClient)
-            assert "11434" in client.url
+        assert isinstance(client, OllamaChatClient)
+        assert "11434" in client.url
 
 # --- 4. The "Gold Standard" Cross-Platform Scenario ---
 
@@ -137,3 +136,12 @@ async def test_gold_standard_ubuntu_ollama_config():
         
         res = await client.generate("Question")
         assert res == "Reasoned via Ollama"
+
+def test_llmscheduler_embedding_role():
+    from src.utils.llm_client import LLMScheduler
+    scheduler = LLMScheduler()
+    scheduler.embed_pool = [OllamaEmbedClient("http://localhost:11434", "nomic-embed")]
+    
+    best = scheduler.select_best_chat(role="embedding")
+    assert isinstance(best, EmbedClient)
+    assert best.model == "nomic-embed"

@@ -324,7 +324,7 @@ async def gateway_relay(path: str, request: Request):
     try:
         if body.get("stream", False):
             return StreamingResponse(
-                pipe.stream_relay(hc, url, enriched_body, headers, session_id, mr, body, trace_id),
+                pipe.stream_relay(hc, url, enriched_body, headers, session_id, mr, body, trace_id, protocol=provider_config.protocol),
                 media_type="text/event-stream"
             )
         else:

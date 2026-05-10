@@ -66,3 +66,22 @@ def test_p13_anthropic_system_mapping():
     visual_audit("System Field Mapping", "System msg to Top-level", expected, payload)
     assert payload["system"] == "Admin Mode"
     assert len(payload["messages"]) == 1
+
+@pytest.mark.asyncio
+async def test_p13_anthropic_sse_reverse_translation():
+    """Verify: Anthropic SSE events are correctly mapped to OpenAI chunks"""
+    from typing import AsyncGenerator
+    async def mock_stream() -> AsyncGenerator[bytes, None]:
+        yield b'event: content_block_delta\ndata: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "Hello"}}\n\n'
+        yield b'event: message_stop\ndata: {"type": "message_stop"}\n\n'
+        
+    chunks = []
+    async for chunk in DialectTranslator.reverse_stream_anthropic_to_openai(mock_stream()):
+        chunks.append(chunk)
+        
+    actual = {"chunks_count": len(chunks), "first_chunk_text": "Hello" if "Hello" in chunks[0] else ""}
+    expected = {"chunks_count": 2, "first_chunk_text": "Hello"}
+    visual_audit("Anthropic SSE Translation", "Map content_block_delta", expected, actual)
+    assert actual["chunks_count"] == 2
+    assert "Hello" in chunks[0]
+    assert "[DONE]" in chunks[1]
