@@ -120,6 +120,26 @@ async def test_p18_wm_session_isolation(tmp_path):
 @respx.mock
 async def test_p18_get_combined_context_isolated(tmp_path):
     """get_combined_context is isolated by session; A's context does not contain B's content"""
+    import re
+    import json
+    
+    def mock_embeddings(request):
+        try:
+            body = json.loads(request.content)
+            inp = body.get("input", "")
+            if isinstance(inp, list):
+                num_embeddings = len(inp)
+            else:
+                num_embeddings = 1
+        except Exception:
+            num_embeddings = 1
+        
+        embeddings = [[0.1] * 768 for _ in range(num_embeddings)]
+        data = [{"embedding": [0.1] * 768} for _ in range(num_embeddings)]
+        return Response(200, json={"embeddings": embeddings, "data": data})
+
+    respx.post(re.compile(r".*/api/embed|.*/v1/embeddings")).mock(side_effect=mock_embeddings)
+
     # Mock Judge (Cognitive Judge v1.4)
     respx.post("http://localhost:1234/chat/completions").mock(return_value=Response(200, json={
         "choices": [{"message": {"content": "YES"}}]

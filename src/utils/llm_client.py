@@ -1,4 +1,5 @@
-# Generated from design/model_decoupling.md v1.8
+# Generated from design/model_decoupling.md v1.3
+# Generated-by: 20260522-ISSUE-009-DesignSourceAlignment
 import os
 import httpx
 import logging
@@ -48,12 +49,39 @@ class HardwareProfiler:
         if vram >= 15: return 2
         return 3
 
+    @staticmethod
+    def pick_best_model(models: List[str]) -> str:
+        """Picks the best chat/reasoning model from a list of model names."""
+        if not models:
+            return ""
+        # Filter out models that look like embedding models
+        chat_models = [m for m in models if "embed" not in m.lower()]
+        if not chat_models:
+            chat_models = models # fallback
+        
+        # Sort based on size (heuristically parsing size or preferring instruct/chat models)
+        def model_priority(name: str) -> Tuple[int, float]:
+            name_lower = name.lower()
+            # 1. Prefer chat/instruct/latest models
+            pref = 0
+            if "chat" in name_lower or "instruct" in name_lower or "latest" in name_lower:
+                pref += 1
+            # 2. Parse size in B
+            match = re.search(r'([0-9.]+)[Bb]', name)
+            size = float(match.group(1)) if match else 7.0
+            return (pref, size)
+            
+        chat_models.sort(key=model_priority, reverse=True)
+        return chat_models[0]
+
 class BaseClient:
     def __init__(self, url: str, model: str, api_key: str = "", timeout: float = 60.0):
         self.url = url.rstrip('/')
         self.model = model
         self.api_key = api_key
-        self.timeout = timeout
+        # Check for environment override for timeout to accommodate slow/deep reasoning models
+        env_timeout = get_env("CLAWBRAIN_LLM_TIMEOUT")
+        self.timeout = float(env_timeout) if env_timeout else timeout
         self.size_b = self._parse_size(model)
 
     def _parse_size(self, name: str) -> float:
@@ -124,6 +152,9 @@ class ChatClient(BaseClient):
     """Unified interface for text generation."""
     async def generate(self, prompt: str, system: str = None, **kwargs) -> str:
         raise NotImplementedError
+
+    async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
+        raise NotImplementedError
     
     async def check_health(self) -> bool:
         try:
@@ -146,6 +177,21 @@ class OllamaChatClient(ChatClient):
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.post(url, json=payload)
                 return resp.json().get("response", "")
+        except: return ""
+
+    async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
+        url = f"{self.url}/api/chat"
+        payload = {
+            "model": self.model, "messages": messages, "stream": False,
+            "options": {
+                "temperature": kwargs.get("temperature", 0.1),
+                "num_predict": kwargs.get("max_tokens", 2000)
+            }
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.post(url, json=payload)
+                return resp.json().get("message", {}).get("content", "")
         except: return ""
 
 class OpenAIChatClient(ChatClient):
@@ -182,6 +228,27 @@ class OpenAIChatClient(ChatClient):
             logger.error(f"[LLM_ERR] OpenAI call failed: {e}")
             return ""
 
+    async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
+        url = f"{self.url}/v1/chat/completions"
+        payload = {
+            "model": self.model, 
+            "messages": messages, 
+            "stream": False, 
+            "temperature": kwargs.get("temperature", 0.1),
+            "max_tokens": kwargs.get("max_tokens", 2000)
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                data = resp.json().get("choices", [{}])[0].get("message", {})
+                content = data.get("content", "")
+                reasoning = data.get("reasoning_content", "")
+                return content or reasoning or ""
+        except Exception as e:
+            logger.error(f"[LLM_ERR] OpenAI chat call failed: {e}")
+            return ""
+
 class LLMScheduler:
     def __init__(self):
         self.chat_pool: List[ChatClient] = []
@@ -192,8 +259,11 @@ class LLMScheduler:
             ("openai", "http://localhost:8080"),
             ("openai", "http://localhost:1234"),
             ("ollama", "http://localhost:11434"),
+            ("openai", "http://localhost:8000"),  # vLLM
+            ("openai", "http://localhost:30000"), # sglang
         ]
         self.chat_pool = []
+        self.embed_pool = []
         for provider, url in hosters:
             try:
                 path = "/api/tags" if provider == "ollama" else "/v1/models"
@@ -209,29 +279,51 @@ class LLMScheduler:
                                 self.chat_pool.append(LLMFactory.get_chat_client(provider, url, m))
             except: continue
 
-    def select_best_chat(self, role: str = "brain") -> Union[ChatClient, EmbedClient]:
+    async def select_best_chat(self, role: str = "brain") -> Union[ChatClient, EmbedClient]:
         if role == "embedding":
             if self.embed_pool:
                 return self.embed_pool[0]
             # fallback to default
             return LLMFactory.get_embed_client("ollama", get_env("CLAWBRAIN_DISTILL_URL", "http://localhost:11434"), "nomic-embed-text")
 
-        if not self.chat_pool: return LLMFactory.from_env()
+        if not self.chat_pool:
+            client = LLMFactory.from_env()
+            if await client.check_health():
+                return client
+            return client
+
         sorted_by_size = sorted(self.chat_pool, key=lambda x: x.size_b)
-        
         tier = HardwareProfiler.get_tier()
+        
         if role == "worker":
             # Tier-aware worker selection (7B+ preferred for logic)
             if tier <= 2:
                 eligible = [c for c in sorted_by_size if 7 <= c.size_b <= 15]
-                if eligible: return eligible[0]
+            else:
+                eligible = []
+                
+            # Perform pre-flight health checks
+            for c in eligible:
+                if await c.check_health():
+                    return c
+            for c in sorted_by_size:
+                if await c.check_health():
+                    return c
             return sorted_by_size[0]
         
         # Brain selection
         if tier == 1: eligible = [c for c in sorted_by_size if c.size_b <= 72]
         elif tier == 2: eligible = [c for c in sorted_by_size if c.size_b <= 15]
-        else: return sorted_by_size[0]
-        return eligible[-1] if eligible else sorted_by_size[0]
+        else: eligible = []
+        
+        # Perform pre-flight health checks
+        for c in reversed(eligible):
+            if await c.check_health():
+                return c
+        for c in reversed(sorted_by_size):
+            if await c.check_health():
+                return c
+        return sorted_by_size[-1] if sorted_by_size else LLMFactory.from_env()
 
 class LLMFactory:
     @staticmethod

@@ -1,4 +1,4 @@
-# Generated from design/gateway.md v1.42 / design/management_api.md v1.2 / GEMINI.md Rule 12
+# Generated from design/gateway.md v1.44 / design/management_api.md v1.3 / design/architecture.md v1.2 / GEMINI.md Rule 12
 import json
 import httpx
 import logging
@@ -18,7 +18,7 @@ from src.gateway.registry import ProviderRegistry
 from src.gateway.detector import ProtocolDetector
 from src.gateway.translator import DialectTranslator
 from src.pipeline import Pipeline
-from src.models import Message
+from src.models import Message, StandardRequest
 from src.utils.config import get_env
 from mcp.server.sse import SseServerTransport
 from src.mcp_server import create_mcp_server
@@ -100,25 +100,36 @@ def prepare_upstream_headers(raw_headers: Dict[str, str], provider_config: Any, 
     upstream_headers = {}
     for k, v in raw_headers.items():
         kl = k.lower()
-        if kl in INTERNAL_SENSITIVE_HEADERS or kl.startswith("x-clawbrain-"):
+        # P27: Secure Header Forwarding - Strip internal and sensitive headers
+        if kl.startswith("x-clawbrain-") or kl in INTERNAL_SENSITIVE_HEADERS:
             continue
         upstream_headers[k] = v
 
+    # Controlled Auth Forwarding
     client_auth = upstream_headers.pop("Authorization", None) or upstream_headers.pop("authorization", None)
+    client_api_key = upstream_headers.pop("x-api-key", None) or upstream_headers.pop("X-Api-Key", None)
 
     if provider_config.api_key:
+        # Priority 1: Static Override from Registry
         if target_protocol == "anthropic":
             upstream_headers["x-api-key"] = provider_config.api_key
         else:
             upstream_headers["Authorization"] = f"Bearer {provider_config.api_key}"
-    elif client_auth:
-        upstream_headers["Authorization"] = client_auth
+    else:
+        # Priority 2: Transparent Relay with Protocol matching
+        if target_protocol == "anthropic":
+            if client_api_key:
+                upstream_headers["x-api-key"] = client_api_key
+        elif target_protocol in ["openai", "google", "mistral", "together"]:
+            if client_auth:
+                upstream_headers["Authorization"] = client_auth
+        # Ollama protocol removes all auth by default (implicit)
 
     return upstream_headers
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "1.42", "engine": "ClawBrain (session_id unified)"}
+    return {"status": "ok", "version": "1.44", "engine": "ClawBrain (session_id unified)"}
 
 @app.get("/v1/status")
 async def get_status(request: Request):
@@ -272,6 +283,42 @@ async def get_events(request: Request, session_id: Optional[str] = None, limit: 
         events = [e for e in events if not e.get("data") or e["data"].get("session_id") == session_id or e["data"].get("session_id") is None]
     return {"events": events[-limit:]}
 
+@app.get("/v1/management/config/taste")
+async def get_taste_profile(request: Request):
+    check_ready(request.app)
+    mr = request.app.state.memory_router
+    return {"taste_profile": mr.neo.taste_profile}
+
+@app.post("/v1/management/config/taste")
+async def set_taste_profile(request: Request):
+    check_ready(request.app)
+    body = await request.json()
+    new_profile = body.get("taste_profile")
+    if not new_profile:
+        raise HTTPException(status_code=400, detail="Missing 'taste_profile' field")
+    
+    mr = request.app.state.memory_router
+    # 1. Update in-memory
+    mr.neo.taste_profile = new_profile
+    
+    # 2. Persist to .env
+    from pathlib import Path
+    env_path = Path.cwd() / ".env"
+    existing = {}
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                existing[k.strip()] = v.strip()
+    
+    existing["CLAWBRAIN_TASTE_PROFILE"] = f'"{new_profile}"'
+    
+    sorted_keys = sorted(existing.keys())
+    lines = [f"{k}={existing[k]}" for k in sorted_keys]
+    env_path.write_text("\n".join(lines) + "\n")
+    
+    return {"status": "success", "active_profile": new_profile}
+
 @app.get("/dashboard")
 async def serve_dashboard():
     return HTMLResponse(content=DASHBOARD_HTML)
@@ -288,6 +335,17 @@ async def ingest_v1(request: Request):
     stimulus = {"messages": [{"role": "user", "content": body.get("content", "")}]}
     tid = await mr.ingest(stimulus, session_id=session_id)
     return {"trace_id": tid, "status": "ingested"}
+
+async def mcp_router(scope, receive, send):
+    app, path = scope["app"], scope["path"]
+    if app.state.engine_state != EngineState.READY: return
+    if path == "/mcp/sse":
+        async with app.state.mcp_sse.connect_sse(scope, receive, send) as (r_str, w_str):
+            await app.state.mcp_server.run(r_str, w_str, app.state.mcp_server.create_initialization_options())
+    elif path == "/mcp/messages": 
+        await app.state.mcp_sse.handle_post_message(scope, receive, send)
+
+app.mount("/mcp", mcp_router)
 
 @app.post("/{path:path}")
 async def gateway_relay(path: str, request: Request):
@@ -316,7 +374,22 @@ async def gateway_relay(path: str, request: Request):
     enriched_body = DialectTranslator.inject_context(input_protocol, body, context)
     mr._last_injections[session_id] = enriched_body
     
-    # 3. Execution
+    # 3. Protocol Translation (Unified Conversion Logic)
+    try:
+        std_req = StandardRequest(**enriched_body)
+        if provider_config.protocol == "anthropic":
+            final_body = DialectTranslator.to_anthropic(std_req)
+        elif provider_config.protocol == "google":
+            final_body = DialectTranslator.to_google(std_req)
+        elif provider_config.protocol == "openai":
+            final_body = DialectTranslator.to_openai(std_req)
+        else:
+            final_body = enriched_body # ollama or default
+    except Exception as e:
+        logger.error(f"[GATEWAY] Standardization failed for {full_model_name}: {e}")
+        final_body = enriched_body
+
+    # 4. Execution
     headers = prepare_upstream_headers(request.headers, provider_config, provider_config.protocol)
     trace_id = await mr.pre_turn_pending(body, session_id=session_id)
     url = f"{provider_config.base_url}/{path.lstrip('/')}"
@@ -324,25 +397,14 @@ async def gateway_relay(path: str, request: Request):
     try:
         if body.get("stream", False):
             return StreamingResponse(
-                pipe.stream_relay(hc, url, enriched_body, headers, session_id, mr, body, trace_id, protocol=provider_config.protocol),
+                pipe.stream_relay(hc, url, final_body, headers, session_id, mr, body, trace_id, protocol=provider_config.protocol),
                 media_type="text/event-stream"
             )
         else:
-            resp = await hc.post(url, json=enriched_body, headers=headers)
+            resp = await hc.post(url, json=final_body, headers=headers)
             final_json = resp.json()
             await pipe.post_turn_solidification(final_json, input_protocol, session_id, mr, body, trace_id)
             return final_json
     except Exception as e:
         await mr.orphan_turn(trace_id, body, str(e), session_id=session_id)
         raise HTTPException(status_code=502, detail=str(e))
-
-async def mcp_router(scope, receive, send):
-    app, path = scope["app"], scope["path"]
-    if app.state.engine_state != EngineState.READY: return
-    if path == "/mcp/sse":
-        async with app.state.mcp_sse.connect_sse(scope, receive, send) as (r_str, w_str):
-            await app.state.mcp_server.run(r_str, w_str, app.state.mcp_server.create_initialization_options())
-    elif path == "/mcp/messages": 
-        await app.state.mcp_sse.handle_post_message(scope, receive, send)
-
-app.mount("/mcp", mcp_router)

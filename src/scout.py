@@ -1,4 +1,4 @@
-# Generated from design/gateway.md v1.32
+# Generated from design/gateway.md v1.43
 import re
 import httpx
 import logging

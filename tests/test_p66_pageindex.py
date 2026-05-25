@@ -1,97 +1,95 @@
-# Generated from design/memory_pageindex.md v1.0 / Issue #48
+# Generated from design/memory_pageindex.md v1.0
 import pytest
 import os
 import asyncio
 import hashlib
 import json
 from pathlib import Path
-from unittest.mock import patch, AsyncMock, MagicMock
 from src.memory.router import MemoryRouter
-from src.utils.llm_client import EmbedClient
-
-class DummyEmbedClient(EmbedClient):
-    def __init__(self):
-        super().__init__("http://dummy", "dummy")
-    def _embed(self, texts):
-        results = []
-        for text in texts:
-            vec = [0.0] * 384
-            for char in text.lower():
-                vec[ord(char) % 384] += 1.0
-            mag = sum(v*v for v in vec) ** 0.5
-            if mag > 0: vec = [v/mag for v in vec]
-            results.append(vec)
-        return results
-    async def embed(self, texts, **kwargs): return self._embed(texts)
-    def embed_sync(self, texts, **kwargs): return self._embed(texts)
+from src.utils.llm_client import LLMFactory
 
 @pytest.mark.asyncio
-async def test_pageindexer_tree_generation(tmp_path):
-    """验证 PageIndexer 能够为大文件构建层级树。"""
+async def test_pageindexer_tree_generation_real(tmp_path):
+    """
+    [NO-MOCK] Verify that PageIndexer builds a hierarchical tree using the REAL local LLM.
+    """
     db_dir = tmp_path / "db"
     vault_dir = tmp_path / "vault"
     db_dir.mkdir(); vault_dir.mkdir()
     
-    large_content = "# System Overview\n" + "Intro content.\n" * 10
-    large_content += "\n## Power Specs\n" + "Voltage: 12V DC.\n" * 5
-    manual_path = vault_dir / "Manual.md"; manual_path.write_text(large_content)
+    # Create a complex markdown file > 5000 chars to trigger deep indexing
+    large_content = "# System Overview\n" + "This platform provides a neural relay for AI memory.\n" * 20
+    large_content += "\n## Component A: The Relay\n" + "Handles real-time traffic and proxying.\n" * 10
+    large_content += "\n## Component B: The Brain\n" + "Handles background distillation and reasoning.\n" * 10
     
+    manual_path = vault_dir / "System_Spec.md"
+    manual_path.write_text(large_content)
+    
+    # Setup environment for the router
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
     
-    # 模拟 Scheduler 和 Client
-    mock_scheduler = MagicMock()
-    mock_client = AsyncMock()
-    mock_client.generate.return_value = "Mocked Summary"
-    mock_client.model = "mock-model"
-    mock_scheduler.select_best_chat.return_value = mock_client
+    router = MemoryRouter(db_dir=str(db_dir))
+    await router.wait_until_ready()
     
-    # 注意：PageIndexer 内部会调用 get_intelligent_scheduler
-    with patch("src.utils.llm_client.LLMFactory.get_intelligent_scheduler", return_value=mock_scheduler):
-        router = MemoryRouter(db_dir=str(db_dir), embed_client=DummyEmbedClient())
-        await router.wait_until_ready()
-        
-        await router.vault_indexer.scan()
-        await router.page_indexer.build_tree(manual_path)
-        
-        index_files = list((db_dir / "pageindex").glob("*.json"))
-        assert len(index_files) == 1
-        
-        tree = json.loads(index_files[0].read_text())
-        assert tree["title"] == "Manual.md"
-        assert len(tree["children"]) >= 1
-        await router.aclose()
+    # 1. Trigger vault scan to detect the new file
+    await router.vault_indexer.scan()
+    
+    # 2. Trigger PageIndex build tree (This will call the real local LLM)
+    # Note: We call it directly here to verify success, although the scan loop would also trigger it.
+    file_hash = await router.page_indexer.build_tree(manual_path)
+    assert file_hash != ""
+    
+    # 3. Verify JSON persistence
+    index_files = list((db_dir / "pageindex").glob("*.json"))
+    assert len(index_files) == 1
+    
+    tree = json.loads(index_files[0].read_text())
+    assert tree["title"] == "System_Spec.md"
+    assert len(tree["children"]) >= 2
+    assert tree["summary"] != ""
+    assert "[FAILED_INDEX]" not in tree["summary"]
+    
+    print(f"\n[PAGEINDEX REAL AUDIT] Tree built successfully for {tree['title']}")
+    print(f"Summary: {tree['summary'][:100]}...")
+    
+    await router.aclose()
 
 @pytest.mark.asyncio
-async def test_hybrid_routing_pageindex(tmp_path):
-    """验证复杂查询能够触发 PageIndex 推理。"""
+async def test_hybrid_routing_pageindex_real(tmp_path):
+    """
+    [NO-MOCK] Verify that complex queries trigger PageIndex reasoning using the REAL local LLM.
+    """
     db_dir = tmp_path / "db"
     vault_dir = tmp_path / "vault"
     db_dir.mkdir(); vault_dir.mkdir()
     
-    content = "# Alpha Project\n## Technical Parameters\nTarget voltage is 48V."
-    manual_path = vault_dir / "Alpha.md"; manual_path.write_text(content)
+    # Precise fact in a large file
+    content = "# Project X Technical Manual\n" + "Filler text to make the file large enough.\n" * 150
+    content += "\n## Critical Parameters\n"
+    content += "The maximum operating temperature for the main CPU is **85.5C**."
+    
+    manual_path = vault_dir / "ProjectX.md"
+    manual_path.write_text(content)
     
     os.environ["CLAWBRAIN_VAULT_PATH"] = str(vault_dir)
-    os.environ["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"] = "true"
-
-    mock_scheduler = MagicMock()
-    mock_client = AsyncMock()
-    mock_client.model = "mock-model"
-    # 第一次调用返回摘要，第二次调用返回索引 "0"
-    mock_client.generate.side_effect = ["Summary A", "Summary B", "Summary Root", "0"]
-    mock_scheduler.select_best_chat.return_value = mock_client
+    os.environ["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"] = "true" # Focus on retrieval, not judge
     
-    with patch("src.utils.llm_client.LLMFactory.get_intelligent_scheduler", return_value=mock_scheduler):
-        router = MemoryRouter(db_dir=str(db_dir), embed_client=DummyEmbedClient())
-        await router.wait_until_ready()
-        
-        await router.vault_indexer.scan()
-        await router.page_indexer.build_tree(manual_path)
-        
-        # 包含 "voltage" 关键词，应触发 PageIndex
-        query = "What is the voltage?"
-        context = await router.get_combined_context("session-66", query)
-        
-        print(f"\n[ISSUE-48 AUDIT] Context: {context}")
-        assert "EXACT SOURCE" in context
-        await router.aclose()
+    router = MemoryRouter(db_dir=str(db_dir))
+    await router.wait_until_ready()
+    
+    # Indexing
+    await router.vault_indexer.scan()
+    await router.page_indexer.build_tree(manual_path)
+    
+    # Complex query containing keywords to trigger PageIndex
+    query = "What is the maximum operating temperature for the CPU in Project X?"
+    context = await router.get_combined_context("session-real-test", query)
+    
+    print(f"\n[HYBRID ROUTER REAL AUDIT] Query: {query}")
+    print(f"Enriched Context Result: {context}")
+    
+    # Assertions
+    assert "EXACT SOURCE" in context
+    assert "85.5" in context
+    
+    await router.aclose()

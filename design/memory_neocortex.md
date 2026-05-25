@@ -1,48 +1,42 @@
-# design/memory_neocortex.md v1.2
+# design/memory_neocortex.md v1.5
 
 ## 1. Objective
-Implement the **ClawBrain Neocortex** engine from scratch. This engine is responsible for asynchronously consolidating verbose episodic memories from the Hippocampus into refined semantic memories (knowledge summaries), while providing "visible semantic audit" capability.
+Implement the **ClawBrain Neocortex** engine from scratch. This engine is responsible for asynchronously consolidating verbose episodic memories from the Hippocampus into refined semantic memories (knowledge summaries), while providing "visible semantic audit" capability. **v1.4: Refactored to use ChromaDB for persistent summaries and LLMFactory for provider-agnostic distillation.** **v1.5: Expose the distill_url attribute to maintain compatibility with test suites.**
 
 ## 2. Architecture
 
 ### 2.1 Data & Storage Model
 - **Dependencies**: 
-  - `db_dir`: Directory for SQLite storage.
-  - `distill_url`: Base URL for the distillation provider (default: `http://127.0.0.1:11434` for Ollama or `http://127.0.0.1:8080/v1` for OpenAI-compatible local servers).
+  - `db_dir`: Root directory for storage.
+  - `chroma_path`: Sub-directory (`db_dir/chroma`) for ChromaDB persistence.
+  - `distill_url`: Base URL for the distillation provider.
   - `distill_model`: Model name for distillation.
   - `distill_provider`: Protocol type (`ollama` or `openai-compatible`).
-- **Storage table (`neocortex_summaries`)**:
-  - `session_id` (TEXT PRIMARY KEY)
-  - `summary_text` (TEXT)
-  - `last_updated` (REAL)
-  - `hebbian_weight` (REAL DEFAULT 1.0)
+- **Storage Strategy (ChromaDB)**:
+  - **Collection**: `summaries`
+  - **ID**: `session_id`
+  - **Document**: The distilled summary text.
+  - **Metadata**: `{"last_updated": float_timestamp}`.
 
 ### 2.2 Semantic Distillation Engine
 - **Method signature**: `async def distill(session_id: str, traces: List[Dict[str, Any]]) -> str`
-- **Config priority**:
-  1. URL: Env `CLAWBRAIN_DISTILL_URL` -> Constructor `distill_url`.
-  2. Model: Env `CLAWBRAIN_DISTILL_MODEL` -> Constructor `distill_model`.
-  3. API Key: Env `CLAWBRAIN_DISTILL_API_KEY` (optional).
-  4. Provider: Env `CLAWBRAIN_DISTILL_PROVIDER` (default: `openai-compatible`).
-- **Protocol Dispatch**:
-  - **Ollama**: Call `distill_url/api/generate` with `prompt`. Extract `response`.
-  - **OpenAI-compatible**: Call `distill_url/chat/completions` with `messages`. Extract `choices[0].message.content`.
+- **Unified Client**: Uses `LLMFactory.get_chat_client()` to abstract away provider-specific API logic.
 - **Logic flow**:
   1. Iterate `traces` to build a conversation corpus.
   2. Construct the summarization prompt. The prompt MUST be template-based and strictly categorize extracted facts into 'Technical Decisions', 'User Preferences', and 'Project Context' to optimize for specific test dimensions (ISSUE-007).
-  3. Dispatch to the selected provider.
-  4. Upsert result into `neocortex_summaries`.
-  5. **TasteGuard (Belief Anchor)**: Apply a protective layer over the distilled summary. Core, highly-weighted subjective facts (e.g., "The user hates ORMs") are anchored and highly resistant to being overwritten or unlearned by transient, contradictory data during future distillations.
+  3. **TasteGuard (Belief Anchor)**: Apply a protective layer over the distilled summary. Core, highly-weighted subjective facts (e.g., "The user hates ORMs") are anchored and highly resistant to being overwritten or unlearned by transient, contradictory data during future distillations.
+  4. Perform stateful merge: Use the LLM to merge NEW dialogue into the EXISTING summary retrieved from ChromaDB.
+  5. Upsert result into the `summaries` collection.
 
 ### 2.4 Subjective Cognitive Judge (L6b Evaluator)
 - **Background**: Replaces the objective "hallucination prevention" judge with a user-specific "Taste/Value Profile" judge.
-- **Mechanism**: The judge must ask: "Does this context align with the user's specific architectural tastes and personal values?" rather than just checking for objective relevance.
-- **Action**: Before context is finalized, an LLM call validates the assembled facts against the user's subjective TasteGuard profile.
+- **Mechanism**: The judge must ask: "Does this context contain information relevant to the user query?" with a bias towards technical grounding.
+- **Action**: Before context is finalized, an LLM call (`verify_relevance`) validates the context snippet against the query.
 - **Fail-open**: If the LLM throws an exception (e.g. timeout), the judge defaults to `True` (allowing the context).
 
 ### 2.5 Memory Recall Interface
 - **Method signature**: `def get_summary(session_id: str) -> Optional[str]`
-- Reads and returns the latest summary for the given session from SQLite.
+- Reads and returns the latest summary for the given session from ChromaDB.
 
 ## 3. Test Specification (High-Fidelity TDD)
 

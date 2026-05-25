@@ -1,4 +1,5 @@
 # MCP Server Regression Test
+# Generated-by: 20260522-ISSUE-009-DesignSourceAlignment
 import pytest
 import subprocess
 import os
@@ -31,12 +32,16 @@ def mcp_server_instance():
     env["CLAWBRAIN_DISABLE_ROOM_DETECTION"] = "true"
     env["PYTHONPATH"] = project_root
 
+    log_file_path = os.path.join(project_root, "tests/data/mcp_test_server.log")
+    os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+    log_file = open(log_file_path, "w")
+
     process = subprocess.Popen(
         [uvicorn_path, "src.main:app", "--host", "127.0.0.1", "--port", str(port)],
         env=env,
         cwd=project_root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stdout=log_file,
+        stderr=log_file
     )
 
     # Wait for server AND cognitive engine to be ready (Conditional Wait)
@@ -46,8 +51,10 @@ def mcp_server_instance():
     
     while time.time() - start_time < safety_limit:
         if process.poll() is not None:
-            stdout, stderr = process.communicate()
-            print(f"Server Crashed! STDERR: {stderr.decode() if stderr else 'None'}")
+            log_file.close()
+            with open(log_file_path, "r") as f:
+                logs = f.read()
+            print(f"Server Crashed! Logs:\n{logs}")
             pytest.fail("MCP Test Server crashed during startup")
             
         try:
@@ -65,11 +72,17 @@ def mcp_server_instance():
         time.sleep(2)
     else:
         process.terminate()
+        log_file.close()
         pytest.fail(f"MCP Test Server failed to reach ONLINE status within {safety_limit}s safety limit")
         
     yield f"http://127.0.0.1:{port}"
     
     process.terminate()
+    try:
+        process.wait(timeout=5)
+    except:
+        process.kill()
+    log_file.close()
 
 @pytest.mark.asyncio
 async def test_p38_mcp_full_handshake(mcp_server_instance):

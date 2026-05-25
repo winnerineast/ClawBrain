@@ -1,4 +1,5 @@
-# Generated from design/memory_router.md v1.19 / GEMINI.md Rule 12
+# Generated from design/memory_router.md v1.20 / GEMINI.md Rule 12
+# Generated-by: 20260522-ISSUE-009-DesignSourceAlignment
 import uuid
 import json
 import os
@@ -39,6 +40,54 @@ class CircuitBreaker:
             self.failures = 0
         return False
 
+class CognitiveWorker:
+    def __init__(self, router: 'MemoryRouter'):
+        self.router = router
+        self.queue = asyncio.Queue()
+        self.task = None
+
+    def start(self):
+        self.task = asyncio.create_task(self._loop())
+
+    async def stop(self):
+        if self.task:
+            self.task.cancel()
+            try:
+                await self.task
+            except asyncio.CancelledError:
+                pass
+
+    def enqueue(self, task_type: str, **kwargs):
+        self.queue.put_nowait((task_type, kwargs))
+
+    async def _loop(self):
+        while True:
+            try:
+                task_type, kwargs = await self.queue.get()
+                try:
+                    if task_type == "topic_detection":
+                        session_id = kwargs.get("session_id")
+                        text = kwargs.get("text")
+                        await self.router._auto_room_worker(session_id, text)
+                    elif task_type == "distill":
+                        session_id = kwargs.get("session_id")
+                        await self.router._auto_distill_worker(session_id)
+                    elif task_type == "vault_scan":
+                        await self.router._run_vault_scan()
+                    elif task_type == "build_tree":
+                        path = kwargs.get("path")
+                        if self.router.page_indexer:
+                            await self.router.page_indexer.build_tree(path)
+                except Exception as e:
+                    logger.error(f"[COGNITIVE_WORKER] Error executing task {task_type}: {e}")
+                finally:
+                    self.queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"[COGNITIVE_WORKER] Loop error: {e}")
+                await asyncio.sleep(1)
+
 class MemoryRouter:
     """
     ClawBrain Memory Central Router v2 (Breathing Brain).
@@ -77,6 +126,9 @@ class MemoryRouter:
 
         self.cb_room = CircuitBreaker(); self.cb_distill = CircuitBreaker(); self.cb_heartbeat = CircuitBreaker()
         
+        self.worker = CognitiveWorker(self)
+        self.worker.start()
+        
         asyncio.create_task(self._async_init())
 
     async def _async_init(self):
@@ -86,7 +138,7 @@ class MemoryRouter:
             # P48: Discovered Embedding Support
             if not self.embed_client:
                 self.scheduler = await LLMFactory.get_intelligent_scheduler()
-                self.embed_client = self.scheduler.select_best_chat(role="embedding")
+                self.embed_client = await self.scheduler.select_best_chat(role="embedding")
             
             logger.info(f"🌿 [COGNITIVE] Using embedding model: {self.embed_client.model}")
 
@@ -159,10 +211,30 @@ class MemoryRouter:
             wm = self._get_wm(session_id)
             for m in stimulus.get("messages", []):
                 if m.get("content"): wm.add_item(WorkingMemoryItem(trace_id=trace_id, content=m["content"]))
-            self.hippo.save_trace(trace_id, stimulus, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
+                
+            # L6b Precision Value Filter: Filter out low value trace before persisting to database
+            disable_judge = get_env("CLAWBRAIN_DISABLE_COGNITIVE_JUDGE", "false").lower() == "true"
+            is_high_value = True
+            if not disable_judge:
+                try:
+                    instruction = "You are a L6b Value Filter. Score the technical value of the conversation from 0.0 to 1.0. Respond ONLY with the float number."
+                    score_str = await self.room_detector.llm.generate(prompt=search_text, system=instruction)
+                    score_match = re.search(r"[0-9.]+", score_str or "1.0")
+                    if score_match:
+                        score = float(score_match.group(0))
+                        if score < 0.5:
+                            is_high_value = False
+                except Exception as e:
+                    logger.warning(f"[L6b] Value classification failed: {e}")
+
+            if is_high_value:
+                self.hippo.save_trace(trace_id, stimulus, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
+            else:
+                self._log_event("Cognitive", "L6bFilter", f"Low value trace {trace_id} dropped by cognitive judge", {"session_id": session_id})
+
             self.hippo.save_wm_state(session_id, wm.items); self._dirty_sessions.add(session_id)
             
-            if self.enable_room_detection: asyncio.create_task(self._auto_room_worker(session_id, search_text))
+            if self.enable_room_detection: self.worker.enqueue("topic_detection", session_id=session_id, text=search_text)
             
             self._log_event("Relay", "Ingest", f"Captured user message for session {session_id}", {"session_id": session_id, "text": search_text[:50]})
             
@@ -212,7 +284,8 @@ class MemoryRouter:
                 score = (hits * 150.0) + (cov * 100.0 * (1.0 + sim)) + (sim * 20.0)
                 return ok, score
 
-            sem_res = self.hippo.search(query, session_id, "general", limit=25, include_distances=True)
+            room_id = self._get_current_room(session_id)
+            sem_res = self.hippo.search(query, session_id, room_id, limit=25, include_distances=True)
             lex_ids = self.hippo.search_lexical(list(hard_anchors) + list(core_subjects)[:5], session_id, limit=25)
             cmap = {c["id"]: c["distance"] for c in sem_res}
             for lid in lex_ids:
@@ -238,12 +311,18 @@ class MemoryRouter:
                 for r in self.vault_indexer.search(query, limit=5):
                     ok, sc = _is_satisfied(r["content"], r.get("distance", 1.0))
                     if ok: vault_results.append({"title": r["title"], "content": r["content"], "score": sc})
+                
+                if vault_results:
+                    logger.info(f"[RETRIEVAL AUDIT] {query} | VAULT_HIT: Y | {vault_results[0]['title']} | {vault_results[0]['score']}")
+                else:
+                    logger.info(f"[RETRIEVAL AUDIT] {query} | VAULT_HIT: N | None | 0.0")
+
                 if vault_results:
                     self._log_event("Cognitive", "VaultSearch", f"Vault hit: {vault_results[0]['title']}", {"session_id": session_id, "count": len(vault_results)})
 
                     # PageIndex Integration: Trigger reasoning if confidence is low or query is complex
                     top_score = vault_results[0]["score"]
-                    reasoning_keywords = ["compare", "parameter", "manual", "technical", "specification", "voltage"]
+                    reasoning_keywords = ["compare", "parameter", "manual", "technical", "specification", "voltage", "temperature", "requirement", "configuration"]
                     is_complex = any(k in query.lower() for k in reasoning_keywords)
 
                     if (top_score < 0.7 or is_complex) and self.page_indexer and self.vault_path:
@@ -307,11 +386,19 @@ class MemoryRouter:
             })
             return final_context
 
+    async def nudge(self):
+        """Manual trigger for the cognitive heartbeat (Regression Support)."""
+        for sid in list(self._dirty_sessions):
+            self.worker.enqueue("distill", session_id=sid)
+        self._dirty_sessions.clear()
+        await self.worker.queue.join()
+
     async def _heartbeat_loop(self):
         while self._running:
             if self.cb_heartbeat.is_open(): await asyncio.sleep(60); continue
             try:
-                for sid in list(self._dirty_sessions): await self._auto_distill_worker(sid)
+                for sid in list(self._dirty_sessions):
+                    self.worker.enqueue("distill", session_id=sid)
                 self._dirty_sessions.clear(); self.cb_heartbeat.record_success()
             except Exception: self.cb_heartbeat.record_failure()
             await asyncio.sleep(30)
@@ -329,18 +416,24 @@ class MemoryRouter:
 
     async def _vault_scan_loop(self):
         while self._running and self.vault_indexer:
-            try:
-                stats = await self.vault_indexer.scan()
-                if stats.get("indexed", 0) > 0:
-                    self._log_event("Cognitive", "VaultScan", f"Vault indexed {stats['indexed']} new/updated files", stats)
-                    threshold = int(get_env("CLAWBRAIN_PAGEINDEX_THRESHOLD", 5000))
-                    for path_str in stats.get("modified_paths", []):
-                        p = Path(path_str)
-                        if p.suffix.lower() == ".pdf" or p.stat().st_size > threshold: 
-                            self._log_event("Cognitive", "DeepIndexing", f"Building reasoning tree for {p.name}", {"path": str(p)})
-                            await self.page_indexer.build_tree(p)
-            except: pass
+            self.worker.enqueue("vault_scan")
             await asyncio.sleep(300)
 
+    async def _run_vault_scan(self):
+        try:
+            stats = await self.vault_indexer.scan()
+            if stats.get("indexed", 0) > 0:
+                self._log_event("Cognitive", "VaultScan", f"Vault indexed {stats['indexed']} new/updated files", stats)
+                threshold = int(get_env("CLAWBRAIN_PAGEINDEX_THRESHOLD", 5000))
+                for path_str in stats.get("modified_paths", []):
+                    p = Path(path_str)
+                    if p.suffix.lower() == ".pdf" or p.stat().st_size > threshold: 
+                        self._log_event("Cognitive", "DeepIndexing", f"Building reasoning tree for {p.name}", {"path": str(p)})
+                        self.worker.enqueue("build_tree", path=p)
+        except Exception as e:
+            logger.error(f"[COGNITIVE] Vault scan run error: {e}")
+
     async def aclose(self):
-        self._running = False; logger.info("[ROUTER] Closing connections..."); clear_chroma_clients()
+        self._running = False; logger.info("[ROUTER] Closing connections...")
+        await self.worker.stop()
+        clear_chroma_clients()

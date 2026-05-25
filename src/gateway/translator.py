@@ -106,6 +106,10 @@ class DialectTranslator:
         raw = request.model_dump(exclude_none=True)
         messages = raw.get("messages", [])
         
+        # 2.1 准则修正：只剥离第一个前缀
+        model_name = raw.get("model", "")
+        target_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
+
         contents = []
         system_instruction = ""
         
@@ -120,6 +124,7 @@ class DialectTranslator:
                 })
         
         google_body = {
+            "model": f"models/{target_model}",
             "contents": contents,
             "generationConfig": {
                 "temperature": raw.get("temperature", 0.7),

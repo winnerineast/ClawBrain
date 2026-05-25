@@ -1,7 +1,7 @@
-# design/test_sanitization.md v1.0
+# design/test_sanitization.md v1.1
 
 ## 1. Objective
-Establish a deterministic and sterile environment for regression testing by enforcing a "Clean Slate" policy. This ensures that every test run is independent of previous executions, preventing intermittent failures caused by lingering processes, shared database locks, or exhausted GPU resources.
+Establish a deterministic and sterile environment for regression testing by enforcing a "Clean Slate" policy. This ensures that every test run is independent of previous executions, preventing intermittent failures caused by lingering processes, shared database locks, or exhausted GPU resources. **v1.1: Mandate process-isolated test file execution in `run_regression.sh` to eliminate database locks and event loop clogging from previous tests.**
 
 ## 2. Sanitization Pillars
 

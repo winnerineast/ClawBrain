@@ -59,7 +59,7 @@ async def test_ollama_distillation_protocol(tmp_path):
 @pytest.mark.asyncio
 async def test_openai_distillation_protocol(tmp_path):
     """实测态度：验证 Neocortex 对真实 OpenAI 兼容协议 (LM Studio) 的处理"""
-    url = "http://127.0.0.1:1234/v1"
+    url = "http://127.0.0.1:1234"
     if not await wait_for_service("http://127.0.0.1:1234"):
         pytest.skip("LM Studio is not responding after periodic probing.")
 
@@ -69,7 +69,15 @@ async def test_openai_distillation_protocol(tmp_path):
     # Get model name from LM Studio
     async with httpx.AsyncClient() as client:
         m_resp = await client.get("http://127.0.0.1:1234/v1/models")
-        model = m_resp.json()["data"][0]["id"]
+        models = [m["id"] for m in m_resp.json().get("data", [])]
+        config_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", "qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive")
+        if config_model in models:
+            model = config_model
+        else:
+            chat_models = [m for m in models if "embed" not in m.lower()]
+            if not chat_models:
+                pytest.skip("No chat/generation model loaded in LM Studio.")
+            model = chat_models[0]
 
     nc = Neocortex(db_dir=test_dir, distill_url=url, distill_model=model, distill_provider="openai")
     

@@ -58,9 +58,15 @@ async def test_lmstudio_real_routing(gpu_resource_manager, tmp_path):
         async with httpx.AsyncClient(timeout=2.0) as client:
             m_resp = await client.get(url)
             if m_resp.status_code == 200:
-                models = m_resp.json().get("data", [])
-                if models:
-                    real_model_id = models[0]["id"]
+                models = [m["id"] for m in m_resp.json().get("data", [])]
+                config_model = os.getenv("CLAWBRAIN_DISTILL_MODEL", "qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive")
+                if config_model in models:
+                    real_model_id = config_model
+                else:
+                    chat_models = [m for m in models if "embed" not in m.lower()]
+                    if chat_models:
+                        real_model_id = chat_models[0]
+                if real_model_id:
                     print(f"[SCOUT] LM Studio found! Active Model: {real_model_id}")
     except Exception as e:
         print(f"[SCOUT] LM Studio probe failed: {e}")

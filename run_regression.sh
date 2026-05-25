@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generated from design/test_sanitization.md v1.0
+# Generated from design/test_sanitization.md v1.1
 
 set -e
 
@@ -32,14 +32,18 @@ PYTHONPATH=. python3 tests/prepare_env.py
 # We disable room detection to prevent background task interference
 # We disable cognitive judge for DETERMINISTIC regression results (did we find it?)
 # but the upstream LLM is still LIVE for generation.
-COMMON_ENV="CLAWBRAIN_DISABLE_ROOM_DETECTION=true CLAWBRAIN_DISABLE_COGNITIVE_JUDGE=true PYTHONPATH=."
+COMMON_ENV="CLAWBRAIN_DISABLE_ROOM_DETECTION=true CLAWBRAIN_DISABLE_COGNITIVE_JUDGE=true CLAWBRAIN_LLM_TIMEOUT=180 PYTHONPATH=."
 
 if [ $# -eq 0 ]; then
-    echo "Running full LIVE regression suite..."
-    eval $COMMON_ENV venv/bin/pytest -s \
-        tests/test_p*.py \
-        tests/test_chromadb_semantic_recall.py \
-        tests/test_issue_*.py
+    echo "Running full LIVE regression suite with process isolation..."
+    TEST_FILES=$(ls tests/test_p*.py tests/test_chromadb_semantic_recall.py tests/test_issue_*.py 2>/dev/null | sort -u)
+    for f in $TEST_FILES; do
+        echo ""
+        echo "========================================================"
+        echo "👉 Running isolated test file: $f"
+        echo "========================================================"
+        eval $COMMON_ENV venv/bin/pytest -s "$f"
+    done
 else
     echo "Running selective LIVE tests: $@"
     eval $COMMON_ENV venv/bin/pytest -s "$@"

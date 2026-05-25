@@ -1,4 +1,5 @@
 # Generated from design/memory_vault.md v1.1 / GEMINI.md Rule 12
+# Generated-by: 20260522-ISSUE-009-DesignSourceAlignment
 import os
 import json
 import hashlib
@@ -27,12 +28,30 @@ class VaultIndexer:
         
         self.embed_fn = ChromaEmbedWrapper(embed_client) if embed_client else None
 
-        # Collection for vault knowledge
-        self.collection = self.client.get_or_create_collection(
-            name="vault_knowledge",
-            metadata={"hnsw:space": "cosine"},
-            embedding_function=self.embed_fn
-        )
+        try:
+            # Helper to safely get or recreate collection on embedding conflict
+            def get_safe_col(name, metadata=None):
+                try:
+                    return self.client.get_or_create_collection(
+                        name=name,
+                        metadata=metadata,
+                        embedding_function=self.embed_fn
+                    )
+                except ValueError as e:
+                    if "embedding function conflict" in str(e).lower():
+                        logger.warning(f"[VAULT] Embedding conflict for {name}. Rebuilding collection.")
+                        self.client.delete_collection(name)
+                        return self.client.get_or_create_collection(
+                            name=name,
+                            metadata=metadata,
+                            embedding_function=self.embed_fn
+                        )
+                    raise
+
+            self.collection = get_safe_col("vault_knowledge", metadata={"hnsw:space": "cosine"})
+        except Exception as e:
+            logger.exception(f"[VAULT] Initialization failed: {e}")
+            raise
         
         self.state = self._load_state()
 
@@ -41,7 +60,7 @@ class VaultIndexer:
             try:
                 return json.loads(self.state_file.read_text())
             except:
-                return {"files": {}}
+                return {"processed_files": {}}
         return {"processed_files": {}}
 
     def _save_state(self):
@@ -81,6 +100,7 @@ class VaultIndexer:
                 if old_meta and old_meta.get("mtime") == mtime:
                     stats["skipped"] += 1
                     new_processed[rel_path] = old_meta
+                    logger.info(f"[INDEXER AUDIT] {rel_path} | MTIME_MATCH: Y | HASH_MATCH: Y | EMBEDDING_TRIGGERED: N")
                     continue
                 
                 # mtime changed, Rule 3.1: TC_TOUCH check (Hash verification)
@@ -91,6 +111,7 @@ class VaultIndexer:
                     # Content identical despite mtime change (e.g. 'touch')
                     stats["skipped"] += 1
                     new_processed[rel_path] = {"mtime": mtime, "hash": current_hash}
+                    logger.info(f"[INDEXER AUDIT] {rel_path} | MTIME_MATCH: N | HASH_MATCH: Y | EMBEDDING_TRIGGERED: N")
                     logger.info(f"[VAULT] Skip (Hash Match): {rel_path}")
                     continue
                 
@@ -101,7 +122,9 @@ class VaultIndexer:
                     new_processed[rel_path] = {"mtime": mtime, "hash": current_hash}
                     stats["indexed"] += 1
                     stats["modified_paths"].append(full_path)
+                    logger.info(f"[INDEXER AUDIT] {rel_path} | MTIME_MATCH: N | HASH_MATCH: N | EMBEDDING_TRIGGERED: Y")
                 except Exception as e:
+                    logger.info(f"[INDEXER AUDIT] {rel_path} | MTIME_MATCH: N | HASH_MATCH: N | EMBEDDING_TRIGGERED: N")
                     logger.error(f"[VAULT] Failed to index {rel_path}: {e}")
 
         # 2. Cleanup deletions

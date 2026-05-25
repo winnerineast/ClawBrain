@@ -5,13 +5,29 @@ import shutil
 import asyncio
 import respx
 import re
+import hashlib
 from httpx import Response
 from pathlib import Path
 from src.memory.router import MemoryRouter
 from src.memory.neocortex import Neocortex
-from src.memory.storage import clear_chroma_clients
+from src.memory.storage import clear_chroma_clients, Hippocampus
+from src.utils.llm_client import EmbedClient
 
-TEST_DATA_DIR = "/home/nvidia/ClawBrain/tests/data/p65_test"
+class DummyEmbedClient(EmbedClient):
+    def __init__(self):
+        super().__init__("http://dummy", "dummy")
+    def _embed(self, texts):
+        results = []
+        for text in texts:
+            vec = [0.0] * 384
+            for char in text.lower():
+                vec[ord(char) % 384] += 1.0
+            mag = sum(v*v for v in vec) ** 0.5
+            if mag > 0: vec = [v/mag for v in vec]
+            results.append(vec)
+        return results
+    async def embed(self, texts, **kwargs): return self._embed(texts)
+    def embed_sync(self, texts, **kwargs): return self._embed(texts)
 
 def side_by_side_audit(test_name, dimension, input_text, score, verdict):
     print(f"\n[AUDIT] {test_name} | {dimension}")
@@ -23,47 +39,55 @@ def side_by_side_audit(test_name, dimension, input_text, score, verdict):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_p65_l6b_precision_filter():
+async def test_p65_l6b_precision_filter(tmp_path):
     """Verify L6b filter correctly scores and drops low-value interactions."""
-    if os.path.exists(TEST_DATA_DIR): shutil.rmtree(TEST_DATA_DIR)
-    os.makedirs(TEST_DATA_DIR)
     clear_chroma_clients()
+    db_dir = str(tmp_path)
     
-    # 1. Mock LLM for high-value scoring
-    respx.post(re.compile(r".*/api/generate|.*/chat/completions")).mock(side_effect=lambda request: 
-        Response(200, json={"response": "0.95", "choices": [{"message": {"content": "0.95"}}]}) 
-        if "Use PostgreSQL" in request.content.decode() else 
-        Response(200, json={"response": "0.10", "choices": [{"message": {"content": "0.10"}}]})
-    )
+    # 1. Force enable cognitive judge for the lifespan of this specific test
+    old_judge = os.environ.get("CLAWBRAIN_DISABLE_COGNITIVE_JUDGE")
+    os.environ["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"] = "false"
+    
+    try:
+        # Mock LLM for high-value scoring
+        respx.post(re.compile(r".*/api/generate|.*/chat/completions")).mock(side_effect=lambda request: 
+            Response(200, json={"response": "0.95", "choices": [{"message": {"content": "0.95"}}]}) 
+            if "Use PostgreSQL" in request.content.decode() else 
+            Response(200, json={"response": "0.10", "choices": [{"message": {"content": "0.10"}}]})
+        )
 
-    router = MemoryRouter(db_dir=TEST_DATA_DIR)
-    
-    # 2. Ingest High Value (Should be saved)
-    tid_high = await router.ingest({"messages": [{"role": "user", "content": "Technical: Use PostgreSQL for production."}]}, sync_distill=True)
-    
-    # 3. Ingest Low Value (Should be dropped)
-    tid_low = await router.ingest({"messages": [{"role": "user", "content": "Hi there, how is the weather?"}]}, sync_distill=True)
-    
-    # 4. Verify L2 state
-    # Wait for async init
-    await router.wait_until_ready()
-    
-    high_trace = router.hippo.get_full_payload(tid_high)
-    low_trace = router.hippo.get_full_payload(tid_low)
-    
-    side_by_side_audit("L6b High Value", "Persistence", "Technical: Use PostgreSQL...", "0.95", "SAVED" if high_trace else "DROPPED")
-    side_by_side_audit("L6b Low Value", "Persistence", "Hi there, how is...", "0.10", "SAVED" if low_trace else "DROPPED")
-    
-    assert high_trace is not None
-    assert low_trace is None
-    
-    await router.aclose()
+        router = MemoryRouter(db_dir=db_dir, embed_client=DummyEmbedClient())
+        await router.wait_until_ready()
+        
+        # 2. Ingest High Value (Should be saved)
+        tid_high = await router.ingest({"messages": [{"role": "user", "content": "Technical: Use PostgreSQL for production."}]}, sync_distill=True)
+        
+        # 3. Ingest Low Value (Should be dropped)
+        tid_low = await router.ingest({"messages": [{"role": "user", "content": "Hi there, how is the weather?"}]}, sync_distill=True)
+        
+        high_trace = router.hippo.get_full_payload(tid_high)
+        low_trace = router.hippo.get_full_payload(tid_low)
+        
+        side_by_side_audit("L6b High Value", "Persistence", "Technical: Use PostgreSQL...", "0.95", "SAVED" if high_trace else "DROPPED")
+        side_by_side_audit("L6b Low Value", "Persistence", "Hi there, how is...", "0.10", "SAVED" if low_trace else "DROPPED")
+        
+        assert high_trace is not None
+        assert low_trace is None
+        
+        await router.aclose()
+    finally:
+        if old_judge is not None:
+            os.environ["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"] = old_judge
+        else:
+            del os.environ["CLAWBRAIN_DISABLE_COGNITIVE_JUDGE"]
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_p65_subjective_judge():
+async def test_p65_subjective_judge(tmp_path):
     """Verify Cognitive Judge respects the subjective Taste Profile."""
-    neo = Neocortex(db_dir=TEST_DATA_DIR)
+    clear_chroma_clients()
+    db_dir = str(tmp_path)
+    neo = Neocortex(db_dir=db_dir)
     neo.taste_profile = "User loves Python, hates Java."
     
     # Mock YES only if Python is in the context/query part of the body
@@ -84,10 +108,12 @@ async def test_p65_subjective_judge():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_p65_tasteguard_distillation():
+async def test_p65_tasteguard_distillation(tmp_path):
     """Verify TasteGuard protection in distillation prompt."""
-    neo = Neocortex(db_dir=TEST_DATA_DIR)
-    neo.taste_profile = "CORE ANCHOR: We use FastAPI."
+    clear_chroma_clients()
+    db_dir = str(tmp_path)
+    neo = Neocortex(db_dir=db_dir)
+    neo.taste_profile = "TASTEGUARD CORE ANCHOR: We use FastAPI."
     
     # We just want to see if TasteGuard is in the system prompt
     mock_route = respx.post(re.compile(r".*/api/generate|.*/chat/completions")).mock(
@@ -105,4 +131,4 @@ async def test_p65_tasteguard_distillation():
     print("-" * 70)
     
     assert "TASTEGUARD" in request_content
-    assert "CORE ANCHOR: We use FastAPI" in request_content
+    assert "TASTEGUARD CORE ANCHOR: We use FastAPI" in request_content

@@ -1,3 +1,5 @@
+# design/cognitive_engine.md v1.1
+
 # ClawBrain Cognitive Engine: The Self-Paced Memory System
 
 ## 1. Architectural Mandate
@@ -5,7 +7,7 @@ The memory processing system must be an independent, self-contained subsystem wi
 
 ## 2. The Four Drivers of Cognition
 
-### Driver 1: Information Inflow (Stimulus)
+## Driver 1: Information Inflow (Stimulus)
 *   **Conversational Turns**: Every message processed by the Relay Plane is placed in an ingestion queue.
 *   **Vault Watcher**: File system changes in the Obsidian Vault trigger incremental scanning.
 *   **Action**: Update L1 Working Memory and L2 Episodic Archive.

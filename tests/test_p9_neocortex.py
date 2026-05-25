@@ -42,7 +42,7 @@ async def test_p9_neocortex_distillation_audit():
     """Phase 9 Depth Audit: Long context extraction and canary fact verification."""
     if os.path.exists(TEST_DATA_DIR): shutil.rmtree(TEST_DATA_DIR)
     
-    nc = Neocortex(db_dir=TEST_DATA_DIR)
+    nc = Neocortex(db_dir=TEST_DATA_DIR, distill_provider="ollama", distill_url="http://127.0.0.1:11434")
     
     # Mock Ollama Response containing the canary facts
     mock_summary = "Technical decisions: Use PostgreSQL 15.2 and Tortoise ORM."

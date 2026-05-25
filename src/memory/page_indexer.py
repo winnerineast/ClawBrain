@@ -1,4 +1,5 @@
 # Generated from design/memory_pageindex.md v1.6
+# Generated-by: 20260522-ISSUE-009-DesignSourceAlignment
 import os
 import json
 import hashlib
@@ -37,8 +38,8 @@ class PageIndexer:
         if not self.scheduler:
             self.scheduler = await LLMFactory.get_intelligent_scheduler()
             # FIX: Use 'role' as defined in LLMScheduler
-            self.worker_client = self.scheduler.select_best_chat(role="worker")
-            self.brain_client = self.scheduler.select_best_chat(role="brain")
+            self.worker_client = await self.scheduler.select_best_chat(role="worker")
+            self.brain_client = await self.scheduler.select_best_chat(role="brain")
             logger.info(f"🌿 [PAGEINDEX] Scheduler active. Worker: {self.worker_client.model}, Brain: {self.brain_client.model}")
 
     def _get_file_hash(self, content: bytes) -> str:

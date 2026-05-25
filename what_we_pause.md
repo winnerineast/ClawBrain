@@ -1,21 +1,22 @@
-# 🦞 ClawBrain: Active Issues & Paused Tasks (May 8, 2026 - Multimodal & Platform Stability)
+# 🦞 ClawBrain: Active Issues & Paused Tasks (May 10, 2026 - Cognitive Reasoning Breakthrough)
 
 ## ✅ Recently Resolved
-- **Full macOS & Ubuntu Parity**: Rooted out all hardcoded Linux paths. System now auto-detects Darwin/Linux and adjusts storage and discovery logic accordingly.
-- **Hardware-Aware Intelligence**: Implemented `HardwareProfiler` to detect Apple Silicon Unified Memory and NVIDIA VRAM, automatically selecting model tiers (Tier 1-3).
-- **LLM Provider Decoupling**: Successfully abstracted Ollama, LM Studio, and OMLX into a unified `LLMClient`. Core cognitive features are now provider-agnostic.
-- **Environmental Autonomy**: `SetupScout` now identifies and auto-starts local LLM backends (Ollama/LMS/OMLX) on both platforms, ensuring functional integrity.
-- **Cognitive Judge Optimization**: Refined the grounding judge prompt to be "generous" for short technical queries, achieving 100% pass rate in real-world regression on 35B models.
-- **Issue #010 Fixed**: Resolved routing security assertion mismatch (501 vs 502) by implementing strict provider resolution.
+- **Issue #47 (Anthropic SSE)**: Fully implemented reverse-translation in the gateway. Claude models are now supported with full streaming memory capture.
+- **Issue #48 (Unified Embedding)**: Integrated `EmbedClient` with `LLMScheduler`. Vector storage is now hardware-accelerated via local models (e.g., nomic-embed).
+- **PageIndex Integration (v1.3)**: Reasoning-based tree traversal implemented. Achieved 100% precision on complex technical manuals in adversarial benchmarks.
+- **All-in-One Dashboard**: Real-time information flow visualization with session isolation and X-Ray debugging live.
+- **Full macOS & Ubuntu Parity**: Regression suite sanitized and verified on both platforms.
+
+## 🚧 Active / In-Progress
+1. **Taste Profile UI**: Creating a management interface for `CLAWBRAIN_TASTE_PROFILE` to allow dynamic tuning of the agent's subjective bias.
 
 ## ⏸️ Paused (Waiting for V&V Milestone)
-1. **L6b Precision Tuning**: The emotional intensity scoring is stable, but we need more E2E data on "Value Eviction" before moving to v1.2.
-2. **Multi-Fact Recall (Phase 58)**: Currently at 85.1%. Paused until we implement `GraphAnchoring` to connect distant entities.
-3. **SignalDecomposer (Background mode)**: Refactoring the decomposer to run as a separate thread to further reduce injection latency.
+1. **L6b Precision Tuning**: Stable, but collecting data on value-based eviction.
+2. **GraphAnchoring**: Punted until Multi-Fact Recall needs to exceed 90%.
+3. **SignalDecomposer (Background mode)**: Refactoring for zero-latency injection.
 
-## 🚀 Upcoming for v1.3
-1. **Taste Profile UI**: Create a management interface for the `CLAWBRAIN_TASTE_PROFILE` to allow non-technical tuning of the agent's "personality."
-2. **SGLang & vLLM Support**: Extend the Orchestrator to support high-throughput inference servers on Linux clusters.
+## 🚀 Upcoming for v1.4
+1. **SGLang & vLLM Support**: High-throughput inference for Linux clusters.
 
 ---
 *Status: MULTI-PLATFORM STABILIZED. 100% REGRESSION PASS ON macOS + LM STUDIO (35B).*

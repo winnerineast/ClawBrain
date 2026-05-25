@@ -1,4 +1,4 @@
-# Generated from design/management_api.md v1.0
+# Generated from design/management_api.md v1.3
 import pytest
 import os
 import shutil
@@ -103,13 +103,13 @@ def test_p17_manual_distill_trigger(tmp_path):
         assert data["session_id"] == "distill_session"
 
 def test_p17_health_check_version():
-    """Health check version number has been updated to 1.42"""
+    """Health check version number has been updated to 1.44"""
     with TestClient(app) as client:
         resp = client.get("/health")
         data = resp.json()
-        visual_audit("Health Check Version", "version should be 1.42", "1.42", data.get("version"))
+        visual_audit("Health Check Version", "version should be 1.44", "1.44", data.get("version"))
         assert resp.status_code == 200
-        assert data["version"] == "1.42"
+        assert data["version"] == "1.44"
 
 def test_p17_management_sessions_and_traces(tmp_path):
     """GET /v1/management/sessions and /traces are fully functional"""

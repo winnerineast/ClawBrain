@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generated from design/management_api.md v1.2 / design/architecture.md v1.2
+# Generated from design/management_api.md v1.3 / design/architecture.md v1.2 / GEMINI.md Rule 12
 """
 ClawBrain CLI — Universal Memory Hub Access
 ===========================================

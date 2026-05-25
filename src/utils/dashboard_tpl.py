@@ -122,6 +122,20 @@ DASHBOARD_HTML = """
         .plane-cognitive { background: var(--plane-cognitive); color: white; }
         .event-msg { flex: 1; }
         
+        .btn-tab { 
+            border: 1px solid var(--border); 
+            background: var(--card); 
+            color: var(--text); 
+            padding: 5px 15px; 
+            border-radius: 20px; 
+            cursor: pointer; 
+            font-size: 12px;
+            margin-right: 5px;
+        }
+        .btn-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .btn-success { background: var(--plane-relay); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .btn-success:disabled { background: var(--border); cursor: not-allowed; }
+        
         #xray-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -183,24 +197,46 @@ DASHBOARD_HTML = """
         <div id="flow-header">
             <h1 id="active-session-title">Select a Session</h1>
             <div id="global-status">
+                <button class="btn-tab active" onclick="showTab('flow')">Flow Diagram</button>
+                <button class="btn-tab" onclick="showTab('taste')">Taste & Personality</button>
                 <span id="relay-status" class="status-pill">Relay Plane: --</span>
                 <span id="cog-status" class="status-pill">Cognitive Plane: --</span>
             </div>
         </div>
 
-        <div id="visual-flow" class="mermaid">
-            graph LR
-                User((User)) -- Chat --> Relay[Relay Plane]
-                Relay -- Request Context --> Cognitive[Cognitive Plane]
-                Cognitive -- Semantic Memory --> Relay
-                Relay -- Enriched Prompt --> LLM((LLM))
-                Vault[(Obsidian Vault)] -- Offline Sync --> Cognitive
+        <!-- TAB: Flow Diagram -->
+        <div id="tab-flow" class="tab-content">
+            <div id="visual-flow" class="mermaid">
+                graph LR
+                    User((User)) -- Chat --> Relay[Relay Plane]
+                    Relay -- Request Context --> Cognitive[Cognitive Plane]
+                    Cognitive -- Semantic Memory --> Relay
+                    Relay -- Enriched Prompt --> LLM((LLM))
+                    Vault[(Obsidian Vault)] -- Offline Sync --> Cognitive
+            </div>
+
+            <div id="event-feed">
+                <h3>Information Flow Log (Real-time)</h3>
+                <div id="event-list">
+                    <div style="color: #666; text-align: center; margin-top: 40px;">No events recorded yet. Start a chat or sync your vault.</div>
+                </div>
+            </div>
         </div>
 
-        <div id="event-feed">
-            <h3>Information Flow Log (Real-time)</h3>
-            <div id="event-list">
-                <div style="color: #666; text-align: center; margin-top: 40px;">No events recorded yet. Start a chat or sync your vault.</div>
+        <!-- TAB: Taste & Personality -->
+        <div id="tab-taste" class="tab-content" style="display: none;">
+            <div class="card">
+                <h3>🎭 Subjective Taste Profile (TasteGuard)</h3>
+                <p style="font-size: 13px; color: #8b949e;">
+                    This profile acts as a <strong>Belief Anchor</strong> for your AI. It dictates how the Cognitive Plane distills memories 
+                    and how the Grounding Judge validates context. Use it to set architectural preferences, 
+                    coding styles, or specific organizational values.
+                </p>
+                <textarea id="taste-input" style="width: 100%; height: 200px; background: #000; color: var(--success); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-family: monospace;"></textarea>
+                <div style="margin-top: 15px;">
+                    <button id="save-taste-btn" class="btn-success" onclick="saveTasteProfile()">💾 Save & Apply Profile</button>
+                    <span id="taste-status" style="margin-left: 10px; font-size: 12px;"></span>
+                </div>
             </div>
         </div>
     </div>
@@ -218,8 +254,59 @@ DASHBOARD_HTML = """
     <script>
         let currentSession = null;
         let lastEventTimestamp = 0;
+        let activeTab = 'flow';
 
         mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
+
+        function showTab(tabId) {
+            activeTab = tabId;
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.getElementById('tab-' + tabId).style.display = 'block';
+            
+            document.querySelectorAll('.btn-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('onclick').includes(tabId));
+            });
+            
+            if (tabId === 'taste') loadTasteProfile();
+        }
+
+        async function loadTasteProfile() {
+            try {
+                const resp = await fetch('/v1/management/config/taste');
+                const data = await resp.json();
+                document.getElementById('taste-input').value = data.taste_profile;
+            } catch (e) { console.error('Failed to load taste profile', e); }
+        }
+
+        async function saveTasteProfile() {
+            const btn = document.getElementById('save-taste-btn');
+            const status = document.getElementById('taste-status');
+            const newValue = document.getElementById('taste-input').value;
+            
+            btn.disabled = true;
+            status.textContent = "⏳ Saving...";
+            
+            try {
+                const resp = await fetch('/v1/management/config/taste', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({taste_profile: newValue})
+                });
+                if (resp.ok) {
+                    status.textContent = "✅ Saved successfully!";
+                    status.style.color = "var(--success)";
+                } else {
+                    status.textContent = "❌ Save failed";
+                    status.style.color = "var(--danger)";
+                }
+            } catch (e) { 
+                status.textContent = "❌ Error: " + e;
+                status.style.color = "var(--danger)";
+            } finally {
+                btn.disabled = false;
+                setTimeout(() => { status.textContent = ""; }, 3000);
+            }
+        }
 
         async function loadSessions() {
             try {

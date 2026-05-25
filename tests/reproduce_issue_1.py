@@ -10,28 +10,20 @@ from unittest.mock import MagicMock, patch
 async def test_header_leak_reproduction():
     """
     Reproduction for Issue #1: Header Forwarding Leaks.
-    We verify if internal headers (x-clawbrain-session) and potentially inappropriate auth headers
-    are leaked to upstream providers.
+    v1.43: Verifies protocol-specific auth forwarding (x-api-key for anthropic vs Bearer for others).
     """
-    # 1. Setup a mock for the HTTP client used in main.py
-    # We want to intercept the outgoing request to see the headers.
-    
-    with patch("httpx.AsyncClient.post") as mock_post, \
-         patch("httpx.AsyncClient.stream") as mock_stream:
-        
-        # Mock response
+    with patch("httpx.AsyncClient.post") as mock_post:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"choices": [{"message": {"content": "Mocked response"}}]}
         mock_resp.is_error = False
         mock_post.return_value = mock_resp
         
-        # USE CONTEXT MANAGER to trigger lifespan
         with TestClient(app) as client:
-            # Request with sensitive headers
+            # --- CASE 1: OpenAI Protocol ---
             headers = {
                 "x-clawbrain-session": "test-session-123",
-                "Authorization": "Bearer sk-leaked-key",
+                "Authorization": "Bearer sk-client-key",
                 "X-Custom-Sensitive": "sensitive-value"
             }
             payload = {
@@ -39,29 +31,49 @@ async def test_header_leak_reproduction():
                 "messages": [{"role": "user", "content": "Hello"}]
             }
             
-            # 2. Trigger the request
-            response = client.post("/v1/chat/completions", json=payload, headers=headers)
+            client.post("/v1/chat/completions", json=payload, headers=headers)
+            sent_headers = mock_post.call_args[1].get("headers", {})
             
-            # 3. Check the mocked outgoing request
-            assert mock_post.called
-            args, kwargs = mock_post.call_args
-            sent_headers = kwargs.get("headers", {})
+            assert "Authorization" in sent_headers
+            assert sent_headers["Authorization"] == "Bearer sk-client-key"
+            assert "x-clawbrain-session" not in sent_headers
+            assert "X-Custom-Sensitive" not in sent_headers
+            assert "x-api-key" not in sent_headers
+
+            # --- CASE 2: Anthropic Protocol ---
+            mock_post.reset_mock()
+            headers = {
+                "x-clawbrain-session": "test-session-123",
+                "x-api-key": "ant-sk-client-key",
+                "Authorization": "Bearer sk-should-be-removed"
+            }
+            payload = {
+                "model": "anthropic/claude-3",
+                "messages": [{"role": "user", "content": "Hello"}]
+            }
             
-            print("\n[AUDIT] Sent Headers to Upstream:")
-            for k, v in sent_headers.items():
-                print(f"  {k}: {v}")
-                
-            # ASSERTIONS: These should NOT be present in sent_headers
-            # Note: headers are lowercase in sent_headers usually if passed as dict to httpx, 
-            # or it depends on how they are extracted.
+            client.post("/v1/chat/completions", json=payload, headers=headers)
+            sent_headers = mock_post.call_args[1].get("headers", {})
             
-            leaked_internal = [k for k in sent_headers.keys() if k.lower() == "x-clawbrain-session"]
-            leaked_sensitive = [k for k in sent_headers.keys() if k.lower() == "x-custom-sensitive"]
+            assert "x-api-key" in sent_headers
+            assert sent_headers["x-api-key"] == "ant-sk-client-key"
+            assert "Authorization" not in sent_headers # Should be removed for Anthropic
+            assert "x-clawbrain-session" not in sent_headers
+
+            # --- CASE 3: Ollama (Internal/Local) ---
+            mock_post.reset_mock()
+            headers = {
+                "Authorization": "Bearer sk-should-be-removed"
+            }
+            payload = {
+                "model": "ollama/llama3",
+                "messages": [{"role": "user", "content": "Hello"}]
+            }
             
-            assert not leaked_internal, f"LEAK: x-clawbrain-session forwarded to upstream! ({leaked_internal})"
-            assert not leaked_sensitive, f"LEAK: Custom sensitive header forwarded! ({leaked_sensitive})"
+            client.post("/v1/chat/completions", json=payload, headers=headers)
+            sent_headers = mock_post.call_args[1].get("headers", {})
             
-            print("\n[VERDICT] Reproduction complete. Check assertions above.")
+            assert "Authorization" not in sent_headers # Removed for Ollama by default
 
 if __name__ == "__main__":
     import asyncio

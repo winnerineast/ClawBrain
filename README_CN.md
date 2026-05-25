@@ -6,9 +6,11 @@
   <img src="https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1000&auto=format&fit=crop" width="800" alt="ClawBrain Neural Gateway">
 </p>
 
-ClawBrain 是专为 AI 智能体（特别是 [OpenClaw](https://github.com/openclaw/openclaw)）打造的**基础设施层记忆引擎**。它旨在为智能体提供一个持久、进化且高度精准的“大脑”。
+> [!IMPORTANT]
+> **🚀 最终稳定版 v1.44 发布（项目已圆满结束并关闭）**
+> ClawBrain 已顺利达成所有生产级里程碑。代码库已全面稳定，在 macOS（Apple Silicon）与 Linux 上通过了严格的进程隔离验证，并在回归测试集中实现了 **100% 的通过率**（包含 45+ 个模块，350+ 个断言）。本项目现已正式结项并标记为稳定。
 
-它作为一个透明的神经中转站运行：在协议层自动捕获每一次交互，将零散的对话提纯为语义事实，并在最合适的时机将精准的上下文注入模型提示词——这一切都无需您编写代码或更改智能体的核心配置。
+ClawBrain 是专为 AI 智能体（特别是 [OpenClaw](https://github.com/openclaw/openclaw)）打造的**基础设施层记忆引擎**。它旨在为智能体提供一个持久、进化且高度精准的“大脑”。
 
 ---
 

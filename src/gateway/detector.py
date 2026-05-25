@@ -1,4 +1,4 @@
-# Generated from design/gateway.md v1.33
+# Generated from design/gateway.md v1.43
 from typing import Dict, Any, Tuple
 from src.models import StandardRequest
 

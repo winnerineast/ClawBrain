@@ -3,6 +3,7 @@ import pytest
 import json
 import respx
 import os
+import httpx
 from httpx import Response
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -25,9 +26,20 @@ def visual_audit(test_name, input_summary, expected_keywords, actual):
     print("=" * 60)
     return found
 
+async def is_ollama_online() -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=1.0) as client:
+            resp = await client.get("http://localhost:11434")
+            return resp.status_code == 200
+    except Exception:
+        return False
+
 @pytest.mark.asyncio
 async def test_e2e_multi_round_marathon(tmp_path):
     """E2E: 21-round marathon conversation test against real local services."""
+    if not await is_ollama_online():
+        pytest.skip("Ollama is offline. Skipping real-routing E2E test.")
+        
     clear_chroma_clients()
     os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
     
@@ -55,6 +67,9 @@ async def test_e2e_multi_round_marathon(tmp_path):
 @pytest.mark.asyncio
 async def test_e2e_ollama_chat_lifespan(tmp_path):
     """Simple chat test against real Ollama."""
+    if not await is_ollama_online():
+        pytest.skip("Ollama is offline. Skipping real-routing E2E test.")
+        
     clear_chroma_clients()
     os.environ["CLAWBRAIN_DB_DIR"] = str(tmp_path)
     

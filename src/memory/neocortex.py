@@ -1,4 +1,4 @@
-# Generated from design/memory_neocortex.md v1.4 / GEMINI.md Rule 12
+# Generated from design/memory_neocortex.md v1.5 / GEMINI.md Rule 12
 import sqlite3
 import chromadb
 import httpx
@@ -34,6 +34,7 @@ class Neocortex:
         
         # Distillation Config
         self.url = distill_url or get_env("CLAWBRAIN_DISTILL_URL", "http://127.0.0.1:11434")
+        self.distill_url = self.url
         self.model = distill_model or get_env("CLAWBRAIN_DISTILL_MODEL", "gemma4:e4b")
         self.provider = distill_provider or get_env("CLAWBRAIN_DISTILL_PROVIDER", "ollama")
         self.api_key = get_env("CLAWBRAIN_DISTILL_API_KEY", "")

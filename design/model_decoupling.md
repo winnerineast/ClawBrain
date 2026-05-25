@@ -1,18 +1,21 @@
-# design/model_decoupling.md v1.0
+# design/model_decoupling.md v1.3
 
 ## 1. Objective
-Establish a **Universal LLM Abstraction Layer** for ClawBrain. This module must shield higher-level cognitive components (Neocortex, PageIndex, RoomDetector) from the technical discrepancies of various LLM hosters (Ollama, LM Studio, OMLX, vLLM, sglang, etc.) while providing intelligent, resource-aware model selection.
+Establish a **Universal LLM Abstraction Layer** for ClawBrain. This module must shield higher-level cognitive components (Neocortex, PageIndex, RoomDetector) from the technical discrepancies of various LLM hosters (Ollama, LM Studio, OMLX, vLLM, sglang, etc.) while providing intelligent, resource-aware model selection. **v1.3: Support environment-configurable LLM timeouts via CLAWBRAIN_LLM_TIMEOUT to ensure slow, deep-reasoning models have sufficient time to respond.**
 
 ## 2. Functional Specification
 
-### 2.1 Standardized Interfaces
+## 2.1 Standardized Interfaces
 - **ChatClient**: Provides `generate(prompt, system, **kwargs)` and `chat(messages, **kwargs)`.
     - Automatically handles endpoint variations (e.g., `/api/generate` for Ollama, `/v1/chat/completions` for OpenAI-compatible).
     - Standardizes parameter names (e.g., `num_predict` vs `max_tokens`).
 - **EmbedClient**: Provides `embed(texts)`.
     - Standardizes vector embedding requests across providers.
+- **HardwareProfiler**:
+    - Profiles system memory/VRAM to guide selection.
+    - **`pick_best_model(models: List[str]) -> str`**: Standardized static method to filter out embedding models and select the optimal chat/instruct model from a hoster's available model inventory. Priority is given to instruct/chat variants, and then sorted based on model parameter size.
 
-### 2.2 Intelligent Environment Adaptation
+## 2.2 Intelligent Environment Adaptation
 The module must perform a multi-stage discovery process:
 1.  **Hardware Profiling**:
     - **OS Detection**: Identify macOS (Darwin) vs Ubuntu (Linux).
@@ -23,8 +26,8 @@ The module must perform a multi-stage discovery process:
     - Query active hosters for installed models.
     - Categorize models by size (e.g., 1.5B, 8B, 35B) and capabilities (Chat vs Embed).
 
-### 2.3 Role-Based Model Selection
-The `LLMScheduler` assigns models based on the detected hardware tier and the task's functional requirements:
+## 2.3 Role-Based Model Selection
+The `LLMScheduler` assigns models asynchronously (`select_best_chat()`) based on the detected hardware tier and the task's functional requirements:
 - **`worker` Role (High-volume/Indexing)**:
     - Target: Absolute smallest functional chat model (e.g., 1.5B - 3B).
     - Goal: Maximize speed and stability for recursive summarization.
@@ -34,12 +37,13 @@ The `LLMScheduler` assigns models based on the detected hardware tier and the ta
 - **`embedding` Role**:
     - Target: Dedicated local embedding model (e.g., `nomic-embed`) if available.
 
-### 2.4 Resilience & Health
+## 2.4 Resilience & Health
 - **Strict Response Validation**: Intercept empty LLM responses and signal them as errors to trigger upstream retries.
-- **Pre-flight Health Checks**: Before selecting a model, perform a minimal handshake (`Say OK`) to ensure the model is actually loaded and responding.
+- **Pre-flight Health Checks**: Before selecting a model via the asynchronous `select_best_chat()` method, perform a minimal handshake (`Say OK`) to ensure the model is actually loaded and responding. Skip unhealthy models and fall back gracefully.
 
 ## 3. Implementation Targets
 - `src/utils/llm_client.py`: Universal abstraction and scheduler.
 - `src/memory/neocortex.py`: Update to use `LLMFactory`.
 - `src/memory/page_indexer.py`: Update to use `LLMScheduler`.
 - `src/memory/router.py`: Update to use unified clients.
+

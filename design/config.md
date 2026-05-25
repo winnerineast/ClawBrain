@@ -1,7 +1,7 @@
-# design/config.md v1.0
+# design/config.md v1.2
 
 ## 1. Objective
-Enable **hot-reload** of the ClawBrain provider registry via environment variables. Currently `ProviderRegistry` and the local model whitelist are fully hard-coded; adding a new model or provider requires a source change and restart. This module enables zero-code-change extension at startup.
+Enable **hot-reload** of the ClawBrain provider registry via environment variables. Currently `ProviderRegistry` and the local model whitelist are fully hard-coded; adding a new model or provider requires a source change and restart. This module enables zero-code-change extension at startup. **v1.2: Intelligent Routing Registry with environment-aware dynamic linking.**
 
 ## 2. Architecture
 

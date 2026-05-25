@@ -1,4 +1,4 @@
-# design/gateway.md v1.43
+# design/gateway.md v1.44
 
 ## 1. Objective
 Fully implement ClawBrain Gateway protocol adaptation for major LLM providers. Build a true "universal neural translator" ensuring every platform promised in the README can receive memory-augmented requests through ClawBrain. Simultaneously, complete the structured logging system so every neural activity is fully transparent. **P27 Update: Implement Secure Header Forwarding to prevent credential leakage (Issue #1).**
@@ -62,6 +62,9 @@ To prevent internal cognitive tasks from interfering with the main relay through
 - **Background**: ClawBrain acts as an OpenAI-compatible proxy. When routing requests to Anthropic models (Claude) in streaming mode, the upstream returns Anthropic's Server-Sent Events (SSE) format, which clients expect to be OpenAI format.
 - **Mechanism**: The gateway must intercept the streaming response from Anthropic.
 - **Logic**: Use `DialectTranslator.reverse_stream_anthropic_to_openai` to consume the Anthropic SSE stream and yield OpenAI-compatible `chat.completion.chunk` events.
+
+## 2.10 Routing Priority Hardening (P38)
+- To prevent catch-all POST routes (e.g., `/{path:path}`) from intercepting sub-protocols like MCP JSON-RPC messages (e.g., POST `/mcp/messages`), any mounted sub-apps (e.g., `app.mount("/mcp", mcp_router)`) must be registered **before** catch-all endpoints in the gateway initialization order.
 
 ## 3. Test Specification (TDD & High-Fidelity Audit)
 

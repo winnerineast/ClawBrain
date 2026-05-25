@@ -17,11 +17,28 @@ class ChromaEmbedWrapper(chromadb.api.types.EmbeddingFunction):
     """v1.11: Wrapper for LLMClient.EmbedClient to satisfy ChromaDB's sync interface."""
     def __init__(self, embed_client):
         self.embed_client = embed_client
+        self._count = 0
 
     def __call__(self, input: chromadb.api.types.Documents) -> chromadb.api.types.Embeddings:
         if not self.embed_client:
             return [] # Fallback to Chroma default if none provided
-        return self.embed_client.embed_sync(input)
+        
+        self._count += 1
+        start = time.time()
+        # Progress Indicator for Regression Monitoring
+        sample = input[0][:30].replace("\n", " ") if input else "Empty"
+        print(f"  [EMBED-LOG] Task #{self._count}: Encoding {len(input)} documents... (Sample: '{sample}')", end="\r", flush=True)
+        
+        res = self.embed_client.embed_sync(input)
+        
+        elapsed = time.time() - start
+        if elapsed > 1.0: # Only log slow embeddings
+             print(f"  [EMBED-LOG] Task #{self._count}: Completed in {elapsed:.2f}s{' '*20}", flush=True)
+             
+        return res
+    
+    def name(self) -> str:
+        return f"clawbrain_{self.embed_client.model if self.embed_client else 'default'}"
 
 _CHROMA_CLIENTS = {}
 
@@ -54,19 +71,30 @@ class Hippocampus:
 
         try:
             self.client = get_chroma_client(self.chroma_path)
-            self.traces_col = self.client.get_or_create_collection(
-                name="traces", 
-                metadata={"hnsw:space": "cosine"},
-                embedding_function=self.embed_fn
-            )
-            self.wm_col = self.client.get_or_create_collection(
-                name="wm_state",
-                embedding_function=self.embed_fn
-            )
-            self.entities_col = self.client.get_or_create_collection(
-                name="entities",
-                embedding_function=self.embed_fn
-            )
+            
+            # Helper to safely get or recreate collection on embedding conflict
+            def get_safe_col(name, metadata=None):
+                try:
+                    return self.client.get_or_create_collection(
+                        name=name,
+                        metadata=metadata,
+                        embedding_function=self.embed_fn
+                    )
+                except ValueError as e:
+                    if "embedding function conflict" in str(e).lower():
+                        logger.warning(f"[HIPPO] Embedding conflict for {name}. Rebuilding collection to match new model.")
+                        self.client.delete_collection(name)
+                        return self.client.get_or_create_collection(
+                            name=name,
+                            metadata=metadata,
+                            embedding_function=self.embed_fn
+                        )
+                    raise
+
+            self.traces_col = get_safe_col("traces", metadata={"hnsw:space": "cosine"})
+            self.wm_col = get_safe_col("wm_state")
+            self.entities_col = get_safe_col("entities")
+
             logger.info("[HIPPO] Storage stabilized (session_id unified).")
             self._startup_cleanup()
         except Exception as e:
@@ -203,16 +231,11 @@ class Hippocampus:
             if "Error finding id" in str(e) or "Internal error" in str(e):
                 logger.warning(f"[HIPPO.SEARCH] ChromaDB index lag detected. Falling back to metadata scan for session {session_id}")
                 res = self.traces_col.get(where=where, limit=limit, include=["metadatas", "documents"])
-                # res from get() has a different structure than query()
-                # query() returns {'ids': [[...]], 'distances': [[...]], ...}
-                # get() returns {'ids': [...], 'metadatas': [...], 'documents': [...], ...}
                 if not res or not res["ids"]: return []
                 ids = res["ids"]
                 if include_distances:
-                    # In fallback mode, distance is unknown (assume 0.5/neutral)
                     return [{"id": tid, "distance": 0.5} for tid in ids]
                 return ids
-            
             raise
         
         if not res or not res["ids"] or len(res["ids"]) == 0:
@@ -228,8 +251,6 @@ class Hippocampus:
     def search_lexical(self, tokens: List[str], session_id: str = "default", limit: int = 10) -> List[str]:
         """v1.12: Substring-based retrieval to ensure technical facts (IDs, Ports) are captured."""
         results = set()
-        
-        # Path 1: ChromaDB $contains filter (efficient but strict)
         for token in tokens:
             if len(token) < 3: continue
             try:
@@ -241,9 +262,6 @@ class Hippocampus:
                 if res and res["ids"]:
                     results.update(res["ids"])
             except: pass
-        
-        # Path 2: Brute-force substring match on recent history (Fallback for precision)
-        # If we still have room, scan the last 100 traces manually for this session
         if len(results) < limit:
             recent = self.get_recent_traces(limit=100, session_id=session_id)
             for row in recent:
@@ -253,12 +271,10 @@ class Hippocampus:
                         results.add(row["trace_id"])
                         break
                 if len(results) >= limit: break
-        
         return list(results)[:limit]
 
     def upsert_fact(self, session_id: str, entity: str, key: str, value: str, trace_id: str = None) -> str:
         fid = f"{session_id}_{entity}_{key}".replace(" ", "_")
-        # Phase 60: Ensure fact evolution by overwriting the old document for this unique ID
         self.entities_col.upsert(
             ids=[fid], 
             documents=[value], 

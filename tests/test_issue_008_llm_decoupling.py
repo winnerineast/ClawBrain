@@ -1,4 +1,5 @@
 # Generated from design/model_decoupling.md v1.2
+# Generated-by: 20260522-ISSUE-009-DesignSourceAlignment
 import pytest
 import os
 import respx
@@ -33,7 +34,8 @@ def test_hardware_profiler_tier_logic():
         mock_vram.return_value = 8.0
         assert HardwareProfiler.get_tier() == 3
 
-def test_model_selection_v1_2_logic():
+@pytest.mark.asyncio
+async def test_model_selection_v1_2_logic():
     """Verify model selection picks optimized versions (35b, 9b, etc.)."""
     from src.utils.llm_client import LLMScheduler, LLMFactory
     scheduler = LLMScheduler()
@@ -44,13 +46,17 @@ def test_model_selection_v1_2_logic():
         LLMFactory.get_chat_client("ollama", "url", "phi3:3b"),
     ]
     
-    with patch("src.utils.llm_client.HardwareProfiler.get_tier") as mock_tier:
+    async def dummy_health(*args, **kwargs):
+        return True
+
+    with patch("src.utils.llm_client.HardwareProfiler.get_tier") as mock_tier, \
+         patch("src.utils.llm_client.ChatClient.check_health", new=dummy_health):
         mock_tier.return_value = 1
-        best = scheduler.select_best_chat(role="brain")
+        best = await scheduler.select_best_chat(role="brain")
         assert "35b" in best.model.lower() or "70b" in best.model.lower()
         
         mock_tier.return_value = 2
-        best = scheduler.select_best_chat(role="brain")
+        best = await scheduler.select_best_chat(role="brain")
         assert "9b" in best.model.lower()
 
 # --- 2. Advanced Parameter Pass-through Verification ---
@@ -137,11 +143,12 @@ async def test_gold_standard_ubuntu_ollama_config():
         res = await client.generate("Question")
         assert res == "Reasoned via Ollama"
 
-def test_llmscheduler_embedding_role():
+@pytest.mark.asyncio
+async def test_llmscheduler_embedding_role():
     from src.utils.llm_client import LLMScheduler
     scheduler = LLMScheduler()
     scheduler.embed_pool = [OllamaEmbedClient("http://localhost:11434", "nomic-embed")]
     
-    best = scheduler.select_best_chat(role="embedding")
+    best = await scheduler.select_best_chat(role="embedding")
     assert isinstance(best, EmbedClient)
     assert best.model == "nomic-embed"

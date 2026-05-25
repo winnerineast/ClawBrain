@@ -1,4 +1,4 @@
-# design/memory_vault.md v1.0
+# design/memory_vault.md v1.1
 
 ## 1. Objective
 Enable ClawBrain to integrate local external knowledge bases, specifically Obsidian vaults, as a prioritized "Source of Truth". This feature allows the AI agent to access structured project notes and documentation alongside interaction memory, utilizing a high-performance incremental indexing system.

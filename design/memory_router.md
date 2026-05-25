@@ -1,22 +1,27 @@
-# design/memory_router.md v1.5 (Phase 61)
+# design/memory_router.md v1.20
 
 ## 1. Objective
-Implement the **ClawBrain MemoryRouter v2** — the central cognitive hub that orchestrates the "Breathing Brain" architecture. It must provide an **Asynchronous Sequential Gate** to ensure that memory ingestion, distillation, and assembly for any given session occur in a consistent logical order without race conditions, while decoupling background processing from real-time response generation.
+Implement the **ClawBrain MemoryRouter v2** — the central cognitive hub that orchestrates the "Breathing Brain" architecture. It must provide an **Asynchronous Sequential Gate** to ensure that memory ingestion, distillation, and assembly for any given session occur in a consistent logical order without race conditions, while decoupling background processing from real-time response generation. **v1.20: Implementation of topic-aware semantic retrieval filtering for strict room-based isolation.**
 
 ## 2. Architecture & Logic
 
 ### 2.1 Initialisation & Sub-module Mounting
 - **Constructor parameters**: `db_dir` (default: dynamic), `distill_threshold` (default 50).
-- **Sub-modules**: `Hippocampus`, `Neocortex`, `SignalDecomposer`, `RoomDetector`, `VaultIndexer`.
+- **Intelligent Resource Management**:
+  - **LLMScheduler**: Discovers and benchmarks local/cloud LLMs for specialized tasks.
+  - **Discovery**: Automatically selects the best `embedding` and `chat` models during initialization.
+- **CircuitBreaker**: Prevents cascading failures. Separate breakers for `room_detection`, `distillation`, and `heartbeat`.
+- **Sub-modules**: `Hippocampus`, `Neocortex`, `SignalDecomposer`, `RoomDetector`, `VaultIndexer`, `PageIndexer`.
 - **Per-session Registry**:
   - `self._wm_sessions: Dict[str, WorkingMemory] = {}`
   - `self._session_locks: Dict[str, asyncio.Lock] = {}` — **Phase 32: Per-session concurrency control**.
 
 ### 2.2 Processing Logic
 
-#### 2.2.1 Unified Significance Scoring
+#### 2.2.1 Unified Significance Scoring & Topic-Aware Isolation
 To handle wide and diverse datasets, the Router computes a `Significance Score` for every candidate:
 - `Score = (Anchors * 150) + (Coverage * 80 * (1 + Similarity)) + (Similarity * 20)`
+- **Topic-Aware Retrieval**: The semantic search in `get_combined_context()` must isolate episodic memory by the active room ID of the current session (`self._get_current_room(session_id)`) rather than querying a hardcoded `"general"` room. This guarantees strict privacy and prioritized recall.
 
 #### 2.2.2 Hybrid Retrieval Strategy (PageIndex Integration)
 The Router orchestrates a two-tier retrieval process:
@@ -49,6 +54,7 @@ Context is assembled in order of "Knowledge Density":
 
 ### 2.5 The Breathing Brain (Heartbeat Loop)
 - **Core Concept**: Cognitive background tasks are decoupled from real-time ingestion.
+- **CognitiveWorker**: An internal queue-based worker that executes asynchronous tasks (`topic_detection`, `distill`, `vault_scan`, `build_tree`) to prevent blocking the main heartbeat.
 - **Priority Gating**:
   - **L1/L2 Storage**: MUST be synchronous (blocking) to ensure immediate retrieval in the next turn.
   - **Entity Mentions**: Extracted via fast regex in the request path and stored immediately in the registry to ensure Turn N+1 visibility.
