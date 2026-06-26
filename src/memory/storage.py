@@ -96,6 +96,7 @@ class Hippocampus:
             self.entities_col = get_safe_col("entities")
 
             logger.info("[HIPPO] Storage stabilized (session_id unified).")
+            self._init_sqlite_archive()
             self._startup_cleanup()
         except Exception as e:
             logger.exception(f"[HIPPO] Initialization failed: {e}")
@@ -286,3 +287,80 @@ class Hippocampus:
         if not entities: return []
         res = self.entities_col.get(where={"$and": [{"session_id": session_id}, {"entity": {"$in": entities}}]})
         return [{"entity": m["entity"], "key": m["key"], "value": d, "timestamp": m["timestamp"]} for d, m in zip(res["documents"], res["metadatas"])] if res else []
+
+    def _init_sqlite_archive(self):
+        db_path = self.db_dir / "hippocampus.db"
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS archived_traces (
+                        trace_id TEXT PRIMARY KEY,
+                        session_id TEXT,
+                        room_id TEXT,
+                        timestamp REAL,
+                        payload TEXT
+                    )
+                """)
+                conn.commit()
+        except Exception as e:
+            logger.error(f"[HIPPO.SQLITE] Failed to init archive: {e}")
+
+    def save_to_archive(self, trace_id: str, payload: Dict[str, Any], session_id: str = "default", room_id: str = "general") -> Dict[str, Any]:
+        """Store trace into SQLite archive table."""
+        db_path = self.db_dir / "hippocampus.db"
+        raw_content = json.dumps(payload)
+        now = time.time()
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO archived_traces (trace_id, session_id, room_id, timestamp, payload) VALUES (?, ?, ?, ?, ?)",
+                    (trace_id, session_id, room_id, now, raw_content)
+                )
+                conn.commit()
+        except Exception as e:
+            logger.error(f"[HIPPO.SQLITE] Failed to save archive: {e}")
+        return {
+            "trace_id": trace_id,
+            "session_id": session_id,
+            "room_id": room_id,
+            "timestamp": now,
+            "raw_content": raw_content
+        }
+
+    def get_archived_traces(self, session_id: str = None, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve low-value traces from SQLite archive."""
+        db_path = self.db_dir / "hippocampus.db"
+        if not db_path.exists(): return []
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                if session_id:
+                    cursor.execute(
+                        "SELECT trace_id, session_id, room_id, timestamp, payload FROM archived_traces WHERE session_id = ? ORDER BY timestamp DESC LIMIT ?",
+                        (session_id, limit)
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT trace_id, session_id, room_id, timestamp, payload FROM archived_traces ORDER BY timestamp DESC LIMIT ?",
+                        (limit,)
+                    )
+                rows = cursor.fetchall()
+                results = []
+                for r in rows:
+                    try:
+                        payload = json.loads(r["payload"])
+                    except:
+                        payload = r["payload"]
+                    results.append({
+                        "trace_id": r["trace_id"],
+                        "session_id": r["session_id"],
+                        "room_id": r["room_id"],
+                        "timestamp": r["timestamp"],
+                        "raw_content": r["payload"],
+                        "payload": payload
+                    })
+                return results
+        except Exception as e:
+            logger.error(f"[HIPPO.SQLITE] Failed to read archive: {e}")
+            return []

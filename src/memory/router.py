@@ -1,4 +1,4 @@
-# Generated from design/memory_router.md v1.20 / GEMINI.md Rule 12
+# Generated from design/memory_router.md v1.21 / GEMINI.md Rule 12
 # Generated-by: 20260522-ISSUE-009-DesignSourceAlignment
 import uuid
 import json
@@ -109,6 +109,8 @@ class MemoryRouter:
         self.distill_threshold = distill_threshold
         self.enable_room_detection = enable_room_detection
         self.enable_auto_distill = True; self.enable_auto_scan = enable_auto_scan
+        self.enable_query_expansion = get_env("CLAWBRAIN_ENABLE_QUERY_EXPANSION", "true").lower() == "true"
+        self.enable_late_stage_reranking = get_env("CLAWBRAIN_ENABLE_LATE_STAGE_RERANKING", "true").lower() == "true"
         
         self._wm_sessions: Dict[str, WorkingMemory] = {}
         self._current_rooms: Dict[str, str] = {}
@@ -230,7 +232,8 @@ class MemoryRouter:
             if is_high_value:
                 self.hippo.save_trace(trace_id, stimulus, search_text=search_text, session_id=session_id, room_id=room_id, threshold=offload_threshold)
             else:
-                self._log_event("Cognitive", "L6bFilter", f"Low value trace {trace_id} dropped by cognitive judge", {"session_id": session_id})
+                self.hippo.save_to_archive(trace_id, stimulus, session_id=session_id, room_id=room_id)
+                self._log_event("Cognitive", "L6bFilter", f"Low value trace {trace_id} archived in SQLite by cognitive judge", {"session_id": session_id})
 
             self.hippo.save_wm_state(session_id, wm.items); self._dirty_sessions.add(session_id)
             
@@ -266,7 +269,9 @@ class MemoryRouter:
         if max_chars is None: max_chars = int(get_env("CLAWBRAIN_MAX_CONTEXT_CHARS", 2000))
         await self.wait_until_ready()
         async with self._get_session_lock(session_id):
-            wm = self._get_wm(session_id); l3_summary = self.neo.get_summary(session_id) or ""
+            wm = self._get_wm(session_id)
+            room_id = self._get_current_room(session_id)
+            l3_summary = self.neo.get_summary(session_id, room_id=room_id) or ""
             working_items = wm.get_active_items()
             
             stop_words = {"what", "how", "when", "where", "which", "who", "whom", "this", "that", "these", "those", "does", "done", "list", "tell", "show", "concisely", "reply", "only", "about"}
@@ -284,11 +289,38 @@ class MemoryRouter:
                 score = (hits * 150.0) + (cov * 100.0 * (1.0 + sim)) + (sim * 20.0)
                 return ok, score
 
-            room_id = self._get_current_room(session_id)
-            sem_res = self.hippo.search(query, session_id, room_id, limit=25, include_distances=True)
-            lex_ids = self.hippo.search_lexical(list(hard_anchors) + list(core_subjects)[:5], session_id, limit=25)
-            cmap = {c["id"]: c["distance"] for c in sem_res}
-            for lid in lex_ids:
+            # 1. Query Expansion
+            queries = [query]
+            if self.enable_query_expansion:
+                try:
+                    instruction = (
+                        "You are a Search Assistant. Expand the user query into 2 alternative search formulations or synonyms, focusing on technical identifiers.\n"
+                        "Respond with a JSON list of strings only, e.g. [\"formulation1\", \"formulation2\"]."
+                    )
+                    expanded_str = await self.neo.llm.generate(prompt=query, system=instruction)
+                    match = re.search(r"\[\s*\"[^\"]*\"\s*(?:,\s*\"[^\"]*\"\s*)*\]", expanded_str or "")
+                    if match:
+                        expanded_queries = json.loads(match.group(0))
+                        if isinstance(expanded_queries, list):
+                            queries.extend([q for q in expanded_queries if q and isinstance(q, str)])
+                except Exception as e:
+                    logger.warning(f"[QUERY_EXPANSION] Query expansion failed: {e}")
+
+            # 2. Retrieve L2 Hippocampus Memories
+            cmap = {}
+            lex_results = set()
+            for q in queries:
+                sem_res = self.hippo.search(q, session_id, room_id, limit=25, include_distances=True)
+                for c in sem_res:
+                    tid = c["id"]
+                    dist = c["distance"]
+                    if tid not in cmap or dist < cmap[tid]:
+                        cmap[tid] = dist
+                
+                lex_ids = self.hippo.search_lexical(list(hard_anchors) + list(core_subjects)[:5], session_id, limit=25)
+                lex_results.update(lex_ids)
+                
+            for lid in lex_results:
                 if lid not in cmap: cmap[lid] = 1.0 
             
             reranked, seen = [], set()
@@ -306,11 +338,18 @@ class MemoryRouter:
             if l2_contents:
                 self._log_event("Cognitive", "MemorySearch", f"Semantic hit from Hippocampus (L2) for {session_id}", {"session_id": session_id, "count": len(l2_contents)})
 
+            # 3. Retrieve Vault Memories
             vault_results = []
             if self.vault_indexer:
-                for r in self.vault_indexer.search(query, limit=5):
-                    ok, sc = _is_satisfied(r["content"], r.get("distance", 1.0))
-                    if ok: vault_results.append({"title": r["title"], "content": r["content"], "score": sc})
+                seen_vault = set()
+                for q in queries:
+                    for r in self.vault_indexer.search(q, limit=5):
+                        title = r["title"]
+                        if title in seen_vault: continue
+                        ok, sc = _is_satisfied(r["content"], r.get("distance", 1.0))
+                        if ok:
+                            vault_results.append({"title": title, "content": r["content"], "score": sc})
+                            seen_vault.add(title)
                 
                 if vault_results:
                     logger.info(f"[RETRIEVAL AUDIT] {query} | VAULT_HIT: Y | {vault_results[0]['title']} | {vault_results[0]['score']}")
@@ -340,22 +379,56 @@ class MemoryRouter:
 
                 vault_results.sort(key=lambda x: x["score"], reverse=True)
 
-            if not any([l3_summary, vault_results, l2_contents]): 
+            # 4. Cognitive Judge / Late-Stage Filtering
+            disable_judge = get_env("CLAWBRAIN_DISABLE_COGNITIVE_JUDGE", "false").lower() == "true"
+            filtered_l2_contents = list(l2_contents)
+            filtered_vault_results = list(vault_results)
+            
+            if not disable_judge:
+                if self.enable_late_stage_reranking:
+                    # Select candidates: top 3 L2, top 2 Vault
+                    candidate_snippets = []
+                    mapping = []
+                    
+                    for idx, content in enumerate(l2_contents[:3]):
+                        candidate_snippets.append(content)
+                        mapping.append(("l2", idx))
+                    for idx, r in enumerate(vault_results[:2]):
+                        candidate_snippets.append(r["content"])
+                        mapping.append(("vault", idx))
+                        
+                    if candidate_snippets:
+                        relevant_indices = await self.neo.filter_relevant_snippets(query, candidate_snippets)
+                        relevant_set = set(relevant_indices)
+                        
+                        temp_l2 = []
+                        temp_vault = []
+                        for c_idx, (t_type, orig_idx) in enumerate(mapping):
+                            if c_idx in relevant_set:
+                                if t_type == "l2":
+                                    temp_l2.append(l2_contents[orig_idx])
+                                else:
+                                    temp_vault.append(vault_results[orig_idx])
+                                    
+                        # Admit remaining items beyond the evaluated ones as a safety margin
+                        if len(l2_contents) > 3:
+                            temp_l2.extend(l2_contents[3:])
+                        if len(vault_results) > 2:
+                            temp_vault.extend(vault_results[2:])
+                            
+                        filtered_l2_contents = temp_l2
+                        filtered_vault_results = temp_vault
+                else:
+                    sample = "\n".join([l3_summary] + l2_contents[:1] + [r["content"] for r in vault_results[:1]])
+                    is_truly_relevant = await self.neo.verify_relevance(query, sample)
+                    if not is_truly_relevant:
+                        filtered_l2_contents = []
+                        filtered_vault_results = []
+
+            if not any([l3_summary, filtered_vault_results, filtered_l2_contents]): 
                 self._log_event("Relay", "ContextEnrichment", f"No relevant long-term memory for {session_id}", {"session_id": session_id, "gain": False})
                 return ""
             
-            sample = "\n".join([l3_summary] + l2_contents[:1] + [r["content"] for r in vault_results[:1]])
-            # v1.4: Allow judge bypass for integration tests/constrained environments
-            disable_judge = get_env("CLAWBRAIN_DISABLE_COGNITIVE_JUDGE", "false").lower() == "true"
-            if disable_judge:
-                is_truly_relevant = True
-            else:
-                is_truly_relevant = await self.neo.verify_relevance(query, sample)
-            
-            if not is_truly_relevant: 
-                self._log_event("Relay", "ContextEnrichment", f"Cognitive Judge rejected candidates for {session_id}", {"session_id": session_id, "relevant": False})
-                return ""
-
             output_parts, cur_len = [], 0
             def try_add(header, contents, prefix="- "):
                 nonlocal cur_len
@@ -373,8 +446,8 @@ class MemoryRouter:
 
             if l3_summary: try_add("SYSTEM MEMORY SUMMARY (NEOCORTEX)", [l3_summary])
             try_add("ACTIVE CONVERSATION (WORKING MEMORY)", [it.content for it in working_items])
-            if vault_results: try_add("EXTERNAL KNOWLEDGE (VAULT)", vault_results)
-            try_add("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", l2_contents, prefix="") 
+            if filtered_vault_results: try_add("EXTERNAL KNOWLEDGE (VAULT)", filtered_vault_results)
+            try_add("RELEVANT HISTORICAL SNIPPETS (HIPPOCAMPUS)", filtered_l2_contents, prefix="") 
             res = "[CLAWBRAIN MEMORY]" + "".join(output_parts)
             coupling = "\n\n[COGNITIVE COUPLING]: Cross-reference above facts. Prioritize NEOCORTEX."
             if len(res) + len(coupling) + 20 <= max_chars: res += coupling
@@ -382,7 +455,7 @@ class MemoryRouter:
             final_context = res + "\n[END CLAWBRAIN MEMORY]"
             self._log_event("Relay", "ContextEnrichment", f"Enriched context for {session_id} (+{len(final_context)} chars)", {
                 "session_id": session_id,
-                "sources": {"l3": bool(l3_summary), "l1": len(working_items), "vault": len(vault_results), "l2": len(l2_contents)}
+                "sources": {"l3": bool(l3_summary), "l1": len(working_items), "vault": len(filtered_vault_results), "l2": len(filtered_l2_contents)}
             })
             return final_context
 
@@ -409,8 +482,9 @@ class MemoryRouter:
             recent = self.hippo.get_recent_traces(limit=50, session_id=session_id)
             if recent:
                 payloads = [self.hippo.get_full_payload(t["trace_id"]) for t in recent]
-                await self.neo.distill(session_id, [p for p in payloads if p])
-                self._log_event("Cognitive", "Distillation", f"L3 Neocortex consolidated for {session_id}", {"session_id": session_id})
+                room_id = self._get_current_room(session_id)
+                await self.neo.distill(session_id, [p for p in payloads if p], room_id=room_id)
+                self._log_event("Cognitive", "Distillation", f"L3 Neocortex consolidated for {session_id} in {room_id}", {"session_id": session_id, "room_id": room_id})
             self.cb_distill.record_success()
         except Exception: self.cb_distill.record_failure()
 

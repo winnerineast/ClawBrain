@@ -14,12 +14,12 @@ Implement the **ClawBrain Neocortex** engine from scratch. This engine is respon
   - `distill_provider`: Protocol type (`ollama` or `openai-compatible`).
 - **Storage Strategy (ChromaDB)**:
   - **Collection**: `summaries`
-  - **ID**: `session_id`
+  - **ID**: `session_id::room_id` (or `session_id` if room_id is empty/default)
   - **Document**: The distilled summary text.
-  - **Metadata**: `{"last_updated": float_timestamp}`.
+  - **Metadata**: `{"session_id": session_id, "room_id": room_id, "last_updated": float_timestamp}`.
 
 ### 2.2 Semantic Distillation Engine
-- **Method signature**: `async def distill(session_id: str, traces: List[Dict[str, Any]]) -> str`
+- **Method signature**: `async def distill(session_id: str, traces: List[Dict[str, Any]], room_id: str = "general") -> str`
 - **Unified Client**: Uses `LLMFactory.get_chat_client()` to abstract away provider-specific API logic.
 - **Logic flow**:
   1. Iterate `traces` to build a conversation corpus.
@@ -31,11 +31,11 @@ Implement the **ClawBrain Neocortex** engine from scratch. This engine is respon
 ### 2.4 Subjective Cognitive Judge (L6b Evaluator)
 - **Background**: Replaces the objective "hallucination prevention" judge with a user-specific "Taste/Value Profile" judge.
 - **Mechanism**: The judge must ask: "Does this context contain information relevant to the user query?" with a bias towards technical grounding.
-- **Action**: Before context is finalized, an LLM call (`verify_relevance`) validates the context snippet against the query.
-- **Fail-open**: If the LLM throws an exception (e.g. timeout), the judge defaults to `True` (allowing the context).
+- **Action**: Before context is finalized, an LLM call (`filter_relevant_snippets`) validates a list of context snippets against the query and returns the indices of the relevant ones, resolving the binary all-or-nothing gate issue.
+- **Fail-open**: If the LLM throws an exception (e.g. timeout), all snippets are considered relevant.
 
 ### 2.5 Memory Recall Interface
-- **Method signature**: `def get_summary(session_id: str) -> Optional[str]`
+- **Method signature**: `def get_summary(session_id: str, room_id: str = "general") -> Optional[str]`
 - Reads and returns the latest summary for the given session from ChromaDB.
 
 ## 3. Test Specification (High-Fidelity TDD)

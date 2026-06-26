@@ -42,6 +42,17 @@ The v1.10 update introduces **Biological Bias**, refining the decoupled cognitiv
 
 ---
 
+## 🧠 Paper-Inspired Memory Optimizations (M2/M3/M4)
+
+ClawBrain incorporates advanced cognitive memory system optimizations inspired by recent research:
+
+1. **Late-Stage LLM Reranking (M3)**: Instead of filtering a concatenated context block, retrieved candidates are individually evaluated by the LLM Grounding Judge. Only verified relevant snippets are injected, dramatically reducing hallucination.
+2. **Generative Query Expansion (M3)**: Vague or short user inputs are automatically expanded by the LLM into 2-3 precise technical synonym formulations to query vector and lexical indexes, boosting recall for sparse concepts.
+3. **Segmented Summaries (M4)**: Neocortex summaries are structured and isolated by both `session_id` and `room_id`. Under isolation, retrieval automatically queries room-segmented summaries with a fallback to the `"general"` room.
+4. **Tiered Ingestion (SQLite Archiving) (M2)**: Rather than dropping low-value traces (L6b score < 0.5), ClawBrain performs tiered archiving into a local SQLite `archived_traces` table. This keeps the ChromaDB active index clean while maintaining cold-storage transaction history.
+
+---
+
 ## 💎 The ClawBrain Edge: Verified by Real-World Evidence
 
 ClawBrain is built on **Engineering Transparency**. We prove our claims with raw data from our regression suite.

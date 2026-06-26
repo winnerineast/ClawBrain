@@ -1,10 +1,12 @@
-# Generated from design/memory_neocortex.md v1.5 / GEMINI.md Rule 12
+# Generated from design/memory_neocortex.md v1.6 / GEMINI.md Rule 12
 import sqlite3
 import chromadb
 import httpx
 import time
 import os
 import asyncio
+import re
+import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from src.memory.storage import get_chroma_client
@@ -15,6 +17,7 @@ class Neocortex:
     """
     ClawBrain Semantic Distillation Engine.
     v1.4: Updated to use unified ChatClient and LLMFactory.
+    v1.6: Segmented Topic Summaries and late-stage snippet filtering.
     """
     def __init__(self, db_dir: str = None, distill_url: str = None, distill_model: str = None, 
                  distill_provider: str = None):
@@ -46,7 +49,7 @@ class Neocortex:
         self._cache_lock = asyncio.Lock()
         self.taste_profile = get_env("CLAWBRAIN_TASTE_PROFILE", "Strict technical accuracy. No conversational filler.")
 
-    async def distill(self, session_id: str, traces: List[Dict[str, Any]]) -> str:
+    async def distill(self, session_id: str, traces: List[Dict[str, Any]], room_id: str = "general") -> str:
         """§2.2: Async distillation logic with recursive knowledge merging (Phase 40)."""
         corpus = []
         for t in traces:
@@ -57,7 +60,7 @@ class Neocortex:
         if not corpus: return "[Error] No dialogue to distill."
 
         full_text = "\n".join(corpus)
-        existing_summary = self.get_summary(session_id) or "(No existing summary)"
+        existing_summary = self.get_summary(session_id, room_id=room_id) or "(No existing summary)"
         
         instruction = (
             "You are a professional Memory Distiller. Merge NEW dialogue into the EXISTING summary.\n"
@@ -75,24 +78,31 @@ class Neocortex:
         )
 
         if summary and "[Error]" not in summary:
-            self._save_summary(session_id, summary)
+            self._save_summary(session_id, summary, room_id=room_id)
             return summary
         return summary or "[Error] Empty summary."
 
-    def _save_summary(self, session_id: str, summary: str):
+    def _save_summary(self, session_id: str, summary: str, room_id: str = "general"):
+        summary_id = f"{session_id}::{room_id}" if room_id else session_id
         self.summary_col.upsert(
-            ids=[session_id],
+            ids=[summary_id],
             documents=[summary],
-            metadatas=[{"last_updated": time.time()}]
+            metadatas=[{"session_id": session_id, "room_id": room_id, "last_updated": time.time()}]
         )
 
-    def get_summary(self, session_id: str) -> Optional[str]:
-        res = self.summary_col.get(ids=[session_id])
+    def get_summary(self, session_id: str, room_id: str = "general") -> Optional[str]:
+        summary_id = f"{session_id}::{room_id}" if room_id else session_id
+        res = self.summary_col.get(ids=[summary_id])
         if res and res["documents"]: return res["documents"][0]
+        # Fallback to general room if not found
+        if room_id and room_id != "general":
+            res = self.summary_col.get(ids=[f"{session_id}::general"])
+            if res and res["documents"]: return res["documents"][0]
         return None
 
-    def clear_summary(self, session_id: str):
-        self.summary_col.delete(ids=[session_id])
+    def clear_summary(self, session_id: str, room_id: str = "general"):
+        summary_id = f"{session_id}::{room_id}" if room_id else session_id
+        self.summary_col.delete(ids=[summary_id])
 
     async def verify_relevance(self, query: str, context_sample: str) -> bool:
         instruction = (
@@ -107,3 +117,34 @@ class Neocortex:
             return "YES" in (result or "").upper()
         except Exception:
             return True # Fail-open
+
+    async def filter_relevant_snippets(self, query: str, snippets: List[str]) -> List[int]:
+        """Ask LLM Grounding Judge to filter out irrelevant snippets individually, returning the indices of relevant ones."""
+        if not snippets: return []
+        
+        snippet_blocks = []
+        for idx, s in enumerate(snippets):
+            snippet_blocks.append(f"SNIPPET {idx}:\n{s[:800]}")
+            
+        candidates_str = "\n\n".join(snippet_blocks)
+        
+        instruction = (
+            "You are a Grounding Judge. Evaluate which of the snippets are relevant to the USER QUERY.\n"
+            "Be generous: if there is a logical or technical connection, mark the snippet as relevant.\n"
+            "Respond ONLY with a JSON list of integers containing the indices of relevant snippets, e.g. [0, 2]."
+        )
+        prompt = f"USER QUERY: {query}\n\nCANDIDATES:\n{candidates_str}"
+        
+        try:
+            result = await self.llm.generate(prompt=prompt, system=instruction)
+            match = re.search(r"\[\s*\d*\s*(?:,\s*\d*\s*)*\]", result or "")
+            if match:
+                indices = json.loads(match.group(0))
+                return [int(i) for i in indices if 0 <= int(i) < len(snippets)]
+            ints = [int(i) for i in re.findall(r"\d+", result or "")]
+            valid_ints = [i for i in ints if 0 <= i < len(snippets)]
+            if valid_ints: return list(set(valid_ints))
+        except Exception as e:
+            logger.warning(f"[NEOCORTEX] Snippet filtering failed: {e}")
+            
+        return list(range(len(snippets)))
