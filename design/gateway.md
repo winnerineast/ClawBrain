@@ -1,7 +1,7 @@
-# design/gateway.md v1.44
+# design/gateway.md v1.45
 
 ## 1. Objective
-Fully implement ClawBrain Gateway protocol adaptation for major LLM providers. Build a true "universal neural translator" ensuring every platform promised in the README can receive memory-augmented requests through ClawBrain. Simultaneously, complete the structured logging system so every neural activity is fully transparent. **P27 Update: Implement Secure Header Forwarding to prevent credential leakage (Issue #1).**
+Fully implement ClawBrain Gateway protocol adaptation for major LLM providers. Build a true "universal neural translator" ensuring every platform promised in the README can receive memory-augmented requests through ClawBrain. Simultaneously, complete the structured logging system so every neural activity is fully transparent. **P27 Update: Implement Secure Header Forwarding to prevent credential leakage (Issue #1).** **v1.45: Verify integration compatibility with Nous-Hermes model family and configure tests.**
 
 ## 2. Architecture
 
@@ -66,12 +66,21 @@ To prevent internal cognitive tasks from interfering with the main relay through
 ## 2.10 Routing Priority Hardening (P38)
 - To prevent catch-all POST routes (e.g., `/{path:path}`) from intercepting sub-protocols like MCP JSON-RPC messages (e.g., POST `/mcp/messages`), any mounted sub-apps (e.g., `app.mount("/mcp", mcp_router)`) must be registered **before** catch-all endpoints in the gateway initialization order.
 
+### 2.11 Upstream Model Compatibility & Hermes Integration
+- **Concept**: Ensure ClawBrain correctly forwards requests to the `Nous-Hermes` (or generic `hermes`) model family. The gateway should translate client payloads using either `lmstudio` or `ollama` endpoints and ensure the memory injection pipeline preserves context.
+- **Routing**: Strip `lmstudio/` prefix (leaving raw model `NousResearch/Hermes-3-Llama-3.1-8B` or similar) when routing via OpenAI-compatible LM Studio port, or forward directly to Ollama when using the `ollama/` prefix.
+
 ## 3. Test Specification (TDD & High-Fidelity Audit)
 
 ### 3.3 Secure Header Leak Audit (New)
 - **Audit Case**: Send a request with `x-clawbrain-session` and `Authorization`.
 - **Verification**: Mock the upstream client and assert that `x-clawbrain-session` is absent and `Authorization` is only present if appropriate for the protocol.
 
+### 3.4 Hermes Integration Audit (New)
+- **Audit Case**: Send a chat completion request using a Hermes model prefix (e.g., `lmstudio/nous-hermes` and `ollama/nous-hermes`) through the `/v1/chat/completions` and `/api/chat` endpoints.
+- **Verification**: Mock downstream connections, assert that the prefix is stripped correctly, context is successfully injected, and standard responses are translated.
+
 ## 4. Output Targets
 - `src/main.py`: Implement the secure header filtering and auth override logic.
 - `tests/reproduce_issue_1.py`: Acceptance test for the fix.
+- `tests/test_p71_hermes_integration.py`: Verify Hermes integration and routing.
